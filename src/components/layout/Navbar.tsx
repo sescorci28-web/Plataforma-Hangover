@@ -56,32 +56,36 @@ export function Navbar({ user }: NavbarProps) {
           </nav>
 
           {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-4">
-            {user ? (
-              <>
-                <Link href={`/dashboard/${user.type}`} className="text-sm font-medium text-white hover:text-primary-300 transition-colors">
-                  Dashboard
-                </Link>
-                <form action={logout}>
-                  <button type="submit" className="text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-white px-5 py-2.5 rounded-full transition-all">
-                    Cerrar Sesión
-                  </button>
-                </form>
-              </>
-            ) : (
-              <>
-                <Link href="/login" className="text-sm font-medium text-white hover:text-primary-300 transition-colors">
-                  Iniciar Sesión
-                </Link>
-                <Link
-                  href="/register"
-                  className="text-sm font-medium bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-full transition-all glow"
-                >
-                  Regístrate
-                </Link>
-              </>
-            )}
-          </div>
+           <div className="hidden md:flex items-center gap-4">
+  {user ? (
+    <>
+      <Link href={`/dashboard/${user.type}`} className="text-sm font-medium text-white hover:text-primary-300 transition-colors">
+        Dashboard
+      </Link>
+
+      <button
+        type="button"
+        onClick={logout}
+        className="text-sm font-medium bg-zinc-800 hover:bg-zinc-700 text-white px-5 py-2.5 rounded-full transition-colors"
+      >
+        Cerrar Sesión
+      </button>
+    </>
+  ) : (
+    <>
+      <Link href="/login" className="text-sm font-medium text-white hover:text-primary-300 transition-colors">
+        Iniciar Sesión
+      </Link>
+      <Link
+        href="/register"
+        className="text-sm font-medium bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-full transition-colors"
+      >
+        Regístrate
+      </Link>
+    </>
+  )}
+</div>
+          
 
           {/* Mobile Menu Button */}
           <button
