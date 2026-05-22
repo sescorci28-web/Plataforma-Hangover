@@ -2,18 +2,26 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Menu, X, Wine } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
-import { logout } from "@/app/(auth)/actions";
+import { createClient } from "@/lib/supabase/client";
 
 interface NavbarProps {
   user: { email: string | undefined; type: string } | null;
 }
 
 export function Navbar({ user }: NavbarProps) {
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const logout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.refresh();
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -122,11 +130,13 @@ export function Navbar({ user }: NavbarProps) {
                 <Link href={`/dashboard/${user.type}`} className="text-zinc-300 hover:text-white py-2">
                   Dashboard
                 </Link>
-                <form action={logout}>
-                  <button type="submit" className="w-full text-center bg-zinc-800 text-white px-4 py-3 rounded-xl mt-2 transition-all">
-                    Cerrar Sesión
-                  </button>
-                </form>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="w-full text-center bg-zinc-800 text-white px-4 py-3 rounded-xl mt-2 transition-all"
+                >
+                  Cerrar Sesión
+                </button>
               </>
             ) : (
               <>
