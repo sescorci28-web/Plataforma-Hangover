@@ -50,7 +50,7 @@ export function Navbar({ user }: NavbarProps) {
             <Link href="/services" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
               Servicios
             </Link>
-            <Link href="/venues" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
+            <Link href="/discotecas" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
               Discotecas
             </Link>
           </nav>
@@ -108,7 +108,7 @@ export function Navbar({ user }: NavbarProps) {
             <Link href="/services" className="text-zinc-300 hover:text-white py-2">
               Servicios
             </Link>
-            <Link href="/venues" className="text-zinc-300 hover:text-white py-2">
+            <Link href="/discotecas" className="text-zinc-300 hover:text-white py-2">
               Discotecas
             </Link>
             <hr className="border-white/10 my-2" />
