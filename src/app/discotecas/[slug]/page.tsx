@@ -167,17 +167,16 @@ export default async function ClubDetailPage({ params }: PageProps) {
         </div>
 
         {/* Details Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-10">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,420px)] gap-8 mt-10 items-start">
           {/* Main Description (Left Side) */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6">
             <div className="space-y-4">
               <h2 className="text-2xl font-bold text-white font-outfit">Sobre {club.name}</h2>
               <p className="text-zinc-300 text-base leading-relaxed whitespace-pre-line">
                 {club.description || "Esta discoteca no cuenta con una descripción detallada en este momento."}
               </p>
             </div>
-            
-            {/* Ambient Highlights / Premium Experience Callouts */}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
               <div className="p-5 rounded-2xl border border-white/5 bg-gradient-to-tr from-white/5 to-transparent">
                 <h4 className="font-bold text-white mb-2 text-sm font-outfit">Servicio de Reservas</h4>
@@ -188,75 +187,63 @@ export default async function ClubDetailPage({ params }: PageProps) {
                 <p className="text-xs text-zinc-400">Acceso seguro con control digital de entradas. Tu diversión está protegida con Hangover.</p>
               </div>
             </div>
-          </div>
 
-          {/* Quick Info & Stats (Right Side) */}
-          <div className="space-y-6">
-            <div className="glass-card p-6 border-white/10 space-y-6 shadow-xl">
-              <h3 className="text-lg font-bold text-white font-outfit pb-3 border-b border-white/5">
-                Detalles del Club
-              </h3>
-
-              <div className="space-y-5">
-                {/* Dirección Física */}
-                {club.address && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {club.address && (
+                <div className="p-5 rounded-2xl border border-white/5 bg-black/30">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Dirección</p>
                   <div className="flex gap-3">
                     <MapPin className="w-5 h-5 text-accent-400 shrink-0 mt-0.5" />
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Dirección</p>
-                      <p className="text-xs text-zinc-300 leading-relaxed">{club.address}</p>
-                    </div>
+                    <p className="text-sm text-zinc-300 leading-relaxed">{club.address}</p>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Horario de Apertura */}
-                {club.opening_hours && (
+              {club.opening_hours && (
+                <div className="p-5 rounded-2xl border border-white/5 bg-black/30">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Horario</p>
                   <div className="flex gap-3">
                     <Clock className="w-5 h-5 text-primary-400 shrink-0 mt-0.5" />
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Horario de Apertura</p>
-                      <p className="text-xs text-zinc-300 leading-relaxed">{club.opening_hours}</p>
-                    </div>
+                    <p className="text-sm text-zinc-300 leading-relaxed">{club.opening_hours}</p>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Instagram Handle */}
-                {club.instagram && (
+              {club.instagram && (
+                <div className="p-5 rounded-2xl border border-white/5 bg-black/30 sm:col-span-2">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Redes Sociales</p>
                   <div className="flex gap-3">
                     <InstagramIcon className="w-5 h-5 text-primary-400 shrink-0 mt-0.5" />
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Redes Sociales</p>
-                      <a 
-                        href={`https://instagram.com/${club.instagram.replace('@', '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary-400 hover:text-primary-300 transition-colors hover:underline font-semibold"
-                      >
-                        {club.instagram}
-                      </a>
-                    </div>
+                    <a
+                      href={`https://instagram.com/${club.instagram.replace('@', '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary-400 hover:text-primary-300 transition-colors hover:underline font-semibold"
+                    >
+                      {club.instagram}
+                    </a>
                   </div>
-                )}
-              </div>
-
-              {/* Action VIP Booking Button */}
-              <div className="pt-4">
-                <ClubBookingModal
-                  club={{
-                    id: club.id,
-                    name: club.name,
-                    provider_id: club.provider_id ?? null,
-                  }}
-                  isAuthenticated={Boolean(user)}
-                  defaultClientName={
-                    user?.user_metadata?.full_name ||
-                    user?.user_metadata?.name ||
-                    user?.email?.split("@")[0] ||
-                    ""
-                  }
-                />
-              </div>
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* Reserva premium (Right Side) */}
+          <div className="w-full xl:max-w-md xl:justify-self-end">
+            <ClubBookingModal
+              club={{
+                id: club.id,
+                name: club.name,
+                provider_id: club.provider_id ?? null,
+              }}
+              isAuthenticated={Boolean(user)}
+              defaultClientName={
+                user?.user_metadata?.full_name ||
+                user?.user_metadata?.name ||
+                user?.email?.split("@")[0] ||
+                ""
+              }
+            />
           </div>
         </div>
       </div>
