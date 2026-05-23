@@ -44,6 +44,8 @@ ALTER TABLE public.bookings
   ADD COLUMN IF NOT EXISTS event_time TIME DEFAULT '00:00:00';
 
 DO $$
+DECLARE
+  check_constraint_name TEXT;
 BEGIN
   IF EXISTS (
     SELECT 1
@@ -53,6 +55,30 @@ BEGIN
       AND column_name = 'service_id'
   ) THEN
     ALTER TABLE public.bookings ALTER COLUMN service_id DROP NOT NULL;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'bookings'
+      AND column_name = 'event_id'
+  ) THEN
+    ALTER TABLE public.bookings ALTER COLUMN event_id DROP NOT NULL;
+  END IF;
+
+  SELECT tc.constraint_name INTO check_constraint_name
+  FROM information_schema.table_constraints tc
+  JOIN information_schema.check_constraints cc
+    ON tc.constraint_name = cc.constraint_name
+   AND tc.constraint_schema = cc.constraint_schema
+  WHERE tc.table_schema = 'public'
+    AND tc.table_name = 'bookings'
+    AND tc.constraint_type = 'CHECK'
+    AND cc.check_clause ILIKE '%service_or_event%';
+
+  IF check_constraint_name IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS %I', check_constraint_name);
   END IF;
 END $$;
 

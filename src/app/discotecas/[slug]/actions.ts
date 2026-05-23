@@ -28,6 +28,20 @@ function buildBookingNotes(customerName: string, guestCount: number, comment: st
   return parts.join(' | ')
 }
 
+type ClubBookingPayload = {
+  user_id: string
+  provider_id: string
+  club_id: string
+  club_slug: string
+  reservation_date: string
+  event_date: string
+  event_time: string
+  number_of_people: number
+  total_amount: number
+  notes: string
+  status: 'pending'
+}
+
 async function ensureUserProfile(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data: profile } = await supabase
     .from('profiles')
@@ -120,11 +134,11 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
     const totalAmount = Number((guestCount * 100).toFixed(2))
     const notes = buildBookingNotes(customerName, guestCount, comment)
 
-    const { error: bookingError } = await supabase.from('bookings').insert({
+    const bookingPayload: ClubBookingPayload = {
       user_id: user.id,
       provider_id: club.provider_id,
       club_id: club.id,
-      club_slug: club.slug,
+      club_slug: club.slug || '',
       reservation_date: reservationDate,
       event_date: reservationDate,
       event_time: '00:00:00',
@@ -132,7 +146,9 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
       total_amount: totalAmount,
       notes,
       status: 'pending',
-    })
+    }
+
+    const { error: bookingError } = await supabase.from('bookings').insert(bookingPayload)
 
     if (bookingError) {
       return { error: `No se pudo guardar la reserva: ${bookingError.message}` }

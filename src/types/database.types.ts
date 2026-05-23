@@ -44,9 +44,14 @@ export interface Booking {
   provider_id: string | null;
   service_id: string | null;
   event_id: string | null;
-  event_date: string;
+  club_id: string | null;
+  club_slug: string | null;
+  reservation_date: string | null;
+  event_date: string | null;
+  event_time: string | null;
+  number_of_people: number | null;
   total_amount: number;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
   notes: string | null;
   created_at: string;
   updated_at: string;
