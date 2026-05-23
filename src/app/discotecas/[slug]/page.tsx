@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { ClubBookingModal } from "@/components/discotecas/ClubBookingModal";
 import { Sparkles, MapPin, Star, Clock, ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
 
@@ -31,6 +32,8 @@ function InstagramIcon({ className }: { className?: string }) {
 export default async function ClubDetailPage({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
 
   // Fetch the specific club matching the slug
   const { data: club, error } = await supabase
@@ -238,11 +241,20 @@ export default async function ClubDetailPage({ params }: PageProps) {
 
               {/* Action VIP Booking Button */}
               <div className="pt-4">
-                <button
-                  className="w-full inline-flex justify-center items-center gap-2 bg-primary-600/50 text-zinc-300 border border-white/5 rounded-xl py-3 px-4 font-semibold text-sm cursor-default"
-                >
-                  Reservar Mesa VIP / Entradas (Próximamente)
-                </button>
+                <ClubBookingModal
+                  club={{
+                    id: club.id,
+                    name: club.name,
+                    provider_id: club.provider_id ?? null,
+                  }}
+                  isAuthenticated={Boolean(user)}
+                  defaultClientName={
+                    user?.user_metadata?.full_name ||
+                    user?.user_metadata?.name ||
+                    user?.email?.split("@")[0] ||
+                    ""
+                  }
+                />
               </div>
             </div>
           </div>
