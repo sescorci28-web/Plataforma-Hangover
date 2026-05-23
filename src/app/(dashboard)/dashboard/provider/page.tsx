@@ -75,39 +75,57 @@ export default async function ProviderDashboard() {
   const servicesCount = services ? services.length : 0;
 
   // Fetch real bookings requested for this provider with try-catch
-  let bookings = null;
+  let bookings: any[] = [];
   let isBookingsError = false;
 
   try {
     const { data, error } = await supabase
       .from("bookings")
-      .select(`
-        id,
-        event_date,
-        total_amount,
-        status,
-        notes,
-        user:profiles!bookings_user_id_fkey (
-          full_name
-        ),
-        service:services (
-          title
-        )
-      `)
+      .select("id, event_date, reservation_date, total_amount, status, notes, user_id, club_id, club_slug, number_of_people")
       .eq("provider_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
       isBookingsError = true;
     } else {
-      bookings = data;
+      bookings = data || [];
     }
   } catch (err) {
     isBookingsError = true;
   }
 
-  const bookingsCount = bookings ? bookings.length : 0;
-  const pendingBookingsCount = bookings ? bookings.filter((b) => b.status === "pending").length : 0;
+  let normalizedBookings = bookings || [];
+
+  if (normalizedBookings.length > 0) {
+    const userIds = [...new Set(normalizedBookings.map((booking: any) => booking.user_id).filter(Boolean))];
+    const clubIds = [...new Set(normalizedBookings.map((booking: any) => booking.club_id).filter(Boolean))];
+
+    const [userProfilesResult, clubsResult] = await Promise.all([
+      userIds.length
+        ? supabase.from("profiles").select("id, full_name").in("id", userIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null }> }),
+      clubIds.length
+        ? supabase.from("clubs").select("id, name").in("id", clubIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+    ]);
+
+    const userMap = new Map((userProfilesResult.data || []).map((item) => [item.id, item]));
+    const clubMap = new Map((clubsResult.data || []).map((item) => [item.id, item]));
+
+    normalizedBookings = normalizedBookings.map((booking: any) => {
+      const club = booking.club_id ? clubMap.get(booking.club_id) || null : null;
+
+      return {
+        ...booking,
+        user: booking.user_id ? userMap.get(booking.user_id) || null : null,
+        club,
+        title: club?.name || booking.club_slug || "Reserva de discoteca",
+      };
+    });
+  }
+
+  const bookingsCount = normalizedBookings.length;
+  const pendingBookingsCount = normalizedBookings.filter((b: any) => b.status === "pending").length;
 
   // Calculate monthly earnings from completed/confirmed bookings
   const monthlyEarnings = bookings
@@ -115,12 +133,6 @@ export default async function ProviderDashboard() {
         .filter((b) => b.status === "confirmed" || b.status === "completed")
         .reduce((sum, b) => sum + Number(b.total_amount), 0)
     : 0;
-
-  // Fallback demo requests if no real requests exist yet
-  const demoRequests = [
-    { id: "demo-1", user: "María G. (Demo)", date: "15 Jun 2026", type: "DJ Set - Boda", status: "Nueva Solicitud", amount: "$800" },
-    { id: "demo-2", user: "Carlos R. (Demo)", date: "20 Jun 2026", type: "DJ Set - Cumpleaños", status: "Pendiente", amount: "$450" },
-  ];
 
   const initials = activeProfile.full_name
     ? activeProfile.full_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
@@ -275,12 +287,12 @@ export default async function ProviderDashboard() {
             </div>
             
             <div className="space-y-4">
-              {bookings && bookings.length > 0 ? (
-                bookings.map((req) => (
+              {normalizedBookings.length > 0 ? (
+                normalizedBookings.map((req: any) => (
                   <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-black/40 rounded-xl border border-white/5">
                     <div className="flex items-start gap-4 mb-4 sm:mb-0">
                       <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-semibold shrink-0">
-                        {req.user ? (req.user as any).full_name.charAt(0) : "U"}
+                        {(req.user as any)?.full_name?.charAt(0) || "U"}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -292,6 +304,8 @@ export default async function ProviderDashboard() {
                               ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 border-solid'
                               : req.status === 'pending'
                               ? 'bg-amber-500/10 text-amber-300 border-amber-500/20 border-solid'
+                              : req.status === 'rejected'
+                              ? 'bg-red-500/10 text-red-300 border-red-500/20 border-solid'
                               : 'bg-red-500/10 text-red-300 border-red-500/20 border-solid'
                           }`}>
                             {req.status === 'confirmed'
@@ -300,12 +314,17 @@ export default async function ProviderDashboard() {
                               ? 'completada'
                               : req.status === 'pending'
                               ? 'pendiente'
+                              : req.status === 'rejected'
+                              ? 'rechazada'
                               : 'cancelada'}
                           </span>
                         </div>
                         <p className="text-sm text-zinc-400">
-                          {(req.service as any)?.title || "Servicio solicitado"} • {new Date(req.event_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {req.title} • {new Date(req.event_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </p>
+                        {req.number_of_people ? (
+                          <p className="text-xs text-zinc-500 mt-1">{req.number_of_people} personas</p>
+                        ) : null}
                         {req.notes && <p className="text-xs text-zinc-500 mt-1 italic">Nota: "{req.notes}"</p>}
                         <p className="text-sm font-medium text-emerald-400 mt-1">${req.total_amount}</p>
                       </div>
@@ -314,38 +333,11 @@ export default async function ProviderDashboard() {
                   </div>
                 ))
               ) : (
-                <>
-                  <div className="text-center py-6 text-zinc-500 text-sm border-b border-white/5 mb-4">
-                    {isBookingsError ? "No se pudieron obtener solicitudes de reserva de la base de datos." : "No tienes solicitudes de reservas reales pendientes."} Mostrando demostración:
-                  </div>
-                  {demoRequests.map((req) => (
-                    <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-black/40 rounded-xl border border-white/5 opacity-60">
-                      <div className="flex items-start gap-4 mb-4 sm:mb-0">
-                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-semibold shrink-0">
-                          {req.user.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-white">{req.user}</h4>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-accent-500/20 text-accent-300">
-                              {req.status}
-                            </span>
-                          </div>
-                          <p className="text-sm text-zinc-400">{req.type} • {req.date}</p>
-                          <p className="text-sm font-medium text-emerald-400 mt-1">{req.amount}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 w-full sm:w-auto">
-                        <button className="flex-1 sm:flex-none px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-medium transition-colors">
-                          Ver Detalles
-                        </button>
-                        <button className="flex-1 sm:flex-none px-4 py-2 bg-accent-600 hover:bg-accent-500 rounded-lg text-sm font-medium text-white transition-colors">
-                          Aceptar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </>
+                <div className="text-center py-6 text-zinc-500 text-sm border-b border-white/5 mb-4">
+                  {isBookingsError
+                    ? "No se pudieron obtener solicitudes de reserva de la base de datos. Revisa las políticas de RLS y ejecuta el script de integración."
+                    : "No tienes solicitudes de reservas reales pendientes."}
+                </div>
               )}
             </div>
           </div>

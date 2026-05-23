@@ -11,9 +11,12 @@ interface BookingActionsProps {
 
 export function BookingActions({ bookingId, currentStatus }: BookingActionsProps) {
   const [isPending, startTransition] = useTransition();
-  const [actionType, setActionType] = useState<"confirm" | "cancel" | "complete" | null>(null);
+  const [actionType, setActionType] = useState<"confirm" | "reject" | "complete" | null>(null);
 
-  const handleAction = (status: "confirmed" | "cancelled" | "completed", type: "confirm" | "cancel" | "complete") => {
+  const handleAction = (
+    status: "confirmed" | "rejected" | "completed",
+    type: "confirm" | "reject" | "complete"
+  ) => {
     setActionType(type);
     startTransition(async () => {
       await updateBookingStatus(bookingId, status);
@@ -30,11 +33,11 @@ export function BookingActions({ bookingId, currentStatus }: BookingActionsProps
       {currentStatus === "pending" && (
         <>
           <button
-            onClick={() => handleAction("cancelled", "cancel")}
+            onClick={() => handleAction("rejected", "reject")}
             disabled={isPending}
             className="flex-1 sm:flex-none px-4 py-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5 text-zinc-300 hover:text-white border border-white/5"
           >
-            {isPending && actionType === "cancel" ? (
+            {isPending && actionType === "reject" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
             ) : (
               <X className="w-3.5 h-3.5 text-red-400" />
@@ -60,16 +63,16 @@ export function BookingActions({ bookingId, currentStatus }: BookingActionsProps
       {currentStatus === "confirmed" && (
         <>
           <button
-            onClick={() => handleAction("cancelled", "cancel")}
+            onClick={() => handleAction("rejected", "reject")}
             disabled={isPending}
             className="flex-1 sm:flex-none px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 disabled:opacity-50 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5 text-red-400 hover:text-red-300"
           >
-            {isPending && actionType === "cancel" ? (
+            {isPending && actionType === "reject" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" />
             ) : (
               <X className="w-3.5 h-3.5" />
             )}
-            Cancelar
+            Rechazar
           </button>
 
           <button

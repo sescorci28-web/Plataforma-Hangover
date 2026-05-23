@@ -54,52 +54,52 @@ export default async function UserDashboard() {
     redirect(`/dashboard/${profile.role}`);
   }
 
-  // Fetch real user bookings with try-catch to avoid crashing if table doesn't exist
-  let bookings = null;
+  // Fetch real user bookings with try-catch and enrich them using the club reference
+  let bookings: any[] = [];
   let isBookingsError = false;
-  
+
   try {
     const { data, error } = await supabase
       .from("bookings")
-      .select(`
-        id,
-        event_date,
-        total_amount,
-        status,
-        services (
-          title
-        ),
-        events (
-          title
-        )
-      `)
+      .select("id, event_date, reservation_date, number_of_people, total_amount, status, notes, club_id, club_slug")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
       isBookingsError = true;
     } else {
-      bookings = data;
+      bookings = data || [];
     }
   } catch (err) {
     isBookingsError = true;
   }
 
-  // Fallback demo bookings if no real bookings exist or query fails
-  const demoBookings = [
-    { id: "demo-1", title: "Reserva DJ Neon (Demo)", date: "24 Mayo 2026", status: "Confirmado", amount: "$350" },
-    { id: "demo-2", title: "Entradas VIP Neon Club (Demo)", date: "28 Mayo 2026", status: "Pendiente", amount: "$120" },
-  ];
+  const clubIds = [...new Set(bookings.map((booking: any) => booking.club_id).filter(Boolean))];
+  const clubNames = new Map<string, string>();
 
-  const hasRealBookings = bookings && bookings.length > 0;
-  const bookingsCount = bookings ? bookings.length : 0;
-  
+  if (clubIds.length > 0) {
+    const { data: clubsData } = await supabase
+      .from("clubs")
+      .select("id, name")
+      .in("id", clubIds);
+
+    (clubsData || []).forEach((club: any) => {
+      clubNames.set(club.id, club.name);
+    });
+  }
+
+  const normalizedBookings = bookings.map((booking: any) => ({
+    ...booking,
+    title: clubNames.get(booking.club_id) || booking.club_slug || "Reserva de discoteca",
+    displayDate: booking.reservation_date || booking.event_date,
+  }));
+
+  const bookingsCount = normalizedBookings.length;
+
   // Calculate total spent on completed/confirmed bookings
-  const totalSpent = bookings
-    ? bookings
-        .filter((b) => b.status === "confirmed" || b.status === "completed")
-        .reduce((sum, b) => sum + Number(b.total_amount), 0)
-    : 0;
+  const totalSpent = normalizedBookings
+    .filter((b: any) => b.status === "confirmed" || b.status === "completed")
+    .reduce((sum: number, b: any) => sum + Number(b.total_amount), 0);
 
   const initials = activeProfile.full_name
     ? activeProfile.full_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
@@ -236,7 +236,7 @@ export default async function UserDashboard() {
           </div>
 
           {/* User Bookings tabs showing separate states */}
-          <UserBookingsTabs initialBookings={bookings || []} />
+          <UserBookingsTabs initialBookings={normalizedBookings} />
         </div>
       </div>
     </div>

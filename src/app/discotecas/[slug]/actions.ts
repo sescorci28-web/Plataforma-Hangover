@@ -18,7 +18,7 @@ function parseGuestCount(value: FormDataEntryValue | null) {
   return Math.max(1, Math.floor(parsed))
 }
 
-function formatBookingNote(customerName: string, guestCount: number, comment: string) {
+function buildBookingNotes(customerName: string, guestCount: number, comment: string) {
   const parts = [`Cliente: ${customerName}`, `Personas: ${guestCount}`]
 
   if (comment.trim()) {
@@ -57,38 +57,6 @@ async function ensureUserProfile(supabase: Awaited<ReturnType<typeof createClien
   }
 }
 
-async function getOrCreateClubService(supabase: Awaited<ReturnType<typeof createClient>>, club: { id: string; name: string; provider_id: string }) {
-  const { data: existingService } = await supabase
-    .from('services')
-    .select('id, title')
-    .eq('provider_id', club.provider_id)
-    .eq('description', `club_reservation:${club.id}`)
-    .maybeSingle()
-
-  if (existingService) {
-    return existingService
-  }
-
-  const { data: insertedService, error: insertError } = await supabase
-    .from('services')
-    .insert({
-      provider_id: club.provider_id,
-      title: `${club.name} — Reserva VIP`,
-      description: `club_reservation:${club.id}`,
-      price: 0,
-      category: 'discotecas',
-      image_url: null,
-    })
-    .select('id, title')
-    .single()
-
-  if (insertError || !insertedService) {
-    throw new Error(insertError?.message || 'No se pudo crear el servicio de reserva para la discoteca.')
-  }
-
-  return insertedService
-}
-
 export async function createClubReservation(_: ClubBookingState, formData: FormData): Promise<ClubBookingState> {
   const supabase = await createClient()
 
@@ -120,12 +88,14 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
   }
 
   const reservationDateObj = new Date(`${reservationDate}T00:00:00`)
+
   if (Number.isNaN(reservationDateObj.getTime())) {
     return { error: 'La fecha ingresada no es válida.' }
   }
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+
   if (reservationDateObj.getTime() < today.getTime()) {
     return { error: 'La fecha de reserva no puede ser anterior a hoy.' }
   }
@@ -135,7 +105,7 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
 
     const { data: club, error: clubError } = await supabase
       .from('clubs')
-      .select('id, name, provider_id')
+      .select('id, name, slug, provider_id')
       .eq('id', clubId)
       .single()
 
@@ -147,19 +117,22 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
       return { error: 'Esta discoteca aún no tiene un proveedor asignado para gestionar reservas.' }
     }
 
-    const service = await getOrCreateClubService(supabase, club)
+    const totalAmount = Number((guestCount * 100).toFixed(2))
+    const notes = buildBookingNotes(customerName, guestCount, comment)
 
-    const { error: bookingError } = await supabase
-      .from('bookings')
-      .insert({
-        user_id: user.id,
-        provider_id: club.provider_id,
-        service_id: service.id,
-        event_date: reservationDate,
-        total_amount: guestCount * 100,
-        status: 'pending',
-        notes: formatBookingNote(customerName, guestCount, comment),
-      })
+    const { error: bookingError } = await supabase.from('bookings').insert({
+      user_id: user.id,
+      provider_id: club.provider_id,
+      club_id: club.id,
+      club_slug: club.slug,
+      reservation_date: reservationDate,
+      event_date: reservationDate,
+      event_time: '00:00:00',
+      number_of_people: guestCount,
+      total_amount: totalAmount,
+      notes,
+      status: 'pending',
+    })
 
     if (bookingError) {
       return { error: `No se pudo guardar la reserva: ${bookingError.message}` }
@@ -175,6 +148,14 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
+
+    if (/row-level security|permission denied|new row violates row-level security/i.test(message)) {
+      return {
+        error:
+          'La reserva no pudo insertarse por RLS o permisos. Revisa que el script de integración haya aplicado las columnas y políticas correctas.',
+      }
+    }
+
     return { error: message }
   }
 }

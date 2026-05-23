@@ -201,7 +201,7 @@ export async function createService(
  */
 export async function updateBookingStatus(
   bookingId: string,
-  status: "confirmed" | "cancelled" | "completed"
+  status: "confirmed" | "cancelled" | "completed" | "rejected"
 ) {
   const supabase = await createClient();
 
