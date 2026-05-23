@@ -31,6 +31,7 @@ function buildBookingNotes(customerName: string, guestCount: number, comment: st
 type ClubBookingPayload = {
   user_id: string
   provider_id: string
+  service_id: string
   club_id: string
   club_slug: string
   reservation_date: string
@@ -40,6 +41,28 @@ type ClubBookingPayload = {
   total_amount: number
   notes: string
   status: 'pending'
+}
+
+function formatSupabaseError(error: { message?: string; code?: string; details?: string; hint?: string } | null | undefined) {
+  if (!error) {
+    return 'Error desconocido.'
+  }
+
+  const parts = [error.message].filter(Boolean)
+
+  if (error.code) {
+    parts.push(`Código: ${error.code}`)
+  }
+
+  if (error.details) {
+    parts.push(`Detalles: ${error.details}`)
+  }
+
+  if (error.hint) {
+    parts.push(`Sugerencia: ${error.hint}`)
+  }
+
+  return parts.join(' | ')
 }
 
 async function ensureUserProfile(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
@@ -69,6 +92,57 @@ async function ensureUserProfile(supabase: Awaited<ReturnType<typeof createClien
   if (error) {
     throw new Error(error.message)
   }
+}
+
+async function getOrCreateClubService(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  club: { id: string; name: string; provider_id: string; slug?: string | null }
+) {
+  const serviceDescription = `club_reservation:${club.id}`
+
+  const { data: existingService, error: existingServiceError } = await supabase
+    .from('services')
+    .select('id')
+    .eq('provider_id', club.provider_id)
+    .eq('description', serviceDescription)
+    .maybeSingle()
+
+  if (existingServiceError) {
+    console.error('[createClubReservation] Error consultando servicio proxy existente', {
+      clubId: club.id,
+      providerId: club.provider_id,
+      error: formatSupabaseError(existingServiceError),
+    })
+    throw new Error(`No se pudo revisar el servicio proxy de la discoteca: ${formatSupabaseError(existingServiceError)}`)
+  }
+
+  if (existingService?.id) {
+    return existingService.id
+  }
+
+  const { data: createdService, error: createServiceError } = await supabase
+    .from('services')
+    .insert({
+      provider_id: club.provider_id,
+      title: `${club.name} — Reserva VIP`,
+      description: serviceDescription,
+      price: 0,
+      category: 'discotecas',
+      image_url: null,
+    })
+    .select('id')
+    .single()
+
+  if (createServiceError || !createdService?.id) {
+    console.error('[createClubReservation] Error creando servicio proxy', {
+      clubId: club.id,
+      providerId: club.provider_id,
+      error: formatSupabaseError(createServiceError),
+    })
+    throw new Error(`No se pudo crear el servicio proxy para la discoteca: ${formatSupabaseError(createServiceError)}`)
+  }
+
+  return createdService.id
 }
 
 export async function createClubReservation(_: ClubBookingState, formData: FormData): Promise<ClubBookingState> {
@@ -131,12 +205,15 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
       return { error: 'Esta discoteca aún no tiene un proveedor asignado para gestionar reservas.' }
     }
 
+    const serviceId = await getOrCreateClubService(supabase, club)
+
     const totalAmount = Number((guestCount * 100).toFixed(2))
     const notes = buildBookingNotes(customerName, guestCount, comment)
 
     const bookingPayload: ClubBookingPayload = {
       user_id: user.id,
       provider_id: club.provider_id,
+      service_id: serviceId,
       club_id: club.id,
       club_slug: club.slug || '',
       reservation_date: reservationDate,
@@ -151,7 +228,14 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
     const { error: bookingError } = await supabase.from('bookings').insert(bookingPayload)
 
     if (bookingError) {
-      return { error: `No se pudo guardar la reserva: ${bookingError.message}` }
+      console.error('[createClubReservation] Error insertando reserva', {
+        clubId: club.id,
+        providerId: club.provider_id,
+        serviceId,
+        payload: bookingPayload,
+        error: formatSupabaseError(bookingError),
+      })
+      return { error: `No se pudo guardar la reserva: ${formatSupabaseError(bookingError)}` }
     }
 
     revalidatePath('/dashboard/user')
@@ -164,6 +248,11 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
+
+    console.error('[createClubReservation] Error inesperado en la reserva', {
+      error: message,
+      clubId: formData.get('clubId'),
+    })
 
     if (/row-level security|permission denied|new row violates row-level security/i.test(message)) {
       return {
