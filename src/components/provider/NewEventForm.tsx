@@ -1,32 +1,20 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createService, updateService } from "@/app/services/actions";
-import { Sparkles, DollarSign, Tag, AlignLeft, FileText, Loader2, CheckCircle2, AlertTriangle, ArrowLeft } from "lucide-react";
+import { createEvent } from "@/app/services/actions";
+import { Sparkles, DollarSign, MapPin, AlignLeft, Calendar, FileText, Loader2, CheckCircle2, AlertTriangle, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Service } from "@/types/database.types";
 
-const CATEGORIES = [
-  { id: "dj", name: "DJs & Música" },
-  { id: "bar", name: "Bares & Coctelería" },
-  { id: "staff", name: "Personal de Servicio" },
-  { id: "security", name: "Seguridad" },
-  { id: "catering", name: "Catering & Comida" }
-];
-
-interface NewServiceFormProps {
-  initialService?: Service;
-}
-
-export function NewServiceForm({ initialService }: NewServiceFormProps = {}) {
+export function NewEventForm() {
   const router = useRouter();
-  const [title, setTitle] = useState(initialService?.title || "");
-  const [description, setDescription] = useState(initialService?.description || "");
-  const [price, setPrice] = useState(initialService?.price?.toString() || "");
-  const [category, setCategory] = useState(initialService?.category || "dj");
-  const [imageUrl, setImageUrl] = useState(initialService?.image_url || "");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [location, setLocation] = useState("");
+  const [ticketPrice, setTicketPrice] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -38,33 +26,35 @@ export function NewServiceForm({ initialService }: NewServiceFormProps = {}) {
     setSuccess(false);
 
     if (!title.trim()) {
-      setError("El título del servicio es requerido.");
+      setError("El título del evento es requerido.");
       return;
     }
 
-    const priceNum = Number(price);
-    if (isNaN(priceNum) || priceNum <= 0) {
-      setError("El precio debe ser un número mayor a cero.");
+    if (!eventDate) {
+      setError("La fecha y hora del evento son requeridas.");
+      return;
+    }
+
+    if (!location.trim()) {
+      setError("La ubicación del evento es requerida.");
+      return;
+    }
+
+    const priceNum = Number(ticketPrice);
+    if (isNaN(priceNum) || priceNum < 0) {
+      setError("El precio de la entrada debe ser un número válido mayor o igual a cero.");
       return;
     }
 
     startTransition(async () => {
-      const result = initialService
-        ? await updateService(
-            initialService.id,
-            title,
-            description,
-            priceNum,
-            category,
-            imageUrl || undefined
-          )
-        : await createService(
-            title,
-            description,
-            priceNum,
-            category,
-            imageUrl || undefined
-          );
+      const result = await createEvent(
+        title,
+        description,
+        eventDate,
+        location,
+        priceNum,
+        imageUrl || undefined
+      );
 
       if (result.error) {
         setError(result.error);
@@ -72,7 +62,6 @@ export function NewServiceForm({ initialService }: NewServiceFormProps = {}) {
       } else {
         setSuccess(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        // Redirect back to dashboard after 2s
         setTimeout(() => {
           router.push("/dashboard/provider");
           router.refresh();
@@ -104,15 +93,15 @@ export function NewServiceForm({ initialService }: NewServiceFormProps = {}) {
             className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-sm"
           >
             <CheckCircle2 className="w-5 h-5 shrink-0" />
-            <div>{initialService ? "¡Servicio actualizado con éxito! Redirigiendo al panel..." : "¡Servicio publicado con éxito! Redirigiendo al panel..."}</div>
+            <div>¡Evento publicado con éxito! Redirigiendo al panel...</div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <div className="space-y-4">
-        {/* Título del Servicio */}
+        {/* Título */}
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-300 ml-1">Título del Servicio</label>
+          <label className="text-sm font-medium text-zinc-300 ml-1">Título del Evento</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Sparkles className="h-5 w-5 text-zinc-500" />
@@ -123,59 +112,74 @@ export function NewServiceForm({ initialService }: NewServiceFormProps = {}) {
               onChange={(e) => setTitle(e.target.value)}
               disabled={isPending || success}
               className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm"
-              placeholder="Ej. DJ Profesional con Equipamiento Completo"
+              placeholder="Ej. Fiesta de Fin de Año VIP"
               required
             />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Categoría */}
+          {/* Fecha */}
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-300 ml-1">Categoría</label>
+            <label className="text-sm font-medium text-zinc-300 ml-1">Fecha y Hora</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Tag className="h-5 w-5 text-zinc-500" />
+                <Calendar className="h-5 w-5 text-zinc-500" />
               </div>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+              <input
+                type="datetime-local"
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
                 disabled={isPending || success}
                 className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm cursor-pointer"
-              >
-                {CATEGORIES.map(cat => (
-                  <option key={cat.id} value={cat.id} className="bg-zinc-950 text-white">
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+                required
+              />
             </div>
           </div>
 
-          {/* Precio base */}
+          {/* Precio de entrada */}
           <div className="space-y-1">
-            <label className="text-sm font-medium text-zinc-300 ml-1">Precio Base ($)</label>
+            <label className="text-sm font-medium text-zinc-300 ml-1">Precio de la Entrada ($)</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <DollarSign className="h-5 w-5 text-zinc-500" />
               </div>
               <input
                 type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                value={ticketPrice}
+                onChange={(e) => setTicketPrice(e.target.value)}
                 disabled={isPending || success}
                 className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm"
-                placeholder="Ej. 350"
-                min="1"
+                placeholder="Ej. 15 (0 para evento gratuito)"
+                min="0"
                 required
               />
             </div>
           </div>
         </div>
 
-        {/* URL de la imagen */}
+        {/* Ubicación */}
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-300 ml-1">Enlace / URL de Imagen (Opcional)</label>
+          <label className="text-sm font-medium text-zinc-300 ml-1">Ubicación / Lugar</label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <MapPin className="h-5 w-5 text-zinc-500" />
+            </div>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              disabled={isPending || success}
+              className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm"
+              placeholder="Ej. Calle Falsa 123, Hangover Club"
+              required
+            />
+          </div>
+        </div>
+
+        {/* URL de Imagen */}
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-zinc-300 ml-1">URL de la Imagen (Opcional)</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <FileText className="h-5 w-5 text-zinc-500" />
@@ -186,14 +190,14 @@ export function NewServiceForm({ initialService }: NewServiceFormProps = {}) {
               onChange={(e) => setImageUrl(e.target.value)}
               disabled={isPending || success}
               className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm"
-              placeholder="https://ejemplo.com/imagen-servicio.jpg"
+              placeholder="https://ejemplo.com/flyer-evento.jpg"
             />
           </div>
         </div>
 
         {/* Descripción */}
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-300 ml-1">Descripción del Servicio</label>
+          <label className="text-sm font-medium text-zinc-300 ml-1">Descripción del Evento</label>
           <div className="relative">
             <div className="absolute top-3 left-3 pointer-events-none">
               <AlignLeft className="h-5 w-5 text-zinc-500" />
@@ -203,7 +207,7 @@ export function NewServiceForm({ initialService }: NewServiceFormProps = {}) {
               onChange={(e) => setDescription(e.target.value)}
               disabled={isPending || success}
               className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm min-h-[140px] resize-y"
-              placeholder="Detalla los servicios incluidos, equipamiento disponible, requerimientos técnicos, etc."
+              placeholder="Detalla las actividades, line-up de DJs, condiciones de entrada, código de vestimenta, etc."
               required
             />
           </div>
@@ -228,10 +232,10 @@ export function NewServiceForm({ initialService }: NewServiceFormProps = {}) {
           {isPending ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              {initialService ? "Guardando..." : "Publicando..."}
+              Publicando...
             </>
           ) : (
-            initialService ? "Guardar Cambios" : "Publicar Servicio"
+            "Publicar Evento"
           )}
         </button>
       </div>

@@ -68,7 +68,7 @@ export function Navbar({ user }: NavbarProps) {
             {user ? (
               <>
                 <Link
-                  href={`/dashboard/${user.type}`}
+                  href="/dashboard"
                   className="text-sm font-medium text-white hover:text-primary-300 transition-colors"
                 >
                   Dashboard
@@ -127,7 +127,7 @@ export function Navbar({ user }: NavbarProps) {
             <hr className="border-white/10 my-2" />
             {user ? (
               <>
-                <Link href={`/dashboard/${user.type}`} className="text-zinc-300 hover:text-white py-2">
+                <Link href="/dashboard" className="text-zinc-300 hover:text-white py-2">
                   Dashboard
                 </Link>
                 <button

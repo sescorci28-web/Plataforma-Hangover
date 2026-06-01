@@ -36,10 +36,17 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (user && (pathname === '/login' || pathname === '/register')) {
-      const userType = user.user_metadata?.type || 'user'
-      const url = request.nextUrl.clone()
-      url.pathname = `/dashboard/${userType}`
-      return NextResponse.redirect(url)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.role) {
+        const url = request.nextUrl.clone()
+        url.pathname = `/dashboard/${profile.role}`
+        return NextResponse.redirect(url)
+      }
     }
 
     return supabaseResponse

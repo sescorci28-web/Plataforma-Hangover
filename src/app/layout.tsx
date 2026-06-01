@@ -28,7 +28,21 @@ export default async function RootLayout({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   
-  const navUser = user ? { email: user.email, type: user.user_metadata?.type || 'user' } : null;
+  let navUser = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profile) {
+      navUser = {
+        email: user.email,
+        type: profile.role
+      };
+    }
+  }
 
   return (
     <html lang="es" className={`${inter.variable} ${outfit.variable} h-full dark`}>

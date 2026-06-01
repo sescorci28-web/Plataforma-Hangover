@@ -4,6 +4,7 @@ import { BarChart3, Settings, Calendar, DollarSign, Plus, Bell, MapPin, User, Lo
 import Link from "next/link";
 import { logout } from "@/app/(auth)/actions";
 import { BookingActions } from "@/components/provider/BookingActions";
+import { ProviderServicesList } from "@/components/provider/ProviderServicesList";
 
 export const revalidate = 0; // Always dynamic
 
@@ -16,63 +17,46 @@ export default async function ProviderDashboard() {
     redirect("/login");
   }
 
-  // Get provider profile with try-catch
-  let profile = null;
-  let isProfileError = false;
+  // Get provider profile
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
 
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    if (error || !data) {
-      isProfileError = true;
-    } else {
-      profile = data;
-    }
-  } catch (err) {
-    isProfileError = true;
+  if (profileError || !profile) {
+    redirect("/login");
   }
 
-  // Fallback profile if database query fails or is empty
-  const activeProfile = profile || {
-    id: user.id,
-    role: "provider" as const, // Force provider role in provider dashboard fallback
-    full_name: user.user_metadata?.name || user.email?.split("@")[0] || "Proveedor",
-    username: user.user_metadata?.username || user.email?.split("@")[0] || "proveedor",
-    city: "No especificada",
-    bio: "Tu perfil está en modo de recuperación porque no encontramos tu registro en la base de datos.",
-    avatar_url: null,
-    phone: null,
-  };
-
-  // Route security: Ensure user role matches (only if profile loaded successfully)
-  if (profile && profile.role !== "provider") {
+  // Route security: Ensure user role matches
+  if (profile.role !== "provider") {
     redirect(`/dashboard/${profile.role}`);
   }
 
+  const activeProfile = profile;
+  const isProfileError = false;
+
   // Fetch real services offered by this provider with try-catch
-  let services = null;
+  let services: any[] = [];
   let isServicesError = false;
 
   try {
     const { data, error } = await supabase
       .from("services")
-      .select("id")
-      .eq("provider_id", user.id);
+      .select("id, title, description, price, category, image_url")
+      .eq("provider_id", user.id)
+      .order("created_at", { ascending: false });
     
     if (error) {
       isServicesError = true;
     } else {
-      services = data;
+      services = data || [];
     }
   } catch (err) {
     isServicesError = true;
   }
 
-  const servicesCount = services ? services.length : 0;
+  const servicesCount = services.length;
 
   // Fetch real bookings requested for this provider with try-catch
   let bookings: any[] = [];
@@ -81,7 +65,7 @@ export default async function ProviderDashboard() {
   try {
     const { data, error } = await supabase
       .from("bookings")
-      .select("id, event_date, reservation_date, total_amount, status, notes, user_id, club_id, club_slug, number_of_people")
+      .select("id, event_date, reservation_date, total_amount, status, notes, user_id, club_id, club_slug, number_of_people, event_id")
       .eq("provider_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -99,27 +83,34 @@ export default async function ProviderDashboard() {
   if (normalizedBookings.length > 0) {
     const userIds = [...new Set(normalizedBookings.map((booking: any) => booking.user_id).filter(Boolean))];
     const clubIds = [...new Set(normalizedBookings.map((booking: any) => booking.club_id).filter(Boolean))];
+    const eventIds = [...new Set(normalizedBookings.map((booking: any) => booking.event_id).filter(Boolean))];
 
-    const [userProfilesResult, clubsResult] = await Promise.all([
+    const [userProfilesResult, clubsResult, eventsResult] = await Promise.all([
       userIds.length
         ? supabase.from("profiles").select("id, full_name").in("id", userIds)
         : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null }> }),
       clubIds.length
         ? supabase.from("clubs").select("id, name").in("id", clubIds)
         : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+      eventIds.length
+        ? supabase.from("events").select("id, title").in("id", eventIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; title: string }> }),
     ]);
 
     const userMap = new Map((userProfilesResult.data || []).map((item) => [item.id, item]));
     const clubMap = new Map((clubsResult.data || []).map((item) => [item.id, item]));
+    const eventMap = new Map((eventsResult.data || []).map((item) => [item.id, item]));
 
     normalizedBookings = normalizedBookings.map((booking: any) => {
       const club = booking.club_id ? clubMap.get(booking.club_id) || null : null;
+      const event = booking.event_id ? eventMap.get(booking.event_id) || null : null;
 
       return {
         ...booking,
         user: booking.user_id ? userMap.get(booking.user_id) || null : null,
         club,
-        title: club?.name || booking.club_slug || "Reserva de discoteca",
+        event,
+        title: event?.title || club?.name || booking.club_slug || "Entrada de evento",
       };
     });
   }
@@ -225,6 +216,10 @@ export default async function ProviderDashboard() {
                 <Plus className="w-5 h-5" />
                 Nuevo Servicio
               </Link>
+              <Link href="/dashboard/provider/new-event" className="bg-zinc-800 hover:bg-zinc-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 border border-white/10 cursor-pointer text-sm">
+                <Plus className="w-5 h-5" />
+                Nuevo Evento
+              </Link>
             </div>
           </header>
 
@@ -275,6 +270,23 @@ export default async function ProviderDashboard() {
               <p className="text-xs text-zinc-400 mt-2">{pendingBookingsCount} pendientes de respuesta</p>
             </div>
           </div>
+
+          {/* Mis Servicios */}
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                Mis Servicios
+                <span className="bg-accent-600 text-white text-xs px-2 py-0.5 rounded-full">
+                  {servicesCount}
+                </span>
+              </h2>
+              <Link href="/dashboard/provider/new-service" className="text-xs text-accent-400 hover:text-accent-300 font-semibold transition-colors flex items-center gap-1 cursor-pointer">
+                + Crear Servicio
+              </Link>
+            </div>
+            <ProviderServicesList services={services} />
+          </div>
+
           {/* Solicitudes y Reservas */}
           <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-6">

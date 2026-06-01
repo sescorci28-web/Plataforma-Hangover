@@ -1,200 +1,118 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { Shield, Settings, Users, Briefcase, UserCheck, Calendar, MapPin, LogOut, AlertTriangle } from "lucide-react";
-import Link from "next/link";
-import { logout } from "@/app/(auth)/actions";
+import { requireAdmin } from "@/lib/admin-guard";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { RoleSelector } from "@/components/admin/RoleSelector";
+import {
+  Shield, Users, Briefcase, Calendar, Building2, Ticket,
+  LayoutGrid, AlertTriangle
+} from "lucide-react";
+import Link from "next/link";
 
-export const revalidate = 0; // Always dynamic
+export const revalidate = 0;
 
 export default async function AdminDashboard() {
-  const supabase = await createClient();
+  const { supabase, user, profile } = await requireAdmin();
 
-  // Get current user session
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    redirect("/login");
-  }
+  // Parallel fetch of all platform-wide counts
+  const [
+    profilesRes,
+    servicesRes,
+    eventsRes,
+    clubsRes,
+    bookingsRes,
+  ] = await Promise.all([
+    supabase.from("profiles").select("id, role, full_name, username, city, avatar_url, created_at"),
+    supabase.from("services").select("id", { count: "exact", head: true }),
+    supabase.from("events").select("id", { count: "exact", head: true }),
+    supabase.from("clubs").select("id", { count: "exact", head: true }),
+    supabase.from("bookings").select("id", { count: "exact", head: true }),
+  ]);
 
-  // Get current profile and check role with try-catch
-  let profile = null;
-  let isProfileError = false;
+  const profilesList = profilesRes.data || [];
+  const totalUsers = profilesList.filter((p) => p.role === "user").length;
+  const totalProviders = profilesList.filter((p) => p.role === "provider").length;
+  const totalAdmins = profilesList.filter((p) => p.role === "admin").length;
+  const totalServices = servicesRes.count ?? 0;
+  const totalEvents = eventsRes.count ?? 0;
+  const totalClubs = clubsRes.count ?? 0;
+  const totalBookings = bookingsRes.count ?? 0;
 
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    if (error || !data) {
-      isProfileError = true;
-    } else {
-      profile = data;
-    }
-  } catch (err) {
-    isProfileError = true;
-  }
-
-  // Fallback profile if database query fails or is empty
-  const activeProfile = profile || {
-    id: user.id,
-    role: "admin" as const, // Force admin role in admin dashboard fallback
-    full_name: user.user_metadata?.name || user.email?.split("@")[0] || "Administrador",
-    username: user.email?.split("@")[0] || "admin",
-    city: "No especificada",
-    bio: "Tu perfil está en modo de recuperación porque no encontramos tu registro en la base de datos.",
-    avatar_url: null,
-    phone: null,
-  };
-
-  // Security: Check if admin (only if profile loaded successfully)
-  if (profile && profile.role !== "admin") {
-    redirect(`/dashboard/${profile.role}`);
-  }
-
-  // Fetch all profiles on the platform with try-catch
-  let allProfiles = null;
-  let isFetchProfilesError = false;
-
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
-    
-    if (error) {
-      isFetchProfilesError = true;
-    } else {
-      allProfiles = data;
-    }
-  } catch (err) {
-    isFetchProfilesError = true;
-  }
-
-  const profilesList = allProfiles || [];
-  
-  // Calculate statistics
-  const totalProfiles = profilesList.length;
-  const usersCount = profilesList.filter(p => p.role === 'user').length;
-  const providersCount = profilesList.filter(p => p.role === 'provider').length;
-  const adminsCount = profilesList.filter(p => p.role === 'admin').length;
-
-  const initials = activeProfile.full_name
-    ? activeProfile.full_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
-    : "A";
+  const STATS = [
+    { label: "Usuarios", value: totalUsers, icon: Users, color: "text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/20" },
+    { label: "Proveedores", value: totalProviders, icon: Briefcase, color: "text-accent-400", bg: "bg-accent-500/10", border: "border-accent-500/20" },
+    { label: "Servicios", value: totalServices, icon: LayoutGrid, color: "text-violet-400", bg: "bg-violet-500/10", border: "border-violet-500/20" },
+    { label: "Eventos", value: totalEvents, icon: Calendar, color: "text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20" },
+    { label: "Discotecas", value: totalClubs, icon: Building2, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+    { label: "Reservas", value: totalBookings, icon: Ticket, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+  ];
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-12">
       <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar */}
-        <div className="w-full md:w-64 flex-shrink-0">
-          <div className="glass-card p-6 sticky top-24">
-            <div className="flex items-center gap-4 mb-8">
-              {activeProfile.avatar_url ? (
-                <img
-                  src={activeProfile.avatar_url}
-                  alt={activeProfile.full_name || ""}
-                  className="w-12 h-12 rounded-full object-cover border border-white/10"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-primary-700 flex items-center justify-center text-xl font-bold font-outfit text-white shrink-0">
-                  {initials}
-                </div>
-              )}
-              <div className="overflow-hidden">
-                <h3 className="font-semibold text-white truncate">{activeProfile.full_name || "Admin"}</h3>
-                <p className="text-xs text-zinc-400 capitalize">Portal {activeProfile.role}</p>
-              </div>
-            </div>
-            
-            <nav className="space-y-2">
-              <Link href="/dashboard/admin" className="flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl text-primary-400 font-medium">
-                <Shield className="w-5 h-5" />
-                Panel Admin
-              </Link>
-              <Link href="/dashboard/profile" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <Settings className="w-5 h-5" />
-                Editar Perfil
-              </Link>
-              <form action={logout}>
-                <button type="submit" className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors text-left font-medium cursor-pointer">
-                  <LogOut className="w-5 h-5" />
-                  Cerrar Sesión
-                </button>
-              </form>
-            </nav>
-          </div>
-        </div>
+        <AdminSidebar profile={profile} />
 
-        {/* Main Content */}
         <div className="flex-grow space-y-8">
-          {/* Recovery Alert Banner */}
-          {isProfileError && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-sm flex flex-col gap-2">
-              <div className="font-semibold flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-                <span>Modo de Recuperación (Sin Conexión a Perfil de Base de Datos)</span>
-              </div>
-              <p className="text-xs text-zinc-300">
-                No pudimos obtener tu registro de perfil de Supabase. Esto puede deberse a que el perfil aún no ha sido sincronizado o hay un inconveniente temporal con la base de datos.
-                Por favor, intenta actualizar tu perfil manualmente para crearlo.
-              </p>
-              <div>
-                <Link 
-                  href="/dashboard/profile" 
-                  className="inline-block bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
-                >
-                  Configurar / Crear mi Perfil ahora
-                </Link>
-              </div>
-            </div>
-          )}
-
+          {/* Header */}
           <header>
-            <h1 className="text-3xl font-bold font-outfit mb-2 text-white">Consola de Administración</h1>
-            <p className="text-zinc-400">Gestiona los perfiles del marketplace y asigna roles administrativos.</p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <Shield className="w-6 h-6 text-emerald-400" />
+              </div>
+              <h1 className="text-3xl font-bold font-outfit text-white">Consola de Administración</h1>
+            </div>
+            <p className="text-zinc-400 ml-1">Visión global del marketplace Hangover y gestión de la plataforma.</p>
           </header>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-zinc-400 font-medium">Total Cuentas</h4>
-                <Users className="w-5 h-5 text-primary-400" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {STATS.map(({ label, value, icon: Icon, color, bg, border }) => (
+              <div key={label} className={`glass-card p-5 border ${border}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-zinc-400 font-medium text-sm">{label}</h4>
+                  <div className={`p-2 rounded-lg ${bg}`}>
+                    <Icon className={`w-4 h-4 ${color}`} />
+                  </div>
+                </div>
+                <p className={`text-3xl font-bold font-outfit ${color}`}>{value}</p>
               </div>
-              <p className="text-3xl font-bold">{totalProfiles}</p>
-            </div>
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-zinc-400 font-medium">Usuarios</h4>
-                <UserCheck className="w-5 h-5 text-sky-400" />
-              </div>
-              <p className="text-3xl font-bold">{usersCount}</p>
-            </div>
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-zinc-400 font-medium">Proveedores</h4>
-                <Briefcase className="w-5 h-5 text-accent-400" />
-              </div>
-              <p className="text-3xl font-bold">{providersCount}</p>
-            </div>
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-zinc-400 font-medium">Administradores</h4>
-                <Shield className="w-5 h-5 text-emerald-400" />
-              </div>
-              <p className="text-3xl font-bold">{adminsCount}</p>
-            </div>
+            ))}
           </div>
 
-          {/* Profiles Table */}
+          {/* Quick navigation cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[
+              { href: "/dashboard/admin/users", icon: Users, label: "Gestionar Usuarios", desc: "Listar, asignar roles y eliminar cuentas.", color: "text-sky-400", border: "border-sky-500/20" },
+              { href: "/dashboard/admin/providers", icon: Briefcase, label: "Gestionar Proveedores", desc: "Ver servicios, eventos por proveedor.", color: "text-accent-400", border: "border-accent-500/20" },
+              { href: "/dashboard/admin/content", icon: LayoutGrid, label: "Gestionar Contenido", desc: "Servicios, eventos y discotecas.", color: "text-violet-400", border: "border-violet-500/20" },
+              { href: "/dashboard/admin/bookings", icon: Ticket, label: "Gestionar Reservas", desc: "Todas las reservas del marketplace.", color: "text-emerald-400", border: "border-emerald-500/20" },
+            ].map(({ href, icon: Icon, label, desc, color, border }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`glass-card p-5 border ${border} hover:border-white/20 transition-all group flex items-start gap-4`}
+              >
+                <div className="p-3 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors shrink-0">
+                  <Icon className={`w-5 h-5 ${color}`} />
+                </div>
+                <div>
+                  <h3 className={`font-bold text-white group-hover:${color} transition-colors`}>{label}</h3>
+                  <p className="text-xs text-zinc-400 mt-1">{desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* Recent profiles table */}
           <div className="glass-card overflow-hidden">
-            <div className="p-6 border-b border-white/5">
-              <h2 className="text-xl font-bold text-white">Listado de Perfiles</h2>
-              <p className="text-sm text-zinc-400">Administra los roles de los usuarios registrados.</p>
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white">Perfiles Recientes</h2>
+                <p className="text-sm text-zinc-400">Últimos usuarios registrados en la plataforma.</p>
+              </div>
+              <Link href="/dashboard/admin/users" className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">
+                Ver todos →
+              </Link>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -207,80 +125,32 @@ export default async function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {isFetchProfilesError && (
-                    <tr>
-                      <td colSpan={5} className="py-6 text-center text-red-400 text-sm">
-                        Error al cargar perfiles: No se pudo conectar a la base de datos de Supabase.
-                      </td>
-                    </tr>
-                  )}
-                  {profilesList.length === 0 && !isFetchProfilesError && (
-                    <tr>
-                      <td colSpan={5} className="py-6 text-center text-zinc-500 text-sm">
-                        No hay perfiles registrados en el sistema.
-                      </td>
-                    </tr>
-                  )}
-                  {profilesList.map((p) => {
+                  {profilesList.slice(0, 8).map((p) => {
                     const memberInitials = p.full_name
                       ? p.full_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
                       : "U";
-                    const joinedDate = new Date(p.created_at).toLocaleDateString('es-ES', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric'
+                    const joinedDate = new Date(p.created_at).toLocaleDateString("es-ES", {
+                      day: "numeric", month: "short", year: "numeric",
                     });
-
                     return (
                       <tr key={p.id} className="hover:bg-white/5 transition-colors text-sm">
-                        <td className="py-4 px-6 flex items-center gap-3">
-                          {p.avatar_url ? (
-                            <img
-                              src={p.avatar_url}
-                              alt={p.full_name || ""}
-                              className="w-9 h-9 rounded-full object-cover border border-white/10 shrink-0"
-                            />
-                          ) : (
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold font-outfit text-white shrink-0 ${
-                              p.role === 'admin' ? 'bg-emerald-600' : p.role === 'provider' ? 'bg-accent-600' : 'bg-primary-600'
-                            }`}>
-                              {memberInitials}
-                            </div>
-                          )}
-                          <div className="overflow-hidden">
-                            <p className="font-semibold text-white truncate max-w-[150px]">
-                              {p.full_name || "Sin nombre"}
-                            </p>
-                            {p.phone && <p className="text-[11px] text-zinc-500">{p.phone}</p>}
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            {p.avatar_url ? (
+                              <img src={p.avatar_url} alt={p.full_name || ""} className="w-9 h-9 rounded-full object-cover border border-white/10 shrink-0" />
+                            ) : (
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${p.role === "admin" ? "bg-emerald-700" : p.role === "provider" ? "bg-accent-600" : "bg-primary-600"}`}>
+                                {memberInitials}
+                              </div>
+                            )}
+                            <p className="font-semibold text-white truncate max-w-[140px]">{p.full_name || "Sin nombre"}</p>
                           </div>
                         </td>
-                        <td className="py-4 px-6 text-zinc-300">
-                          @{p.username || "usuario"}
-                        </td>
-                        <td className="py-4 px-6 text-zinc-300">
-                          {p.city ? (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                              <span className="truncate max-w-[120px]">{p.city}</span>
-                            </span>
-                          ) : (
-                            <span className="text-zinc-600 italic text-xs">No especificada</span>
-                          )}
-                        </td>
-                        <td className="py-4 px-6 text-zinc-400 text-xs">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                            {joinedDate}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 align-middle text-right">
-                          <div className="flex justify-end">
-                            <RoleSelector
-                              userId={p.id}
-                              currentRole={p.role}
-                              currentAdminId={user.id}
-                            />
-                          </div>
+                        <td className="py-4 px-6 text-zinc-300">@{p.username || "usuario"}</td>
+                        <td className="py-4 px-6 text-zinc-400 text-xs">{p.city || "—"}</td>
+                        <td className="py-4 px-6 text-zinc-400 text-xs">{joinedDate}</td>
+                        <td className="py-4 px-6 text-right">
+                          <RoleSelector userId={p.id} currentRole={p.role} currentAdminId={user.id} />
                         </td>
                       </tr>
                     );

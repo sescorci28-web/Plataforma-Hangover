@@ -31,7 +31,7 @@ function buildBookingNotes(customerName: string, guestCount: number, comment: st
 type ClubBookingPayload = {
   user_id: string
   provider_id: string
-  service_id: string
+  service_id: string | null
   club_id: string
   club_slug: string
   reservation_date: string
@@ -97,7 +97,7 @@ async function ensureUserProfile(supabase: Awaited<ReturnType<typeof createClien
 async function getOrCreateClubService(
   supabase: Awaited<ReturnType<typeof createClient>>,
   club: { id: string; name: string; provider_id: string; slug?: string | null }
-) {
+): Promise<string | null> {
   const serviceDescription = `club_reservation:${club.id}`
 
   const { data: existingService, error: existingServiceError } = await supabase
@@ -113,36 +113,9 @@ async function getOrCreateClubService(
       providerId: club.provider_id,
       error: formatSupabaseError(existingServiceError),
     })
-    throw new Error(`No se pudo revisar el servicio proxy de la discoteca: ${formatSupabaseError(existingServiceError)}`)
   }
 
-  if (existingService?.id) {
-    return existingService.id
-  }
-
-  const { data: createdService, error: createServiceError } = await supabase
-    .from('services')
-    .insert({
-      provider_id: club.provider_id,
-      title: `${club.name} — Reserva VIP`,
-      description: serviceDescription,
-      price: 0,
-      category: 'discotecas',
-      image_url: null,
-    })
-    .select('id')
-    .single()
-
-  if (createServiceError || !createdService?.id) {
-    console.error('[createClubReservation] Error creando servicio proxy', {
-      clubId: club.id,
-      providerId: club.provider_id,
-      error: formatSupabaseError(createServiceError),
-    })
-    throw new Error(`No se pudo crear el servicio proxy para la discoteca: ${formatSupabaseError(createServiceError)}`)
-  }
-
-  return createdService.id
+  return existingService?.id || null
 }
 
 export async function createClubReservation(_: ClubBookingState, formData: FormData): Promise<ClubBookingState> {
@@ -247,20 +220,22 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
       message: `Reserva creada correctamente para ${customerName}. El proveedor revisará tu solicitud pronto.`,
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Ocurrió un error inesperado.'
+    const err = error as any
+    const message = err?.message || (typeof error === 'string' ? error : 'Ocurrió un error inesperado.')
+    const code = err?.code
+    const details = err?.details
+    const hint = err?.hint
 
     console.error('[createClubReservation] Error inesperado en la reserva', {
       error: message,
       clubId: formData.get('clubId'),
     })
 
-    if (/row-level security|permission denied|new row violates row-level security/i.test(message)) {
-      return {
-        error:
-          'La reserva no pudo insertarse por RLS o permisos. Revisa que el script de integración haya aplicado las columnas y políticas correctas.',
-      }
-    }
+    const parts = [message]
+    if (code) parts.push(`Código: ${code}`)
+    if (details) parts.push(`Detalles: ${details}`)
+    if (hint) parts.push(`Sugerencia: ${hint}`)
 
-    return { error: message }
+    return { error: parts.join(' | ') }
   }
 }

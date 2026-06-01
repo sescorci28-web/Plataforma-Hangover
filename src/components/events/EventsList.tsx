@@ -5,6 +5,7 @@ import { createEventBooking } from "@/app/services/actions";
 import { Event } from "@/types/database.types";
 import { Calendar, MapPin, DollarSign, Sparkles, X, Loader2, CheckCircle2, AlertTriangle, PartyPopper } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 
 interface ExtendedEvent extends Event {
   creator: {
@@ -113,7 +114,9 @@ export function EventsList({ initialEvents, user }: EventsListProps) {
                     <span className="text-xs text-zinc-500">Organizado por {creatorName}</span>
                     
                     <h3 className="text-lg font-bold text-white line-clamp-1 group-hover:text-primary-400 transition-colors">
-                      {event.title}
+                      <Link href={`/events/${event.id}`}>
+                        {event.title}
+                      </Link>
                     </h3>
                     
                     <p className="text-zinc-400 text-sm line-clamp-3 min-h-[60px]">

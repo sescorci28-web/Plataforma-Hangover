@@ -16,43 +16,24 @@ export default async function UserDashboard() {
     redirect("/login");
   }
 
-  // Get user profile with try-catch and error flag
-  let profile = null;
-  let isProfileError = false;
+  // Get user profile
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
 
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    if (error || !data) {
-      isProfileError = true;
-    } else {
-      profile = data;
-    }
-  } catch (err) {
-    isProfileError = true;
+  if (profileError || !profile) {
+    redirect("/login");
   }
 
-  // Fallback profile if database query fails or is empty
-  // This avoids infinite redirects to /login when user is authenticated but profile row is missing
-  const activeProfile = profile || {
-    id: user.id,
-    role: "user" as const, // Force user role in user dashboard fallback
-    full_name: user.user_metadata?.name || user.email?.split("@")[0] || "Usuario",
-    username: user.user_metadata?.username || user.email?.split("@")[0] || "usuario",
-    city: "No especificada",
-    bio: "Tu perfil está en modo de recuperación porque no encontramos tu registro en la base de datos.",
-    avatar_url: null,
-    phone: null,
-  };
-
-  // Route security: Ensure user role matches (only if profile loaded successfully)
-  if (profile && profile.role !== "user") {
+  // Route security: Ensure user role matches
+  if (profile.role !== "user") {
     redirect(`/dashboard/${profile.role}`);
   }
+
+  const activeProfile = profile;
+  const isProfileError = false;
 
   // Fetch real user bookings with try-catch and enrich them using the club reference
   let bookings: any[] = [];

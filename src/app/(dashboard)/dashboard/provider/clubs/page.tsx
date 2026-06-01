@@ -17,33 +17,22 @@ export default async function ProviderClubsPage() {
   }
 
   // Get provider profile
-  let profile = null;
-  try {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    profile = data;
-  } catch (err) {
-    console.error("Error loading profile:", err);
-  }
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
 
-  const activeProfile = profile || {
-    id: user.id,
-    role: "provider" as const,
-    full_name: user.user_metadata?.name || user.email?.split("@")[0] || "Proveedor",
-    username: user.user_metadata?.username || user.email?.split("@")[0] || "proveedor",
-    city: "No especificada",
-    bio: "",
-    avatar_url: null,
-    phone: null,
-  };
+  if (profileError || !profile) {
+    redirect("/login");
+  }
 
   // Route security: Ensure user role matches
-  if (profile && profile.role !== "provider") {
+  if (profile.role !== "provider") {
     redirect(`/dashboard/${profile.role}`);
   }
+
+  const activeProfile = profile;
 
   // Fetch clubs belonging to this provider
   let clubs = [];

@@ -123,11 +123,21 @@ export async function createEventBooking(
   }
 
   try {
+    // Fetch event creator to assign provider_id
+    const { data: eventDataObj } = await supabase
+      .from("events")
+      .select("creator_id")
+      .eq("id", eventId)
+      .single();
+
+    const providerId = eventDataObj?.creator_id || null;
+
     const { error: insertError } = await supabase
       .from("bookings")
       .insert({
         user_id: user.id,
         event_id: eventId,
+        provider_id: providerId,
         event_date: eventDate,
         total_amount: totalAmount,
         status: "confirmed", // Automatically confirm ticket purchases
@@ -254,3 +264,154 @@ export async function updateBookingStatus(
     return { error: err.message || "Error al actualizar la reserva." };
   }
 }
+
+/**
+ * Updates an existing service (restricted to providers/admins).
+ */
+export async function updateService(
+  serviceId: string,
+  title: string,
+  description: string,
+  price: number,
+  category: string,
+  imageUrl?: string
+) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  // Double check profile role
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile || (profile.role !== "provider" && profile.role !== "admin")) {
+    return { error: "No autorizado. Solo proveedores pueden modificar servicios." };
+  }
+
+  try {
+    const { error: updateError } = await supabase
+      .from("services")
+      .update({
+        title,
+        description: description || null,
+        price,
+        category,
+        image_url: imageUrl || null
+      })
+      .eq("id", serviceId)
+      .eq("provider_id", user.id);
+
+    if (updateError) {
+      return { error: `Error al actualizar el servicio: ${updateError.message}` };
+    }
+
+    revalidatePath("/services");
+    revalidatePath("/dashboard/provider");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error al actualizar el servicio." };
+  }
+}
+
+/**
+ * Deletes an existing service (restricted to providers/admins).
+ */
+export async function deleteService(serviceId: string) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  // Double check profile role
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile || (profile.role !== "provider" && profile.role !== "admin")) {
+    return { error: "No autorizado. Solo proveedores pueden eliminar servicios." };
+  }
+
+  try {
+    const { error: deleteError } = await supabase
+      .from("services")
+      .delete()
+      .eq("id", serviceId)
+      .eq("provider_id", user.id);
+
+    if (deleteError) {
+      return { error: `Error al eliminar el servicio: ${deleteError.message}` };
+    }
+
+    revalidatePath("/services");
+    revalidatePath("/dashboard/provider");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error al eliminar el servicio." };
+  }
+}
+
+/**
+ * Creates a new event (restricted to providers/admins).
+ */
+export async function createEvent(
+  title: string,
+  description: string,
+  eventDate: string,
+  location: string,
+  ticketPrice: number,
+  imageUrl?: string
+) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  // Double check profile role
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile || (profile.role !== "provider" && profile.role !== "admin")) {
+    return { error: "No autorizado. Solo proveedores pueden crear eventos." };
+  }
+
+  try {
+    const { error: insertError } = await supabase
+      .from("events")
+      .insert({
+        creator_id: user.id,
+        title,
+        description: description || null,
+        event_date: eventDate,
+        location,
+        ticket_price: ticketPrice,
+        image_url: imageUrl || null
+      });
+
+    if (insertError) {
+      return { error: `Error al crear el evento: ${insertError.message}` };
+    }
+
+    revalidatePath("/events");
+    revalidatePath("/dashboard/provider");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error al crear el evento." };
+  }
+}
+
+
