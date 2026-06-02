@@ -53,6 +53,7 @@ interface Club {
   opening_hours: string | null
   rating: number
   active: boolean
+  cover_price: number | null
   created_at: string
 }
 
@@ -115,6 +116,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
   const [openingHours, setOpeningHours] = useState("")
   const [rating, setRating] = useState(5.0)
   const [active, setActive] = useState(true)
+  const [coverPrice, setCoverPrice] = useState(0.00)
 
   const [bannerPreviewUrl, setBannerPreviewUrl] = useState<string | null>(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
@@ -144,6 +146,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
     setOpeningHours("")
     setRating(5.0)
     setActive(true)
+    setCoverPrice(0.00)
     setEditingClub(null)
     cleanupBlobUrl(bannerPreviewUrl)
     cleanupBlobUrl(logoPreviewUrl)
@@ -173,6 +176,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
     setOpeningHours(club.opening_hours || "")
     setRating(club.rating || 5.0)
     setActive(club.active ?? true)
+    setCoverPrice(club.cover_price || 0.00)
     setBannerPreviewUrl(club.banner_image || null)
     setLogoPreviewUrl(club.logo || null)
     setIsModalOpen(true)
@@ -258,6 +262,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
         opening_hours: openingHours.trim() || null,
         rating: Number(rating) || 5.0,
         active,
+        cover_price: Number(coverPrice) || 0.00,
       }
 
       startTransition(async () => {
@@ -541,6 +546,20 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                     disabled={isFormLocked}
                     placeholder="Ej. Jueves a Sábados 10PM - 6AM"
                     className="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-primary-500/50"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-zinc-300 ml-1">Precio de Cover ($USD)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={coverPrice}
+                    onChange={e => setCoverPrice(parseFloat(e.target.value) || 0.00)}
+                    disabled={isFormLocked}
+                    placeholder="Ej. 15.00"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary-500/50"
                   />
                 </div>
 

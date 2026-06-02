@@ -96,8 +96,24 @@ export function UserBookingsTabs({ initialBookings }: UserBookingsTabsProps) {
                         <h4 className="font-semibold text-white text-md tracking-tight leading-tight">
                           {title}
                         </h4>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-primary-500/10 text-primary-300 border border-primary-500/20">
-                          Reserva
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
+                          booking.booking_type === "club_cover"
+                            ? "bg-accent-500/10 text-accent-300 border-accent-500/20"
+                            : booking.booking_type === "event"
+                            ? "bg-primary-500/10 text-primary-300 border-primary-500/20"
+                            : booking.booking_type === "club_vip"
+                            ? "bg-purple-500/10 text-purple-300 border-purple-500/20"
+                            : "bg-zinc-500/10 text-zinc-300 border-zinc-500/20"
+                        }`}>
+                          {booking.booking_type === "club_cover"
+                            ? "Cover Entrada"
+                            : booking.booking_type === "event"
+                            ? "Entrada Evento"
+                            : booking.booking_type === "club_vip"
+                            ? "Mesa VIP"
+                            : booking.booking_type === "service"
+                            ? "Servicio"
+                            : "Reserva"}
                         </span>
                       </div>
 
@@ -231,7 +247,18 @@ export function UserBookingsTabs({ initialBookings }: UserBookingsTabsProps) {
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-bold text-white text-sm">{selectedBooking.title}</h4>
-                      <p className="text-[11px] text-zinc-400 capitalize">
+                      <p className="text-[10px] text-accent-400 font-semibold uppercase tracking-wider mt-0.5">
+                        {selectedBooking.booking_type === "club_cover"
+                          ? "Cover Entrada"
+                          : selectedBooking.booking_type === "event"
+                          ? "Entrada Evento"
+                          : selectedBooking.booking_type === "club_vip"
+                          ? "Mesa VIP"
+                          : selectedBooking.booking_type === "service"
+                          ? "Servicio"
+                          : "Reserva"}
+                      </p>
+                      <p className="text-[11px] text-zinc-400 capitalize mt-1">
                         {new Date(selectedBooking.displayDate || selectedBooking.reservation_date || selectedBooking.event_date).toLocaleDateString("es-ES", {
                           weekday: "short",
                           day: "numeric",

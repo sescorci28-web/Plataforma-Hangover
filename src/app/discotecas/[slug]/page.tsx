@@ -235,6 +235,7 @@ export default async function ClubDetailPage({ params }: PageProps) {
                 id: club.id,
                 name: club.name,
                 provider_id: club.provider_id ?? null,
+                cover_price: club.cover_price ?? 0.00,
               }}
               isAuthenticated={Boolean(user)}
               defaultClientName={

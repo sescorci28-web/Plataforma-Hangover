@@ -149,6 +149,26 @@ export function QRValidatorForm() {
 
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-white/5 border border-white/5 rounded-xl flex items-center justify-center text-zinc-400 shrink-0">
+                    <Ticket className="w-4 h-4 text-primary-400" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Tipo de Pase</p>
+                    <p className="text-sm font-semibold text-white">
+                      {successData.bookingType === "club_cover"
+                        ? "Cover Entrada"
+                        : successData.bookingType === "event"
+                        ? "Entrada Evento"
+                        : successData.bookingType === "club_vip"
+                        ? "Mesa VIP"
+                        : successData.bookingType === "service"
+                        ? "Servicio"
+                        : "Reserva"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-white/5 border border-white/5 rounded-xl flex items-center justify-center text-zinc-400 shrink-0">
                     <DollarSign className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div>

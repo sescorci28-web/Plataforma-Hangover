@@ -42,6 +42,7 @@ type ClubBookingPayload = {
   total_amount: number
   notes: string
   status: 'pending'
+  booking_type: string
   qr_code: string
   qr_status: string
 }
@@ -199,6 +200,7 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
       total_amount: totalAmount,
       notes,
       status: 'pending',
+      booking_type: 'club_vip',
       qr_code: 'QR-' + randomUUID(),
       qr_status: 'active',
     }
@@ -242,5 +244,126 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
     if (hint) parts.push(`Sugerencia: ${hint}`)
 
     return { error: parts.join(' | ') }
+  }
+}
+
+export async function buyClubCover(_: ClubBookingState, formData: FormData): Promise<ClubBookingState> {
+  const supabase = await createClient()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { error: 'Debes iniciar sesión para comprar un cover.' }
+  }
+
+  const clubId = String(formData.get('clubId') || '')
+  const customerName = String(formData.get('customer_name') || '').trim()
+  const reservationDate = String(formData.get('reservation_date') || '').trim()
+  const guestCount = parseGuestCount(formData.get('guest_count'))
+
+  if (!clubId) {
+    return { error: 'No se encontró la discoteca seleccionada.' }
+  }
+
+  if (!customerName) {
+    return { error: 'El nombre del cliente es obligatorio.' }
+  }
+
+  if (!reservationDate) {
+    return { error: 'La fecha de visita es obligatoria.' }
+  }
+
+  if (!guestCount || guestCount < 1) {
+    return { error: 'La cantidad de personas debe ser al menos 1.' }
+  }
+
+  const reservationDateObj = new Date(`${reservationDate}T00:00:00`)
+
+  if (Number.isNaN(reservationDateObj.getTime())) {
+    return { error: 'La fecha ingresada no es válida.' }
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  if (reservationDateObj.getTime() < today.getTime()) {
+    return { error: 'La fecha de visita no puede ser anterior a hoy.' }
+  }
+
+  try {
+    await ensureUserProfile(supabase, user.id)
+
+    const { data: club, error: clubError } = await supabase
+      .from('clubs')
+      .select('id, name, slug, provider_id, cover_price')
+      .eq('id', clubId)
+      .single()
+
+    if (clubError || !club) {
+      return { error: 'No se pudo cargar la discoteca para comprar el cover.' }
+    }
+
+    if (!club.provider_id) {
+      return { error: 'Esta discoteca aún no tiene un proveedor asignado para gestionar la venta de covers.' }
+    }
+
+    const serviceId = await getOrCreateClubService(supabase, club)
+
+    const coverPrice = Number(club.cover_price) || 0.0
+    const totalAmount = Number((guestCount * coverPrice).toFixed(2))
+    const notes = buildBookingNotes(customerName, guestCount, `Compra de Cover (${guestCount} pers. x $${coverPrice})`)
+
+    const bookingPayload: ClubBookingPayload = {
+      user_id: user.id,
+      provider_id: club.provider_id,
+      service_id: serviceId,
+      club_id: club.id,
+      club_slug: club.slug || '',
+      reservation_date: reservationDate,
+      event_date: reservationDate,
+      event_time: '00:00:00',
+      number_of_people: guestCount,
+      total_amount: totalAmount,
+      notes,
+      status: 'pending', // Will be updated to 'confirmed' right below to compile with pending type constraint, or wait - status in ClubBookingPayload is 'pending'. Let's change ClubBookingPayload status type if we want, or just insert as status: 'confirmed' bypassing typed helper.
+      booking_type: 'club_cover',
+      qr_code: 'QR-' + randomUUID(),
+      qr_status: 'active',
+    }
+
+    // Since ClubBookingPayload defines status: 'pending', but we want to insert 'confirmed', we override it here.
+    const insertPayload = {
+      ...bookingPayload,
+      status: 'confirmed'
+    }
+
+    const { error: bookingError } = await supabase.from('bookings').insert(insertPayload)
+
+    if (bookingError) {
+      console.error('[buyClubCover] Error insertando cover', {
+        clubId: club.id,
+        providerId: club.provider_id,
+        serviceId,
+        payload: insertPayload,
+        error: formatSupabaseError(bookingError),
+      })
+      return { error: `No se pudo guardar la compra del cover: ${formatSupabaseError(bookingError)}` }
+    }
+
+    revalidatePath('/dashboard/user')
+    revalidatePath('/dashboard/provider')
+    revalidatePath('/discotecas')
+
+    return {
+      success: true,
+      message: `¡Cover comprado con éxito para ${customerName}! Tu entrada con código QR ya está activa y disponible en tu panel de usuario.`,
+    }
+  } catch (error) {
+    const err = error as any
+    const message = err?.message || (typeof error === 'string' ? error : 'Ocurrió un error inesperado.')
+    console.error('[buyClubCover] Error inesperado en compra de cover', {
+      error: message,
+      clubId,
+    })
+    return { error: message }
   }
 }

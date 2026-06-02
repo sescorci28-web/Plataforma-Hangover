@@ -52,6 +52,7 @@ export async function createClub(data: {
   opening_hours: string | null;
   rating: number;
   active: boolean;
+  cover_price: number;
 }) {
   const { error: authError, user, supabase } = await validateProvider();
   if (authError || !user) {
@@ -75,7 +76,8 @@ export async function createClub(data: {
         instagram: data.instagram || null,
         opening_hours: data.opening_hours || null,
         rating: Number(data.rating) || 5.0,
-        active: data.active
+        active: data.active,
+        cover_price: Number(data.cover_price) || 0.00
       });
 
     if (insertError) {
@@ -106,6 +108,7 @@ export async function updateClub(
     opening_hours: string | null;
     rating: number;
     active: boolean;
+    cover_price: number;
   }
 ) {
   const { error: authError, user, supabase } = await validateProvider();
@@ -129,7 +132,8 @@ export async function updateClub(
         instagram: data.instagram || null,
         opening_hours: data.opening_hours || null,
         rating: Number(data.rating) || 5.0,
-        active: data.active
+        active: data.active,
+        cover_price: Number(data.cover_price) || 0.00
       })
       .eq("id", id)
       .eq("provider_id", user.id); // Ensure ownership

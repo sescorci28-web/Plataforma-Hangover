@@ -247,7 +247,7 @@ export async function updateBookingStatus(
         .select("role")
         .eq("id", user.id)
         .single();
-      
+
       if (!profile || profile.role !== "admin") {
         return { error: "No autorizado para modificar esta reserva." };
       }
@@ -452,7 +452,7 @@ export async function validateQRCode(qrCode: string) {
     // 2. Fetch booking by qr_code
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
-      .select("id, status, provider_id, qr_status, number_of_people, user_id, event_id, club_id, total_amount, event_date")
+      .select("id, status, provider_id, qr_status, number_of_people, user_id, event_id, club_id, total_amount, event_date, booking_type")
       .eq("qr_code", qrCode)
       .maybeSingle();
 
@@ -524,7 +524,7 @@ export async function validateQRCode(qrCode: string) {
 
     revalidatePath("/dashboard/user");
     revalidatePath("/dashboard/provider");
-    
+
     return {
       success: true,
       bookingDetails: {
@@ -533,7 +533,8 @@ export async function validateQRCode(qrCode: string) {
         title: targetTitle,
         numberOfPeople: booking.number_of_people || 1,
         totalAmount: booking.total_amount,
-        eventDate: booking.event_date
+        eventDate: booking.event_date,
+        bookingType: booking.booking_type
       }
     };
 
