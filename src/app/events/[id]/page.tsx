@@ -53,7 +53,8 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
     minute: "2-digit"
   });
 
-  const creatorName = event.creator?.full_name || "Organizador Hangover";
+  const creator = event.creator;
+  const creatorName = (Array.isArray(creator) ? creator[0]?.full_name : (creator as any)?.full_name) || "Organizador Hangover";
 
   return (
     <div className="relative min-h-screen w-full bg-[#05050a] text-zinc-100 pb-20 overflow-hidden">
