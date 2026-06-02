@@ -87,6 +87,7 @@ export async function createClub(data: {
 
     // Revalidate relevant pages
     revalidatePath("/discotecas");
+    revalidatePath("/discotecas/[slug]", "page");
     revalidatePath("/dashboard/provider/clubs");
     return { success: true };
   } catch (err: any) {
@@ -145,6 +146,7 @@ export async function updateClub(
 
     // Revalidate paths
     revalidatePath("/discotecas");
+    revalidatePath("/discotecas/[slug]", "page");
     revalidatePath("/dashboard/provider/clubs");
     return { success: true };
   } catch (err: any) {
@@ -173,6 +175,7 @@ export async function deleteClub(id: string) {
 
     // Revalidate paths
     revalidatePath("/discotecas");
+    revalidatePath("/discotecas/[slug]", "page");
     revalidatePath("/dashboard/provider/clubs");
     return { success: true };
   } catch (err: any) {

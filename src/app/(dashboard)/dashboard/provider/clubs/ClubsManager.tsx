@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Plus,
@@ -122,7 +122,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
   const [bannerAssetFile, setBannerAssetFile] = useState<File | null>(null)
   const [logoAssetFile, setLogoAssetFile] = useState<File | null>(null)
 
-  const [isPending, startTransition] = useTransition()
+  const [isPending, setIsPending] = useState(false)
   const [isUploadingAssets, setIsUploadingAssets] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -261,49 +261,51 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
         opening_hours: openingHours.trim() || null,
         rating: Number(rating) || 5.0,
         active,
-        cover_price: Number(coverPrice) || 0.00,
+        cover_price: Number(coverPrice) || 0,
       }
 
-      startTransition(async () => {
-        const result = editingClub ? await updateClub(editingClub.id, payload) : await createClub(payload)
+      // Direct await — startTransition(async()=>) does NOT properly await
+      // async server actions; the result would be silently lost.
+      const result = editingClub
+        ? await updateClub(editingClub.id, payload)
+        : await createClub(payload)
 
-        if (result.error) {
-          setError(result.error)
-        } else {
-          setSuccess(true)
-          setBannerAssetFile(null)
-          setLogoAssetFile(null)
-          router.refresh()
-          setTimeout(() => {
-            setIsModalOpen(false)
-            resetFormState()
-            setSuccess(false)
-          }, 1500)
-        }
+      setIsUploadingAssets(false)
 
-        setIsUploadingAssets(false)
-      })
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setSuccess(true)
+        setBannerAssetFile(null)
+        setLogoAssetFile(null)
+        router.refresh()
+        setTimeout(() => {
+          setIsModalOpen(false)
+          resetFormState()
+          setSuccess(false)
+        }, 1500)
+      }
     } catch (uploadError: any) {
       setError(uploadError?.message || "No se pudo subir una o más imágenes.")
       setIsUploadingAssets(false)
     }
   }
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (!deletingClubId) return
 
     setError(null)
+    setIsPending(true)
 
-    startTransition(async () => {
-      const result = await deleteClub(deletingClubId)
-      if (result.error) {
-        setError(result.error)
-        alert(result.error)
-      } else {
-        router.refresh()
-      }
-      setDeletingClubId(null)
-    })
+    const result = await deleteClub(deletingClubId)
+    if (result.error) {
+      setError(result.error)
+      alert(result.error)
+    } else {
+      router.refresh()
+    }
+    setDeletingClubId(null)
+    setIsPending(false)
   }
 
   const isFormLocked = isPending || isUploadingAssets || success
