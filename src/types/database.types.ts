@@ -53,6 +53,9 @@ export interface Booking {
   total_amount: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
   notes: string | null;
+  qr_code: string | null;
+  qr_status: 'active' | 'used' | 'cancelled' | null;
+  qr_validated_at: string | null;
   created_at: string;
   updated_at: string;
 }

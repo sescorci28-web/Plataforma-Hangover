@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { randomUUID } from 'crypto'
 
 export type ClubBookingState = {
   success?: boolean
@@ -41,6 +42,8 @@ type ClubBookingPayload = {
   total_amount: number
   notes: string
   status: 'pending'
+  qr_code: string
+  qr_status: string
 }
 
 function formatSupabaseError(error: { message?: string; code?: string; details?: string; hint?: string } | null | undefined) {
@@ -196,6 +199,8 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
       total_amount: totalAmount,
       notes,
       status: 'pending',
+      qr_code: 'QR-' + randomUUID(),
+      qr_status: 'active',
     }
 
     const { error: bookingError } = await supabase.from('bookings').insert(bookingPayload)
