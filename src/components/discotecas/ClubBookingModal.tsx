@@ -20,6 +20,8 @@ const initialState: ClubBookingState = {}
 
 export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: ClubBookingModalProps) {
   const [activeTab, setActiveTab] = useState<'vip' | 'cover'>('vip')
+  const [coverName, setCoverName] = useState(defaultClientName ?? '')
+  const [coverDate, setCoverDate] = useState('')
   const [coverGuests, setCoverGuests] = useState(1)
 
   const [state, formAction, isPending] = useActionState(createClubReservation, initialState)
@@ -41,7 +43,7 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
 
     return activeTab === 'vip'
       ? 'Completa el formulario premium y confirma tu reserva con un proveedor verificado.'
-      : `Compra tus entradas al instante por $${coverPrice.toFixed(2)} c/u.`
+      : `Compra tus entradas al instante por $${Math.round(coverPrice).toLocaleString('es-CO')} COP c/u.`
   }, [club.provider_id, isAuthenticated, activeTab, coverPrice])
 
   return (
@@ -109,14 +111,15 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
 
         {canBook ? (
           activeTab === 'vip' ? (
-            <form action={formAction} className="space-y-4">
-              <input type="hidden" name="clubId" value={club.id} />
+            <form key="vip-booking-form" action={formAction} className="space-y-4">
+              <input key="vip-club-id" type="hidden" name="clubId" value={club.id ?? ''} />
 
               <label className="block text-sm text-zinc-200">
                 <span className="mb-1 block font-medium">Nombre del cliente</span>
                 <input
+                  key="vip-customer-name"
                   name="customer_name"
-                  defaultValue={defaultClientName}
+                  defaultValue={defaultClientName ?? ''}
                   required
                   placeholder="Tu nombre"
                   className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-white outline-none transition focus:border-primary-400"
@@ -127,6 +130,7 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
                 <label className="block text-sm text-zinc-200">
                   <span className="mb-1 block font-medium">Fecha de reserva</span>
                   <input
+                    key="vip-reservation-date"
                     name="reservation_date"
                     type="date"
                     min={new Date().toISOString().split('T')[0]}
@@ -138,6 +142,7 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
                 <label className="block text-sm text-zinc-200">
                   <span className="mb-1 block font-medium">Personas</span>
                   <input
+                    key="vip-guest-count"
                     name="guest_count"
                     type="number"
                     min={1}
@@ -186,14 +191,16 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
               </button>
             </form>
           ) : (
-            <form action={coverFormAction} className="space-y-4">
-              <input type="hidden" name="clubId" value={club.id} />
+            <form key="cover-booking-form" action={coverFormAction} className="space-y-4">
+              <input key="cover-club-id" type="hidden" name="clubId" value={club.id ?? ''} />
 
               <label className="block text-sm text-zinc-200">
                 <span className="mb-1 block font-medium">Nombre del cliente</span>
                 <input
+                  key="cover-customer-name"
                   name="customer_name"
-                  defaultValue={defaultClientName}
+                  value={coverName ?? ''}
+                  onChange={(e) => setCoverName(e.target.value)}
                   required
                   placeholder="Tu nombre"
                   className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-white outline-none transition focus:border-primary-400"
@@ -204,8 +211,11 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
                 <label className="block text-sm text-zinc-200">
                   <span className="mb-1 block font-medium">Fecha de visita</span>
                   <input
+                    key="cover-reservation-date"
                     name="reservation_date"
                     type="date"
+                    value={coverDate ?? ''}
+                    onChange={(e) => setCoverDate(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
                     required
                     className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-white outline-none transition focus:border-primary-400"
@@ -215,11 +225,12 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
                 <label className="block text-sm text-zinc-200">
                   <span className="mb-1 block font-medium">Entradas</span>
                   <input
+                    key="cover-guest-count"
                     name="guest_count"
                     type="number"
                     min={1}
                     max={50}
-                    value={coverGuests}
+                    value={coverGuests ?? 1}
                     onChange={(e) => setCoverGuests(Math.max(1, parseInt(e.target.value) || 1))}
                     required
                     className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-white outline-none transition focus:border-primary-400"
@@ -230,11 +241,11 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
               <div className="rounded-xl border border-primary-500/20 bg-primary-500/5 p-4 space-y-2">
                 <div className="flex justify-between items-center text-sm text-zinc-300">
                   <span>Precio Unitario:</span>
-                  <span className="font-semibold text-white">${coverPrice.toFixed(2)} USD</span>
+                  <span className="font-semibold text-white">${Math.round(coverPrice).toLocaleString('es-CO')} COP</span>
                 </div>
                 <div className="flex justify-between items-center text-sm border-t border-white/5 pt-2 font-bold text-white">
                   <span>Total a Pagar:</span>
-                  <span className="text-emerald-400 text-lg">${(coverGuests * coverPrice).toFixed(2)} USD</span>
+                  <span className="text-emerald-400 text-lg">${Math.round(coverGuests * coverPrice).toLocaleString('es-CO')} COP</span>
                 </div>
               </div>
 
@@ -264,7 +275,7 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
                 className="w-full inline-flex justify-center items-center gap-2 rounded-xl bg-accent-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-500 disabled:cursor-not-allowed disabled:opacity-70 glow border border-accent-500/20 cursor-pointer"
               >
                 <Ticket className="w-4 h-4" />
-                {isCoverPending ? 'Procesando Compra...' : `Comprar Cover - $${(coverGuests * coverPrice).toFixed(2)}`}
+                {isCoverPending ? 'Procesando Compra...' : `Comprar Cover - $${Math.round(coverGuests * coverPrice).toLocaleString('es-CO')} COP`}
               </button>
             </form>
           )

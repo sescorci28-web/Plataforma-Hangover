@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import {
   Plus,
   Edit2,
@@ -76,11 +77,8 @@ function validateImageFile(file: File) {
   return null
 }
 
-// Usamos el bucket existente "avatars" con subcarpetas para no depender de
-// permisos de ownership sobre storage.objects ni de crear nuevos buckets.
-const STORAGE_BUCKET = "avatars"
-
-async function uploadClubAsset(file: File, folder: "clubs/banners" | "clubs/logos") {
+// Subimos las imágenes a los buckets correspondientes ("banners" o "logos")
+async function uploadClubAsset(file: File, bucket: "banners" | "logos") {
   const supabase = createClient()
   const cleanName = file.name
     .replace(/\s+/g, "-")
@@ -88,22 +86,23 @@ async function uploadClubAsset(file: File, folder: "clubs/banners" | "clubs/logo
     .slice(0, 60)
 
   const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg"
-  const filePath = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${cleanName || "asset"}.${fileExt}`
+  const filePath = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${cleanName || "asset"}.${fileExt}`
 
-  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(filePath, file, {
+  const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
     cacheControl: "3600",
     upsert: true,
   })
 
   if (error) {
-    throw new Error(error.message || `No fue posible subir la imagen (${folder}).`)
+    throw new Error(error.message || `No fue posible subir la imagen al bucket de ${bucket}.`)
   }
 
-  const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(filePath)
+  const { data } = supabase.storage.from(bucket).getPublicUrl(filePath)
   return data.publicUrl
 }
 
 export function ClubsManager({ clubs }: ClubsManagerProps) {
+  const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingClub, setEditingClub] = useState<Club | null>(null)
   const [name, setName] = useState("")
@@ -248,8 +247,8 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
     setIsUploadingAssets(true)
 
     try {
-      const uploadedBannerUrl = bannerAssetFile ? await uploadClubAsset(bannerAssetFile, "clubs/banners") : bannerImage || null
-      const uploadedLogoUrl = logoAssetFile ? await uploadClubAsset(logoAssetFile, "clubs/logos") : logo || null
+      const uploadedBannerUrl = bannerAssetFile ? await uploadClubAsset(bannerAssetFile, "banners") : bannerImage || null
+      const uploadedLogoUrl = logoAssetFile ? await uploadClubAsset(logoAssetFile, "logos") : logo || null
 
       const payload = {
         name: name.trim(),
@@ -274,6 +273,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
           setSuccess(true)
           setBannerAssetFile(null)
           setLogoAssetFile(null)
+          router.refresh()
           setTimeout(() => {
             setIsModalOpen(false)
             resetFormState()
@@ -299,6 +299,8 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
       if (result.error) {
         setError(result.error)
         alert(result.error)
+      } else {
+        router.refresh()
       }
       setDeletingClubId(null)
     })
@@ -550,15 +552,15 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-300 ml-1">Precio de Cover ($USD)</label>
+                  <label className="text-xs font-semibold text-zinc-300 ml-1">Precio de Cover ($ COP)</label>
                   <input
                     type="number"
                     min="0"
-                    step="0.01"
+                    step="1"
                     value={coverPrice}
-                    onChange={e => setCoverPrice(parseFloat(e.target.value) || 0.00)}
+                    onChange={e => setCoverPrice(parseFloat(e.target.value) || 0)}
                     disabled={isFormLocked}
-                    placeholder="Ej. 15.00"
+                    placeholder="Ej. 25000"
                     className="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary-500/50"
                   />
                 </div>

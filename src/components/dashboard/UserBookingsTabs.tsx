@@ -132,7 +132,7 @@ export function UserBookingsTabs({ initialBookings }: UserBookingsTabsProps) {
 
                   <div className="flex items-center justify-between sm:justify-end gap-6 border-t sm:border-t-0 border-white/5 pt-3 sm:pt-0">
                     <div className="text-left sm:text-right flex flex-col items-start sm:items-end gap-1.5">
-                      <p className="text-sm font-semibold text-white tracking-tight">${booking.total_amount}</p>
+                      <p className="text-sm font-semibold text-white tracking-tight">${Math.round(booking.total_amount).toLocaleString('es-CO')} COP</p>
 
                       <span className={`text-[10px] px-2.5 py-0.5 rounded-full border capitalize font-bold tracking-wider ${
                         booking.status === "confirmed"
@@ -289,7 +289,7 @@ export function UserBookingsTabs({ initialBookings }: UserBookingsTabsProps) {
 
                   <div className="flex justify-between items-center text-xs text-zinc-400">
                     <span>Precio total:</span>
-                    <span className="text-emerald-400 font-bold">${selectedBooking.total_amount}</span>
+                    <span className="text-emerald-400 font-bold">${Math.round(selectedBooking.total_amount).toLocaleString('es-CO')} COP</span>
                   </div>
                 </div>
 
