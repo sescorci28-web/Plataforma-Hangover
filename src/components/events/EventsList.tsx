@@ -8,9 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 
 interface ExtendedEvent extends Event {
-  creator: {
-    full_name: string | null;
-  } | null;
+  creator: { full_name: string | null } | { full_name: string | null }[] | null;
 }
 
 interface EventsListProps {
@@ -86,7 +84,8 @@ export function EventsList({ initialEvents, user }: EventsListProps) {
               hour: "2-digit",
               minute: "2-digit"
             });
-            const creatorName = event.creator?.full_name || "Organizador Hangover";
+            const creatorRaw = event.creator;
+            const creatorName = (Array.isArray(creatorRaw) ? creatorRaw[0]?.full_name : (creatorRaw as any)?.full_name) || "Organizador Hangover";
 
             return (
               <div key={event.id} className="glass-card overflow-hidden hover:border-white/20 transition-all flex flex-col h-full group">
