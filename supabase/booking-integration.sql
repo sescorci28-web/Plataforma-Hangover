@@ -184,7 +184,9 @@ FOR ALL
 TO authenticated
 USING (
   auth.uid() = provider_id
+  OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
 )
 WITH CHECK (
   auth.uid() = provider_id
+  OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
 );

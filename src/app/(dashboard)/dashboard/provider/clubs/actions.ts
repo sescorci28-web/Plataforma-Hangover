@@ -120,7 +120,15 @@ export async function updateClub(
   const slug = slugify(data.name);
 
   try {
-    const { error: updateError } = await supabase
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    const isAdmin = profile?.role === "admin";
+
+    let query = supabase
       .from("clubs")
       .update({
         name: data.name,
@@ -136,8 +144,13 @@ export async function updateClub(
         active: data.active,
         cover_price: Number(data.cover_price) || 0.00
       })
-      .eq("id", id)
-      .eq("provider_id", user.id); // Ensure ownership
+      .eq("id", id);
+
+    if (!isAdmin) {
+      query = query.eq("provider_id", user.id); // Ensure ownership
+    }
+
+    const { error: updateError } = await query;
 
     if (updateError) {
       console.error("Update club error:", updateError);
@@ -146,7 +159,7 @@ export async function updateClub(
 
     // Revalidate paths
     revalidatePath("/discotecas");
-    revalidatePath("/discotecas/[slug]", "page");
+    revalidatePath("/discotecas/[slug]");
     revalidatePath("/dashboard/provider/clubs");
     return { success: true };
   } catch (err: any) {
@@ -162,11 +175,24 @@ export async function deleteClub(id: string) {
   }
 
   try {
-    const { error: deleteError } = await supabase
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    const isAdmin = profile?.role === "admin";
+
+    let query = supabase
       .from("clubs")
       .delete()
-      .eq("id", id)
-      .eq("provider_id", user.id); // Ensure ownership
+      .eq("id", id);
+
+    if (!isAdmin) {
+      query = query.eq("provider_id", user.id); // Ensure ownership
+    }
+
+    const { error: deleteError } = await query;
 
     if (deleteError) {
       console.error("Delete club error:", deleteError);
@@ -175,7 +201,7 @@ export async function deleteClub(id: string) {
 
     // Revalidate paths
     revalidatePath("/discotecas");
-    revalidatePath("/discotecas/[slug]", "page");
+    revalidatePath("/discotecas/[slug]");
     revalidatePath("/dashboard/provider/clubs");
     return { success: true };
   } catch (err: any) {

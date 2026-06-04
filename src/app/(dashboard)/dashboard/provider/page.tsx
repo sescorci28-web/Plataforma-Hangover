@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { BarChart3, Settings, Calendar, DollarSign, Plus, Bell, MapPin, User, LogOut, AlertTriangle, Building2, QrCode } from "lucide-react";
+import { BarChart3, Settings, Calendar, DollarSign, Plus, Bell, MapPin, User, LogOut, AlertTriangle, Building2, QrCode, Camera } from "lucide-react";
 import Link from "next/link";
 import { logout } from "@/app/(auth)/actions";
 import { BookingActions } from "@/components/provider/BookingActions";
@@ -166,6 +166,10 @@ export default async function ProviderDashboard() {
                 <QrCode className="w-5 h-5 text-primary-400" />
                 Validar Entrada
               </Link>
+              <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
+                <Camera className="w-5 h-5 text-accent-400" />
+                Escáner Cámara
+              </Link>
               <Link href="/dashboard/profile" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
                 <Settings className="w-5 h-5" />
                 Editar Perfil
@@ -216,9 +220,13 @@ export default async function ProviderDashboard() {
                   <span>{activeProfile.city}</span>
                 </div>
               )}
+              <Link href="/dashboard/provider/scanner" className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 glow cursor-pointer text-sm">
+                <Camera className="w-5 h-5" />
+                Validar por Cámara
+              </Link>
               <Link href="/dashboard/provider/validate" className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 glow cursor-pointer text-sm">
                 <QrCode className="w-5 h-5" />
-                Validar QR / Acceso
+                Validar Manual
               </Link>
               <Link href="/dashboard/provider/new-service" className="bg-accent-600 hover:bg-accent-500 text-white px-5 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 glow cursor-pointer text-sm">
                 <Plus className="w-5 h-5" />

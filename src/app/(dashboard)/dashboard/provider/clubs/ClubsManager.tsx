@@ -77,27 +77,32 @@ function validateImageFile(file: File) {
   return null
 }
 
-// Subimos las imágenes a los buckets correspondientes ("banners" o "logos")
+// Subimos las imágenes al bucket "avatars" con subcarpetas ("clubs/banners" o "clubs/logos")
 async function uploadClubAsset(file: File, bucket: "banners" | "logos") {
   const supabase = createClient()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    throw new Error("No fue posible subir la imagen. Usuario no autenticado.")
+  }
+
   const cleanName = file.name
     .replace(/\s+/g, "-")
     .replace(/[^a-zA-Z0-9._-]/g, "")
     .slice(0, 60)
 
   const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg"
-  const filePath = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${cleanName || "asset"}.${fileExt}`
+  const filePath = `${user.id}/clubs/${bucket}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${cleanName || "asset"}.${fileExt}`
 
-  const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
+  const { error } = await supabase.storage.from("avatars").upload(filePath, file, {
     cacheControl: "3600",
     upsert: true,
   })
 
   if (error) {
-    throw new Error(error.message || `No fue posible subir la imagen al bucket de ${bucket}.`)
+    throw new Error(error.message || `No fue posible subir la imagen a avatars/clubs/${bucket}.`)
   }
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(filePath)
+  const { data } = supabase.storage.from("avatars").getPublicUrl(filePath)
   return data.publicUrl
 }
 
@@ -412,12 +417,22 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                     {club.description || "Sin descripción proporcionada."}
                   </p>
 
-                  {club.opening_hours && (
-                    <div className="flex items-center gap-1.5 text-xs text-zinc-400 bg-white/5 py-1.5 px-3 rounded-lg border border-white/5 mt-2">
-                      <Clock className="w-3.5 h-3.5 text-primary-400 shrink-0" />
-                      <span className="truncate">{club.opening_hours}</span>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {club.opening_hours && (
+                      <div className="flex items-center gap-1.5 text-xs text-zinc-400 bg-white/5 py-1.5 px-3 rounded-lg border border-white/5">
+                        <Clock className="w-3.5 h-3.5 text-primary-400 shrink-0" />
+                        <span className="truncate">{club.opening_hours}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 text-xs text-zinc-400 bg-white/5 py-1.5 px-3 rounded-lg border border-white/5">
+                      <span className="text-primary-400 font-semibold shrink-0">Cover:</span>
+                      <span className="text-zinc-200">
+                        {club.cover_price !== null && club.cover_price !== undefined && Number(club.cover_price) > 0
+                          ? `$${Number(club.cover_price).toLocaleString('es-CO')} COP`
+                          : "Gratis / No definido"}
+                      </span>
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3 pt-3 border-t border-white/5 mt-3">

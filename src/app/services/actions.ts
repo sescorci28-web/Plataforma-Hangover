@@ -543,5 +543,120 @@ export async function validateQRCode(qrCode: string) {
   }
 }
 
+/**
+ * Audits a QR code and returns booking details without marking it as used.
+ */
+export async function checkQRCode(qrCode: string) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  // 1. Get validator profile role (provider or admin)
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile || (profile.role !== "provider" && profile.role !== "admin")) {
+    return { error: "No tienes permisos de proveedor o administrador para auditar códigos QR." };
+  }
+
+  try {
+    // 2. Fetch booking by qr_code
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select("id, status, provider_id, qr_status, number_of_people, user_id, event_id, club_id, total_amount, event_date, booking_type")
+      .eq("qr_code", qrCode)
+      .maybeSingle();
+
+    if (bookingError) {
+      return { error: `Error al buscar la entrada/reserva: ${bookingError.message}` };
+    }
+
+    if (!booking) {
+      return { error: "El código QR ingresado no existe en la base de datos." };
+    }
+
+    // 3. Check authorization (provider must own the service/club/event, i.e. booking.provider_id === user.id)
+    if (profile.role === "provider" && booking.provider_id !== user.id) {
+      return { error: "No estás autorizado para validar este código QR. Pertenece a otro proveedor." };
+    }
+
+    // 4. Fetch buyer profile name
+    const { data: buyerProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", booking.user_id)
+      .single();
+
+    // 5. Fetch target title (event name or club name)
+    let targetTitle = "Entrada/Reserva";
+    if (booking.event_id) {
+      const { data: eventData } = await supabase
+        .from("events")
+        .select("title")
+        .eq("id", booking.event_id)
+        .single();
+      if (eventData) targetTitle = eventData.title;
+    } else if (booking.club_id) {
+      const { data: clubData } = await supabase
+        .from("clubs")
+        .select("name")
+        .eq("id", booking.club_id)
+        .single();
+      if (clubData) targetTitle = clubData.name;
+    }
+
+    const bookingDetails = {
+      id: booking.id,
+      buyerName: buyerProfile?.full_name || "Cliente Hangover",
+      title: targetTitle,
+      numberOfPeople: booking.number_of_people || 1,
+      totalAmount: booking.total_amount,
+      eventDate: booking.event_date,
+      bookingType: booking.booking_type
+    };
+
+    // 6. Return specific status states based on the audit
+    if (booking.qr_status === "used") {
+      return {
+        success: true,
+        status: "used",
+        bookingDetails
+      };
+    }
+
+    if (booking.qr_status === "cancelled") {
+      return {
+        success: true,
+        status: "cancelled",
+        bookingDetails
+      };
+    }
+
+    if (booking.status !== "confirmed" && booking.status !== "completed") {
+      return {
+        success: true,
+        status: "invalid", // Not confirmed/completed
+        bookingDetails
+      };
+    }
+
+    return {
+      success: true,
+      status: "valid",
+      bookingDetails
+    };
+
+  } catch (err: any) {
+    return { error: err.message || "Ocurrió un error inesperado al auditar el QR." };
+  }
+}
+
+
 
 
