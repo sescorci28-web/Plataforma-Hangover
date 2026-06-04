@@ -147,7 +147,7 @@ export function ClubTabs({
 
   // Cart operations
   const addToCart = (item: MenuItem) => {
-    if (!item.available) return;
+    if (item.available === false) return;
     const existing = cart.find((i) => i.id === item.id);
     if (existing) {
       saveCart(
@@ -402,7 +402,7 @@ export function ClubTabs({
                           <div
                             key={`featured-${item.id}`}
                             className={`glass-card p-4 bg-zinc-950/60 border border-amber-500/20 hover:border-amber-500/40 transition-all rounded-2xl flex flex-col justify-between w-64 shrink-0 shadow-[0_0_15px_rgba(245,158,11,0.05)] relative ${
-                              !item.available ? "opacity-60 saturate-50" : ""
+                              item.available === false ? "opacity-60 saturate-50" : ""
                             }`}
                           >
                             <div>
@@ -422,7 +422,7 @@ export function ClubTabs({
                                   <span className="text-[9px] text-amber-300 bg-amber-950/80 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                                     🔥 TOP
                                   </span>
-                                  {!item.available && (
+                                  {item.available === false && (
                                     <span className="text-[9px] text-red-300 bg-red-950/85 border border-red-500/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                                       AGOTADO
                                     </span>
@@ -448,14 +448,14 @@ export function ClubTabs({
                               </span>
                               <button
                                 onClick={() => addToCart(item)}
-                                disabled={!item.available}
+                                disabled={item.available === false}
                                 className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                                  item.available
+                                  item.available !== false
                                     ? "bg-primary-600 hover:bg-primary-500 text-white shadow-md shadow-primary-500/10 active:scale-95"
                                     : "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed"
                                 }`}
                               >
-                                {item.available ? "Agregar" : "Agotado"}
+                                {item.available !== false ? "Agregar" : "Agotado"}
                               </button>
                             </div>
                           </div>
@@ -475,7 +475,7 @@ export function ClubTabs({
                         <div
                           key={item.id}
                           className={`glass-card p-4 bg-zinc-950/40 border border-white/5 hover:border-white/10 transition-all rounded-2xl flex gap-4 items-center relative ${
-                            !item.available ? "opacity-60 saturate-50" : ""
+                            item.available === false ? "opacity-60 saturate-50" : ""
                           }`}
                         >
                           <div className="w-18 h-18 rounded-xl border border-white/10 bg-zinc-900 overflow-hidden shrink-0 relative">
@@ -490,7 +490,7 @@ export function ClubTabs({
                                 <Wine className="w-7 h-7" />
                               </div>
                             )}
-                            {!item.available && (
+                            {item.available === false && (
                               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                                 <span className="text-[9px] text-red-400 bg-red-950/90 border border-red-500/20 px-1.5 py-0.5 rounded-full font-bold">
                                   AGOTADO
@@ -521,15 +521,15 @@ export function ClubTabs({
                           <div className="shrink-0">
                             <button
                               onClick={() => addToCart(item)}
-                              disabled={!item.available}
+                              disabled={item.available === false}
                               className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                                item.available
+                                item.available !== false
                                   ? "bg-primary-600 hover:bg-primary-500 text-white shadow-md shadow-primary-500/10 active:scale-90"
                                   : "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed"
                               }`}
-                              title={item.available ? "Agregar al carrito" : "Agotado"}
+                              title={item.available !== false ? "Agregar al carrito" : "Agotado"}
                             >
-                              {item.available ? <Plus className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                              {item.available !== false ? <Plus className="w-4 h-4" /> : <X className="w-4 h-4" />}
                             </button>
                           </div>
                         </div>

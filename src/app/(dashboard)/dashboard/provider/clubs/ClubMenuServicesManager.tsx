@@ -502,54 +502,71 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
                             />
                           </div>
 
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             <label className="text-[11px] font-semibold text-zinc-400 ml-1">Visibilidad</label>
-                            <div className="flex items-center gap-2 h-9 pl-1">
-                              <input
-                                id="item-active"
-                                type="checkbox"
-                                checked={itemActive}
-                                onChange={(e) => setItemActive(e.target.checked)}
+                            <div className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl">
+                              <span className="text-xs text-zinc-300 select-none">Visible en menú público</span>
+                              <button
+                                type="button"
+                                onClick={() => setItemActive(!itemActive)}
                                 disabled={isPending}
-                                className="w-4 h-4 rounded border-white/10 bg-black/60 accent-primary-500 cursor-pointer"
-                              />
-                              <label htmlFor="item-active" className="text-xs text-zinc-300 cursor-pointer select-none">
-                                Producto activo en carta
-                              </label>
+                                className={`w-10 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 focus:outline-none ${
+                                  itemActive ? "bg-primary-600" : "bg-zinc-700"
+                                }`}
+                              >
+                                <motion.div
+                                  layout
+                                  className="bg-white w-4 h-4 rounded-full shadow-md"
+                                  animate={{ x: itemActive ? 16 : 0 }}
+                                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                />
+                              </button>
                             </div>
                           </div>
 
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             <label className="text-[11px] font-semibold text-zinc-400 ml-1">Destacado</label>
-                            <div className="flex items-center gap-2 h-9 pl-1">
-                              <input
-                                id="item-featured"
-                                type="checkbox"
-                                checked={itemFeatured}
-                                onChange={(e) => setItemFeatured(e.target.checked)}
+                            <div className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl">
+                              <span className="text-xs text-amber-300 select-none font-medium flex items-center gap-1">
+                                🔥 Más vendido
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setItemFeatured(!itemFeatured)}
                                 disabled={isPending}
-                                className="w-4 h-4 rounded border-white/10 bg-black/60 accent-primary-500 cursor-pointer"
-                              />
-                              <label htmlFor="item-featured" className="text-xs text-zinc-300 cursor-pointer select-none font-medium text-amber-300 flex items-center gap-1">
-                                🔥 Más vendido / Destacado
-                              </label>
+                                className={`w-10 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 focus:outline-none ${
+                                  itemFeatured ? "bg-amber-500" : "bg-zinc-700"
+                                }`}
+                              >
+                                <motion.div
+                                  layout
+                                  className="bg-white w-4 h-4 rounded-full shadow-md"
+                                  animate={{ x: itemFeatured ? 16 : 0 }}
+                                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                />
+                              </button>
                             </div>
                           </div>
 
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             <label className="text-[11px] font-semibold text-zinc-400 ml-1">Disponibilidad</label>
-                            <div className="flex items-center gap-2 h-9 pl-1">
-                              <input
-                                id="item-available"
-                                type="checkbox"
-                                checked={itemAvailable}
-                                onChange={(e) => setItemAvailable(e.target.checked)}
+                            <div className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl">
+                              <span className="text-xs text-zinc-300 select-none">Disponible para la venta</span>
+                              <button
+                                type="button"
+                                onClick={() => setItemAvailable(!itemAvailable)}
                                 disabled={isPending}
-                                className="w-4 h-4 rounded border-white/10 bg-black/60 accent-primary-500 cursor-pointer"
-                              />
-                              <label htmlFor="item-available" className="text-xs text-zinc-300 cursor-pointer select-none">
-                                Disponible para la venta
-                              </label>
+                                className={`w-10 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 focus:outline-none ${
+                                  itemAvailable ? "bg-emerald-500" : "bg-zinc-700"
+                                }`}
+                              >
+                                <motion.div
+                                  layout
+                                  className="bg-white w-4 h-4 rounded-full shadow-md"
+                                  animate={{ x: itemAvailable ? 16 : 0 }}
+                                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                />
+                              </button>
                             </div>
                           </div>
 
@@ -638,7 +655,7 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
                                     🔥 Destacado
                                   </span>
                                 )}
-                                {item.available ? (
+                                {item.available !== false ? (
                                   <span className="text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
                                     ✓ Disponible
                                   </span>
