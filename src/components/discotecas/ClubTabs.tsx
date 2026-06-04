@@ -123,6 +123,7 @@ export function ClubTabs({
   const [manualTableNumber, setManualTableNumber] = useState<string>("");
   const [isSendingOrder, setIsSendingOrder] = useState<boolean>(false);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [hasActiveSession, setHasActiveSession] = useState<boolean>(false);
 
   // Sync and validate cart on load
   useEffect(() => {
@@ -143,6 +144,33 @@ export function ClubTabs({
       console.error("Error cargando el carrito:", err);
     }
   }, [clubId]);
+
+  // Check if there is an active open session
+  useEffect(() => {
+    if (!isMounted) return;
+    const checkActiveSession = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const { data, error } = await supabase
+          .from("live_sessions")
+          .select("id")
+          .eq("club_id", clubId)
+          .eq("user_id", user.id)
+          .eq("status", "open")
+          .maybeSingle();
+          
+        if (!error && data) {
+          setHasActiveSession(true);
+        }
+      } catch (err) {
+        console.error("Error checking active session:", err);
+      }
+    };
+    checkActiveSession();
+  }, [isMounted, clubId]);
 
   // Fetch tables from Supabase Client
   useEffect(() => {
@@ -300,41 +328,55 @@ export function ClubTabs({
 
   return (
     <div className="space-y-6 relative">
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-white/5 p-1 bg-black/30 rounded-2xl gap-2 shrink-0 max-w-md">
-        <button
-          onClick={() => setActiveTab("info")}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
-            activeTab === "info"
-              ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
-          }`}
-        >
-          <Info className="w-3.5 h-3.5" />
-          Información
-        </button>
-        <button
-          onClick={() => setActiveTab("menu")}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
-            activeTab === "menu"
-              ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
-          }`}
-        >
-          <Wine className="w-3.5 h-3.5" />
-          Carta / Menú
-        </button>
-        <button
-          onClick={() => setActiveTab("services")}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
-            activeTab === "services"
-              ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
-          }`}
-        >
-          <Settings2 className="w-3.5 h-3.5" />
-          Servicios
-        </button>
+      {/* Navigation and Active Mesa Tab Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 pb-4">
+        {/* Navigation Tabs */}
+        <div className="flex p-1 bg-black/30 rounded-2xl gap-2 shrink-0 w-full sm:max-w-md">
+          <button
+            onClick={() => setActiveTab("info")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+              activeTab === "info"
+                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+            }`}
+          >
+            <Info className="w-3.5 h-3.5" />
+            Información
+          </button>
+          <button
+            onClick={() => setActiveTab("menu")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+              activeTab === "menu"
+                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+            }`}
+          >
+            <Wine className="w-3.5 h-3.5" />
+            Carta / Menú
+          </button>
+          <button
+            onClick={() => setActiveTab("services")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+              activeTab === "services"
+                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+            }`}
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            Servicios
+          </button>
+        </div>
+
+        {/* Active Session Button */}
+        {hasActiveSession && (
+          <button
+            onClick={() => router.push(`/discotecas/${clubSlug}/mi-cuenta`)}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 hover:from-emerald-500/20 hover:to-emerald-600/20 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400 text-xs font-bold py-2.5 px-4.5 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.05)] transition-all cursor-pointer w-full sm:w-auto justify-center"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+            <span>Mi Mesa 🟢</span>
+          </button>
+        )}
       </div>
 
       {/* Tab Contents with animations */}

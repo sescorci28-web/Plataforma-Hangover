@@ -328,7 +328,17 @@ export default function MiCuentaPage() {
                 <div>
                   <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Total Acumulado</p>
                   <p className="text-base font-black text-emerald-400 font-outfit">
-                    ${session.total_amount.toLocaleString("es-CO")} COP
+                    ${(() => {
+                      const calculatedTotal = orders
+                        .filter(o => o.status === 'confirmed')
+                        .reduce((sum, order) => {
+                          return sum + order.live_order_items.reduce((itemSum, item) => {
+                            return itemSum + (Number(item.price_at_order) * item.quantity);
+                          }, 0);
+                        }, 0);
+                      
+                      return (calculatedTotal || session.total_amount).toLocaleString("es-CO");
+                    })()} COP
                   </p>
                 </div>
               </div>
