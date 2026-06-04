@@ -19,34 +19,31 @@ export function QrScanner() {
     // Dynamic import to prevent SSR (Server-Side Rendering) failures in Next.js
     import("html5-qrcode").then((module) => {
       // Small timeout to ensure the DOM element "qr-reader" exists
-      setTimeout(() => {
+      setTimeout(async () => {
         const qrReaderElem = document.getElementById("qr-reader");
         if (!qrReaderElem) return;
 
         // Clean up any existing instances first
-        if (scannerRef.current) {
-          scannerRef.current.clear().catch(() => {});
+        try {
+          if (scannerRef.current && scannerRef.current.isScanning) {
+            await scannerRef.current.stop();
+          }
+        } catch (err) {
+          console.warn("Error cleaning up scanner during startup:", err);
         }
 
-        const html5QrcodeScanner = new module.Html5QrcodeScanner(
-          "qr-reader",
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-            showTorchButtonIfSupported: true,
-          },
-          /* verbose= */ false
-        );
-
-        scannerRef.current = html5QrcodeScanner;
+        const html5Qrcode = new module.Html5Qrcode("qr-reader");
 
         const onScanSuccess = async (decodedText: string) => {
           console.log(`Scan success: ${decodedText}`);
           
-          // Stop scanner
-          if (scannerRef.current) {
-            scannerRef.current.clear().catch(() => {});
+          // Stop scanner before processing the result
+          try {
+            if (html5Qrcode.isScanning) {
+              await html5Qrcode.stop();
+            }
+          } catch (err) {
+            console.error("Error stopping scanner on success:", err);
           }
 
           setScanStatus("processing");
@@ -70,7 +67,23 @@ export function QrScanner() {
           // Quietly log scanner failures as they happen continuously
         };
 
-        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        try {
+          await html5Qrcode.start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 },
+              aspectRatio: 1.0,
+            },
+            onScanSuccess,
+            onScanFailure
+          );
+          scannerRef.current = html5Qrcode;
+        } catch (err: any) {
+          console.error("Error starting camera:", err);
+          setScanStatus("error");
+          setErrorMsg("No se pudo iniciar la cámara. Asegúrate de conceder los permisos correspondientes.");
+        }
       }, 100);
     }).catch(err => {
       console.error("Failed to load html5-qrcode library", err);
@@ -83,8 +96,10 @@ export function QrScanner() {
     startScanner();
 
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(() => {});
+      if (scannerRef.current && scannerRef.current.isScanning) {
+        scannerRef.current.stop().catch((err: any) => {
+          console.error("Error stopping scanner on unmount:", err);
+        });
       }
     };
   }, []);
