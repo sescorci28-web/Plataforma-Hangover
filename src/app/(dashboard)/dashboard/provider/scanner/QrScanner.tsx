@@ -25,16 +25,21 @@ export function QrScanner() {
         const qrReaderElem = document.getElementById("qr-reader");
         if (!qrReaderElem) return;
 
-        // Clean up any existing instances first
-        try {
-          if (scannerRef.current && scannerRef.current.isScanning) {
-            await scannerRef.current.stop();
-          }
-        } catch (err) {
-          console.warn("Error cleaning up scanner during startup:", err);
-        }
+        let html5Qrcode = scannerRef.current;
 
-        const html5Qrcode = new module.Html5Qrcode("qr-reader");
+        // Clean up or reuse the existing instance
+        if (!html5Qrcode) {
+          html5Qrcode = new module.Html5Qrcode("qr-reader");
+          scannerRef.current = html5Qrcode;
+        } else {
+          try {
+            if (html5Qrcode.isScanning) {
+              await html5Qrcode.stop();
+            }
+          } catch (err) {
+            console.warn("Error stopping scanner before reuse:", err);
+          }
+        }
 
         const onScanSuccess = async (decodedText: string) => {
           console.log(`Scan success: ${decodedText}`);
@@ -80,7 +85,6 @@ export function QrScanner() {
             onScanSuccess,
             onScanFailure
           );
-          scannerRef.current = html5Qrcode;
         } catch (err: any) {
           console.error("Error starting camera:", err);
           setScanStatus("error");
@@ -136,34 +140,29 @@ export function QrScanner() {
 
   return (
     <div className="space-y-6">
-      <AnimatePresence mode="wait">
-        {scanStatus === "scanning" && (
-          <motion.div
-            key="scanner-view"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="glass-card p-6 bg-[#0c0c14] border border-white/10 rounded-2xl relative overflow-hidden"
-          >
-            <div className="absolute -top-12 -left-12 w-32 h-32 bg-accent-600/10 rounded-full blur-2xl pointer-events-none" />
-            
-            <div className="space-y-4 text-center">
-              <div className="flex items-center justify-center gap-2 text-accent-400 font-semibold uppercase tracking-wider text-xs">
-                <Camera className="w-4 h-4 animate-pulse" />
-                <span>Cámara Activa</span>
-              </div>
-              
-              <div className="max-w-sm mx-auto overflow-hidden rounded-2xl border border-white/10 bg-black/40 relative">
-                <div id="qr-reader" className="w-full h-full" />
-              </div>
-              
-              <p className="text-xs text-zinc-400">
-                Apunta tu cámara al código QR de la entrada para escanearlo automáticamente.
-              </p>
+      {/* Scanner View (Always mounted in DOM to prevent race conditions with html5-qrcode and AnimatePresence) */}
+      <div className={scanStatus === "scanning" ? "block" : "hidden"}>
+        <div className="glass-card p-6 bg-[#0c0c14] border border-white/10 rounded-2xl relative overflow-hidden">
+          <div className="absolute -top-12 -left-12 w-32 h-32 bg-accent-600/10 rounded-full blur-2xl pointer-events-none" />
+          
+          <div className="space-y-4 text-center">
+            <div className="flex items-center justify-center gap-2 text-accent-400 font-semibold uppercase tracking-wider text-xs">
+              <Camera className="w-4 h-4 animate-pulse" />
+              <span>Cámara Activa</span>
             </div>
-          </motion.div>
-        )}
+            
+            <div className="max-w-sm mx-auto overflow-hidden rounded-2xl border border-white/10 bg-black/40 relative">
+              <div id="qr-reader" className="w-full h-full" />
+            </div>
+            
+            <p className="text-xs text-zinc-400">
+              Apunta tu cámara al código QR de la entrada para escanearlo automáticamente.
+            </p>
+          </div>
+        </div>
+      </div>
 
+      <AnimatePresence mode="wait">
         {scanStatus === "processing" && (
           <motion.div
             key="processing-view"
