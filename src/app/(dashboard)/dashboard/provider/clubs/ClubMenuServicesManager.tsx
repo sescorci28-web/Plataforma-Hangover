@@ -51,6 +51,8 @@ interface MenuItem {
   price: number;
   image_url: string | null;
   active: boolean;
+  featured: boolean;
+  available: boolean;
 }
 
 interface ClubService {
@@ -115,11 +117,13 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
   const [isMenuFormOpen, setIsMenuFormOpen] = useState(false);
   const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
   const [itemName, setItemName] = useState("");
-  const [itemCategory, setItemCategory] = useState("Botellas");
+  const [itemCategory, setItemCategory] = useState("Whisky");
   const [itemDescription, setItemDescription] = useState("");
   const [itemPrice, setItemPrice] = useState("");
   const [itemImageUrl, setItemImageUrl] = useState("");
   const [itemActive, setItemActive] = useState(true);
+  const [itemFeatured, setItemFeatured] = useState(false);
+  const [itemAvailable, setItemAvailable] = useState(true);
   const [itemPreviewUrl, setItemPreviewUrl] = useState<string | null>(null);
   const [itemAssetFile, setItemAssetFile] = useState<File | null>(null);
 
@@ -182,11 +186,13 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
   const resetMenuForm = () => {
     setEditingMenuItem(null);
     setItemName("");
-    setItemCategory("Botellas");
+    setItemCategory("Whisky");
     setItemDescription("");
     setItemPrice("");
     setItemImageUrl("");
     setItemActive(true);
+    setItemFeatured(false);
+    setItemAvailable(true);
     cleanupBlobUrl(itemPreviewUrl);
     setItemPreviewUrl(null);
     setItemAssetFile(null);
@@ -243,6 +249,8 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
           price: parseFloat(itemPrice) || 0,
           image_url: uploadedUrl || null,
           active: itemActive,
+          featured: itemFeatured,
+          available: itemAvailable
         };
 
         const res = editingMenuItem
@@ -466,10 +474,16 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
                               disabled={isPending}
                               className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary-500/50"
                             >
-                              <option value="Botellas">Botellas</option>
-                              <option value="Tragos">Tragos / Cocteles</option>
-                              <option value="Comida">Comida / Snacks</option>
-                              <option value="Sin Alcohol">Sin Alcohol / Bebidas</option>
+                              <option value="Whisky">Whisky</option>
+                              <option value="Vodka">Vodka</option>
+                              <option value="Ron">Ron</option>
+                              <option value="Tequila">Tequila</option>
+                              <option value="Cerveza">Cerveza</option>
+                              <option value="Cócteles">Cócteles</option>
+                              <option value="Hookahs">Hookahs</option>
+                              <option value="Comida">Comida</option>
+                              <option value="Combos">Combos</option>
+                              <option value="Otros">Otros</option>
                             </select>
                           </div>
 
@@ -501,6 +515,40 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
                               />
                               <label htmlFor="item-active" className="text-xs text-zinc-300 cursor-pointer select-none">
                                 Producto activo en carta
+                              </label>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-zinc-400 ml-1">Destacado</label>
+                            <div className="flex items-center gap-2 h-9 pl-1">
+                              <input
+                                id="item-featured"
+                                type="checkbox"
+                                checked={itemFeatured}
+                                onChange={(e) => setItemFeatured(e.target.checked)}
+                                disabled={isPending}
+                                className="w-4 h-4 rounded border-white/10 bg-black/60 accent-primary-500 cursor-pointer"
+                              />
+                              <label htmlFor="item-featured" className="text-xs text-zinc-300 cursor-pointer select-none font-medium text-amber-300 flex items-center gap-1">
+                                🔥 Más vendido / Destacado
+                              </label>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-zinc-400 ml-1">Disponibilidad</label>
+                            <div className="flex items-center gap-2 h-9 pl-1">
+                              <input
+                                id="item-available"
+                                type="checkbox"
+                                checked={itemAvailable}
+                                onChange={(e) => setItemAvailable(e.target.checked)}
+                                disabled={isPending}
+                                className="w-4 h-4 rounded border-white/10 bg-black/60 accent-primary-500 cursor-pointer"
+                              />
+                              <label htmlFor="item-available" className="text-xs text-zinc-300 cursor-pointer select-none">
+                                Disponible para la venta
                               </label>
                             </div>
                           </div>
@@ -582,13 +630,27 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h5 className="font-bold text-white text-sm truncate font-outfit">{item.name}</h5>
-                                <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/5 text-[9px] text-zinc-400">
+                                <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/5 text-[9px] text-zinc-400 font-semibold">
                                   {item.category}
                                 </span>
-                                {item.active ? (
-                                  <span className="text-[9px] text-emerald-400 flex items-center gap-0.5"><Eye className="w-2.5 h-2.5" /> Activo</span>
+                                {item.featured && (
+                                  <span className="text-[9px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-bold flex items-center gap-0.5">
+                                    🔥 Destacado
+                                  </span>
+                                )}
+                                {item.available ? (
+                                  <span className="text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                                    ✓ Disponible
+                                  </span>
                                 ) : (
-                                  <span className="text-[9px] text-zinc-500 flex items-center gap-0.5"><EyeOff className="w-2.5 h-2.5" /> Inactivo</span>
+                                  <span className="text-[9px] text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                                    🚫 Agotado
+                                  </span>
+                                )}
+                                {item.active ? (
+                                  <span className="text-[9px] text-zinc-300 bg-white/5 border border-white/5 px-2 py-0.5 rounded-full font-medium flex items-center gap-0.5"><Eye className="w-2.5 h-2.5" /> Visible</span>
+                                ) : (
+                                  <span className="text-[9px] text-zinc-600 bg-black/40 border border-white/5 px-2 py-0.5 rounded-full font-medium flex items-center gap-0.5"><EyeOff className="w-2.5 h-2.5" /> Oculto</span>
                                 )}
                               </div>
                               {item.description && <p className="text-[11px] text-zinc-400 line-clamp-1 mt-0.5">{item.description}</p>}
@@ -607,6 +669,8 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
                                 setItemPrice(item.price.toString());
                                 setItemImageUrl(item.image_url || "");
                                 setItemActive(item.active);
+                                setItemFeatured(item.featured || false);
+                                setItemAvailable(item.available ?? true);
                                 setItemPreviewUrl(item.image_url);
                                 setIsMenuFormOpen(true);
                               }}
@@ -799,3 +863,4 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
     </div>
   );
 }
+

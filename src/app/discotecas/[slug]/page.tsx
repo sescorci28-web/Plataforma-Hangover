@@ -191,6 +191,7 @@ export default async function ClubDetailPage({ params }: PageProps) {
           {/* Tabs System (Left Side) */}
           <div className="w-full">
             <ClubTabs
+              clubId={club.id}
               clubName={club.name}
               clubDescription={club.description}
               clubAddress={club.address}

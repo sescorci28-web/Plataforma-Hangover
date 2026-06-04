@@ -221,6 +221,8 @@ export async function createMenuItem(data: {
   price: number;
   image_url: string | null;
   active: boolean;
+  featured: boolean;
+  available: boolean;
 }) {
   const { error: authError, user, supabase } = await validateProvider();
   if (authError || !user) {
@@ -257,7 +259,9 @@ export async function createMenuItem(data: {
         description: data.description || null,
         price: Number(data.price) || 0,
         image_url: data.image_url || null,
-        active: data.active
+        active: data.active,
+        featured: data.featured,
+        available: data.available
       });
 
     if (insertError) {
@@ -284,6 +288,8 @@ export async function updateMenuItem(
     price: number;
     image_url: string | null;
     active: boolean;
+    featured: boolean;
+    available: boolean;
   }
 ) {
   const { error: authError, user, supabase } = await validateProvider();
@@ -331,7 +337,9 @@ export async function updateMenuItem(
         description: data.description || null,
         price: Number(data.price) || 0,
         image_url: data.image_url || null,
-        active: data.active
+        active: data.active,
+        featured: data.featured,
+        available: data.available
       })
       .eq("id", id);
 
