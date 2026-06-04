@@ -73,6 +73,15 @@ export default function MiCuentaPage() {
   
   const [isPending, startTransition] = useTransition();
 
+  const getStepIndex = (status: string) => {
+    switch (status) {
+      case "pending": return 0;
+      case "preparing": return 1;
+      case "delivered_by_staff": return 2;
+      default: return 0;
+    }
+  };
+
   const fetchSessionAndOrders = async () => {
     const supabase = createClient();
     try {
@@ -326,139 +335,266 @@ export default function MiCuentaPage() {
             </div>
 
             {/* List of Orders */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 pl-1 border-l-2 border-primary-500">
-                <Receipt className="w-4 h-4 text-primary-400" />
-                Historial de Pedidos de la Noche ({orders.length})
-              </h3>
+            <div className="space-y-8">
+              {(() => {
+                const activeOrders = orders.filter(
+                  (o) => o.status !== "confirmed" && o.status !== "cancelled"
+                );
+                const pastOrders = orders.filter(
+                  (o) => o.status === "confirmed" || o.status === "cancelled"
+                );
 
-              <div className="space-y-4">
-                {orders.length === 0 ? (
-                  <div className="text-center py-12 border border-white/5 bg-black/20 rounded-2xl">
-                    <HelpCircle className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-                    <p className="text-xs text-zinc-500">No hay comandas registradas en esta sesión aún.</p>
-                  </div>
-                ) : (
-                  orders.map((order) => {
-                    const statusConfig = {
-                      pending: {
-                        label: "Enviado a Barra",
-                        classes: "bg-yellow-500/10 border-yellow-500/20 text-yellow-400",
-                        description: "El personal está asignando tu comanda en barra.",
-                      },
-                      preparing: {
-                        label: "Preparando",
-                        classes: "bg-primary-500/10 border-primary-500/20 text-primary-400 animate-pulse",
-                        description: "Tu bebida/comida se está preparando en la barra.",
-                      },
-                      delivered_by_staff: {
-                        label: "Entregado en Mesa",
-                        classes: "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 animate-pulse font-bold",
-                        description: "El personal ya entregó el pedido. Por favor confirma la recepción.",
-                      },
-                      confirmed: {
-                        label: "Confirmado y Cargado",
-                        classes: "bg-zinc-800 border-zinc-700 text-zinc-400",
-                        description: "Pedido recibido correctamente y sumado al acumulado.",
-                      },
-                      cancelled: {
-                        label: "Cancelado",
-                        classes: "bg-red-500/10 border-red-500/20 text-red-400",
-                        description: "Este pedido fue cancelado por el staff.",
-                      },
-                    };
+                return (
+                  <>
+                    {/* Active Orders Section with Stepper */}
+                    {activeOrders.length > 0 && (
+                      <div className="space-y-4">
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 pl-1 border-l-2 border-primary-500 font-outfit">
+                          <TrendingUp className="w-4 h-4 text-primary-400 animate-pulse shrink-0" />
+                          Pedidos en Curso ({activeOrders.length})
+                        </h3>
 
-                    const cfg = statusConfig[order.status] || statusConfig.pending;
-                    const orderDate = new Date(order.created_at).toLocaleTimeString("es-ES", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    });
+                        <div className="space-y-5">
+                          {activeOrders.map((order) => {
+                            const currentIndex = getStepIndex(order.status);
+                            const orderDate = new Date(order.created_at).toLocaleTimeString("es-ES", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            });
 
-                    return (
-                      <div
-                        key={order.id}
-                        className="glass-card p-5 bg-zinc-950/30 border border-white/5 hover:border-white/10 transition-all rounded-2xl space-y-4"
-                      >
-                        {/* Order Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-white font-outfit">
-                              Comanda #{order.id.slice(0, 8).toUpperCase()}
-                            </span>
-                            <span className="text-[10px] text-zinc-500">• {orderDate}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10px] uppercase font-bold tracking-wider px-3 py-1 rounded-full border ${cfg.classes}`}>
-                              {cfg.label}
-                            </span>
-                          </div>
-                        </div>
+                            return (
+                              <div
+                                key={order.id}
+                                className="glass-card p-6 bg-gradient-to-br from-zinc-950/80 via-zinc-950/50 to-zinc-950/80 border border-white/10 rounded-2xl space-y-6 shadow-[0_4px_30px_rgba(0,0,0,0.4)]"
+                              >
+                                {/* Active Order Header */}
+                                <div className="flex justify-between items-center pb-3 border-b border-white/5">
+                                  <div>
+                                    <span className="text-xs font-bold text-white font-outfit">
+                                      Comanda #{order.id.slice(0, 8).toUpperCase()}
+                                    </span>
+                                    <span className="text-[10px] text-zinc-500 ml-2">• {orderDate}</span>
+                                  </div>
+                                  <span className="text-[10px] text-primary-400 font-bold bg-primary-500/10 border border-primary-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                    {order.status === "pending"
+                                      ? "En Cola"
+                                      : order.status === "preparing"
+                                      ? "En Barra"
+                                      : "En Mesa"}
+                                  </span>
+                                </div>
 
-                        {/* Order Items */}
-                        <div className="space-y-3.5">
-                          {order.live_order_items.map((item) => (
-                            <div key={item.id} className="flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-10 h-10 rounded-lg border border-white/5 bg-zinc-900 overflow-hidden shrink-0">
-                                  {item.club_menu_items?.image_url ? (
-                                    <img
-                                      src={item.club_menu_items.image_url}
-                                      alt={item.club_menu_items.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-700">
-                                      <Wine className="w-5 h-5" />
+                                {/* Active Order Stepper */}
+                                <div className="relative py-4 px-2">
+                                  {/* Line Background */}
+                                  <div className="absolute top-[28px] left-[10%] right-[10%] h-[2px] bg-zinc-800 rounded-full" />
+
+                                  {/* Line Progress */}
+                                  <motion.div
+                                    className="absolute top-[28px] left-[10%] h-[2px] bg-gradient-to-r from-primary-500 to-emerald-500 rounded-full origin-left"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${(currentIndex / 2) * 80}%` }}
+                                    transition={{ duration: 0.6, ease: "easeInOut" }}
+                                  />
+
+                                  {/* Nodes */}
+                                  <div className="relative flex justify-between">
+                                    {[
+                                      { label: "Enviado", desc: "Comanda enviada", icon: Receipt },
+                                      { label: "Preparando", desc: "En barra", icon: Wine },
+                                      { label: "Entregado", desc: "En tu mesa", icon: CheckCircle2 },
+                                    ].map((step, idx) => {
+                                      const Icon = step.icon;
+                                      const isCompleted = currentIndex > idx;
+                                      const isActive = currentIndex === idx;
+
+                                      return (
+                                        <div key={idx} className="flex flex-col items-center w-24 text-center z-10">
+                                          <motion.div
+                                            className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-350 ${
+                                              isCompleted
+                                                ? "bg-emerald-500 border-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                                : isActive
+                                                ? "bg-primary-600 border-primary-400 text-white shadow-[0_0_15px_rgba(217,70,239,0.4)] scale-110"
+                                                : "bg-zinc-950 border-zinc-800 text-zinc-500"
+                                            }`}
+                                            animate={isActive ? { scale: [1, 1.05, 1] } : {}}
+                                            transition={{ repeat: Infinity, duration: 2 }}
+                                          >
+                                            <Icon className="w-4 h-4" />
+                                          </motion.div>
+
+                                          <span
+                                            className={`text-[10px] font-bold mt-2 font-outfit ${
+                                              isActive
+                                                ? "text-primary-400"
+                                                : isCompleted
+                                                ? "text-emerald-400"
+                                                : "text-zinc-500"
+                                            }`}
+                                          >
+                                            {step.label}
+                                          </span>
+                                          <span className="text-[8px] text-zinc-500 mt-0.5 max-w-[80px] hidden sm:block">
+                                            {step.desc}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* Active Order Items */}
+                                <div className="space-y-3 bg-white/[0.02] border border-white/5 rounded-xl p-4">
+                                  {order.live_order_items.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between gap-4">
+                                      <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-8 h-8 rounded-lg border border-white/5 bg-zinc-900 overflow-hidden shrink-0">
+                                          {item.club_menu_items?.image_url ? (
+                                            <img
+                                              src={item.club_menu_items.image_url}
+                                              alt={item.club_menu_items.name}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-700">
+                                              <Wine className="w-4 h-4" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <h5 className="font-bold text-white text-[11px] truncate">
+                                            {item.club_menu_items?.name || "Producto"}
+                                          </h5>
+                                          <p className="text-[9px] text-zinc-500 mt-0.5">
+                                            ${item.price_at_order.toLocaleString("es-CO")} x {item.quantity}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <span className="text-[11px] font-bold text-zinc-300 font-outfit">
+                                        ${(item.price_at_order * item.quantity).toLocaleString("es-CO")} COP
+                                      </span>
                                     </div>
-                                  )}
+                                  ))}
                                 </div>
-                                <div className="min-w-0">
-                                  <h5 className="font-bold text-white text-xs truncate">
-                                    {item.club_menu_items?.name || "Producto desconocido"}
-                                  </h5>
-                                  <p className="text-[10px] text-zinc-500 mt-0.5">
-                                    ${item.price_at_order.toLocaleString("es-CO")} COP x {item.quantity}
-                                  </p>
-                                </div>
+
+                                {/* Confirmation Section if delivered */}
+                                {order.status === "delivered_by_staff" && (
+                                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-xl">
+                                    <div className="text-left w-full sm:w-auto">
+                                      <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-outfit">
+                                        ¡Pedido en tu mesa!
+                                      </p>
+                                      <p className="text-[9px] text-zinc-400 mt-0.5">
+                                        Por favor confirma la recepción para agregar el total a la cuenta.
+                                      </p>
+                                    </div>
+                                    <button
+                                      onClick={() => handleConfirmReceipt(order.id)}
+                                      disabled={isPending}
+                                      className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold px-5 py-2.5 rounded-xl transition-all shadow-md shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                    >
+                                      {isPending ? (
+                                        <>
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                          Procesando...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CheckCircle2 className="w-3.5 h-3.5" />
+                                          Confirmar que Recibí
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
-                              <span className="text-xs font-extrabold text-zinc-300">
-                                ${(item.price_at_order * item.quantity).toLocaleString("es-CO")} COP
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Status Description / Receipt Confirm Action */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-white/5 bg-white/[0.01] p-3 rounded-xl">
-                          <p className="text-[10px] text-zinc-400 leading-relaxed max-w-sm">
-                            {cfg.description}
-                          </p>
-
-                          {order.status === "delivered_by_staff" && (
-                            <button
-                              onClick={() => handleConfirmReceipt(order.id)}
-                              disabled={isPending}
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold px-4 py-2 rounded-xl transition-all shadow-md shadow-emerald-500/10 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                            >
-                              {isPending ? (
-                                <>
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  Procesando...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  Confirmar que Recibí
-                                </>
-                              )}
-                            </button>
-                          )}
+                            );
+                          })}
                         </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
+                    )}
+
+                    {/* Past Orders / History Section */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 pl-1 border-l-2 border-zinc-500 font-outfit">
+                        <Receipt className="w-4 h-4 text-zinc-400 shrink-0" />
+                        Historial de Consumo ({pastOrders.length})
+                      </h3>
+
+                      <div className="space-y-3">
+                        {pastOrders.length === 0 ? (
+                          <div className="text-center py-10 border border-white/5 bg-black/10 rounded-2xl">
+                            <HelpCircle className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
+                            <p className="text-xs text-zinc-500">No hay consumos confirmados en esta sesión aún.</p>
+                          </div>
+                        ) : (
+                          pastOrders.map((order) => {
+                            const orderDate = new Date(order.created_at).toLocaleTimeString("es-ES", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            });
+
+                            return (
+                              <div
+                                key={order.id}
+                                className="glass-card p-4 bg-zinc-950/20 border border-white/5 rounded-xl space-y-3 opacity-80 hover:opacity-100 transition-opacity"
+                              >
+                                <div className="flex justify-between items-center pb-2 border-b border-white/5 text-[10px]">
+                                  <div>
+                                    <span className="font-bold text-zinc-400">
+                                      Comanda #{order.id.slice(0, 8).toUpperCase()}
+                                    </span>
+                                    <span className="text-zinc-600 ml-2">• {orderDate}</span>
+                                  </div>
+                                  <span
+                                    className={`font-bold px-2 py-0.5 rounded-md uppercase tracking-wider text-[8px] ${
+                                      order.status === "confirmed"
+                                        ? "bg-zinc-800 text-zinc-400 border border-zinc-700/50"
+                                        : "bg-red-950/20 border border-red-900/30 text-red-400"
+                                    }`}
+                                  >
+                                    {order.status === "confirmed" ? "Confirmado" : "Cancelado"}
+                                  </span>
+                                </div>
+
+                                <div className="space-y-2">
+                                  {order.live_order_items.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between text-xs gap-3">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-6 h-6 rounded border border-white/5 bg-zinc-900 overflow-hidden shrink-0">
+                                          {item.club_menu_items?.image_url ? (
+                                            <img
+                                              src={item.club_menu_items.image_url}
+                                              alt={item.club_menu_items.name}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-800">
+                                              <Wine className="w-3.5 h-3.5" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <span className="text-zinc-300 truncate max-w-[180px]">
+                                          {item.club_menu_items?.name || "Producto"}
+                                        </span>
+                                        <span className="text-zinc-500 font-bold">x{item.quantity}</span>
+                                      </div>
+                                      <span className="text-zinc-400 font-bold font-outfit">
+                                        ${(item.price_at_order * item.quantity).toLocaleString("es-CO")} COP
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}
