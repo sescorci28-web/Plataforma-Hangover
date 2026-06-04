@@ -97,6 +97,12 @@ CREATE POLICY "Clientes pueden insertar sus propias sesiones"
   ON public.live_sessions FOR INSERT
   WITH CHECK (user_id = auth.uid() AND status = 'open');
 
+DROP POLICY IF EXISTS "Clientes pueden actualizar sus propias sesiones" ON public.live_sessions;
+CREATE POLICY "Clientes pueden actualizar sus propias sesiones"
+  ON public.live_sessions FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
 DROP POLICY IF EXISTS "Proveedores pueden ver y gestionar sesiones de sus clubes" ON public.live_sessions;
 CREATE POLICY "Proveedores pueden ver y gestionar sesiones de sus clubes"
   ON public.live_sessions FOR ALL
