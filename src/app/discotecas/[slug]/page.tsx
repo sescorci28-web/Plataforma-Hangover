@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ClubBookingModal } from "@/components/discotecas/ClubBookingModal";
 import { Sparkles, MapPin, Star, Clock, ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
+import { ClubTabs } from "@/components/discotecas/ClubTabs";
 
 export const revalidate = 0; // Dynamic route
 
@@ -77,6 +78,25 @@ export default async function ClubDetailPage({ params }: PageProps) {
       </div>
     );
   }
+
+  // Fetch menu items and services in parallel
+  const [menuItemsRes, clubServicesRes] = await Promise.all([
+    supabase
+      .from("club_menu_items")
+      .select("*")
+      .eq("club_id", club.id)
+      .eq("active", true)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("club_services")
+      .select("*")
+      .eq("club_id", club.id)
+      .eq("active", true)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  const menuItems = menuItemsRes.data || [];
+  const clubServices = clubServicesRes.data || [];
 
   const ratingVal = club.rating || 0;
   const formattedRating = Number(ratingVal).toFixed(1);
@@ -168,64 +188,17 @@ export default async function ClubDetailPage({ params }: PageProps) {
 
         {/* Details Content Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,420px)] gap-8 mt-10 items-start">
-          {/* Main Description (Left Side) */}
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <h2 className="text-2xl font-bold text-white font-outfit">Sobre {club.name}</h2>
-              <p className="text-zinc-300 text-base leading-relaxed whitespace-pre-line">
-                {club.description || "Esta discoteca no cuenta con una descripción detallada en este momento."}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-              <div className="p-5 rounded-2xl border border-white/5 bg-gradient-to-tr from-white/5 to-transparent">
-                <h4 className="font-bold text-white mb-2 text-sm font-outfit">Servicio de Reservas</h4>
-                <p className="text-xs text-zinc-400">Reserva mesas VIP, botellas y accesos rápidos directamente sin comisiones adicionales.</p>
-              </div>
-              <div className="p-5 rounded-2xl border border-white/5 bg-gradient-to-tr from-white/5 to-transparent">
-                <h4 className="font-bold text-white mb-2 text-sm font-outfit">Seguridad Garantizada</h4>
-                <p className="text-xs text-zinc-400">Acceso seguro con control digital de entradas. Tu diversión está protegida con Hangover.</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {club.address && (
-                <div className="p-5 rounded-2xl border border-white/5 bg-black/30">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Dirección</p>
-                  <div className="flex gap-3">
-                    <MapPin className="w-5 h-5 text-accent-400 shrink-0 mt-0.5" />
-                    <p className="text-sm text-zinc-300 leading-relaxed">{club.address}</p>
-                  </div>
-                </div>
-              )}
-
-              {club.opening_hours && (
-                <div className="p-5 rounded-2xl border border-white/5 bg-black/30">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Horario</p>
-                  <div className="flex gap-3">
-                    <Clock className="w-5 h-5 text-primary-400 shrink-0 mt-0.5" />
-                    <p className="text-sm text-zinc-300 leading-relaxed">{club.opening_hours}</p>
-                  </div>
-                </div>
-              )}
-
-              {club.instagram && (
-                <div className="p-5 rounded-2xl border border-white/5 bg-black/30 sm:col-span-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Redes Sociales</p>
-                  <div className="flex gap-3">
-                    <InstagramIcon className="w-5 h-5 text-primary-400 shrink-0 mt-0.5" />
-                    <a
-                      href={`https://instagram.com/${club.instagram.replace('@', '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary-400 hover:text-primary-300 transition-colors hover:underline font-semibold"
-                    >
-                      {club.instagram}
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Tabs System (Left Side) */}
+          <div className="w-full">
+            <ClubTabs
+              clubName={club.name}
+              clubDescription={club.description}
+              clubAddress={club.address}
+              clubOpeningHours={club.opening_hours}
+              clubInstagram={club.instagram}
+              menuItems={menuItems}
+              clubServices={clubServices}
+            />
           </div>
 
           {/* Reserva premium (Right Side) */}

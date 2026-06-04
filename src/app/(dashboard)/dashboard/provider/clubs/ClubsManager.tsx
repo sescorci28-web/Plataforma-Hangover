@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { createClub, updateClub, deleteClub } from "./actions"
+import { ClubMenuServicesManager } from "./ClubMenuServicesManager"
 
 function Instagram({ className }: { className?: string }) {
   return (
@@ -110,6 +111,13 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
   const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingClub, setEditingClub] = useState<Club | null>(null)
+  const [selectedMenuClub, setSelectedMenuClub] = useState<Club | null>(null)
+  const [isMenuManagerOpen, setIsMenuManagerOpen] = useState(false)
+
+  const openManageMenuServicesModal = (club: Club) => {
+    setSelectedMenuClub(club)
+    setIsMenuManagerOpen(true)
+  }
   const [name, setName] = useState("")
   const [city, setCity] = useState("")
   const [description, setDescription] = useState("")
@@ -435,13 +443,20 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 pt-3 border-t border-white/5 mt-3">
+                <div className="flex items-center gap-3 pt-3 border-t border-white/5 mt-3 flex-wrap">
                   <button
                     onClick={() => openEditModal(club)}
-                    className="flex-1 bg-white/5 hover:bg-white/10 text-white rounded-xl py-2.5 px-3 text-xs font-semibold border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-white rounded-xl py-2.5 px-3 text-xs font-semibold border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-[70px]"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                     Editar
+                  </button>
+                  <button
+                    onClick={() => openManageMenuServicesModal(club)}
+                    className="flex-1 bg-primary-600/10 hover:bg-primary-600/20 text-primary-400 border border-primary-500/20 rounded-xl py-2.5 px-3 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-[90px]"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Carta / Servicios
                   </button>
                   <button
                     onClick={() => setDeletingClubId(club.id)}
@@ -769,6 +784,17 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {selectedMenuClub && (
+        <ClubMenuServicesManager
+          club={selectedMenuClub}
+          isOpen={isMenuManagerOpen}
+          onClose={() => {
+            setIsMenuManagerOpen(false);
+            setSelectedMenuClub(null);
+          }}
+        />
       )}
     </div>
   )
