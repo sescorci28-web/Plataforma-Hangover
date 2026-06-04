@@ -58,8 +58,26 @@ CREATE POLICY "Permitir lectura pública de mesas"
   USING (true);
 
 DROP POLICY IF EXISTS "Permitir gestión de mesas a proveedores y admin" ON public.club_tables;
-CREATE POLICY "Permitir gestión de mesas a proveedores y admin"
-  ON public.club_tables FOR ALL
+DROP POLICY IF EXISTS "Permitir modificación de mesas a proveedores y admin" ON public.club_tables;
+DROP POLICY IF EXISTS "Permitir eliminación de mesas a proveedores y admin" ON public.club_tables;
+DROP POLICY IF EXISTS "Permitir creación de mesas a usuarios autenticados" ON public.club_tables;
+
+CREATE POLICY "Permitir creación de mesas a usuarios autenticados"
+  ON public.club_tables FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Permitir modificación de mesas a proveedores y admin"
+  ON public.club_tables FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.clubs
+      WHERE clubs.id = club_tables.club_id
+        AND (clubs.provider_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
+    )
+  );
+
+CREATE POLICY "Permitir eliminación de mesas a proveedores y admin"
+  ON public.club_tables FOR DELETE
   USING (
     EXISTS (
       SELECT 1 FROM public.clubs
