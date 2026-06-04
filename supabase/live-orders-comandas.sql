@@ -71,7 +71,7 @@ CREATE POLICY "Permitir modificación de mesas a proveedores y admin"
   USING (
     EXISTS (
       SELECT 1 FROM public.clubs
-      WHERE clubs.id = club_tables.club_id
+      WHERE clubs.id = club_id
         AND (clubs.provider_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
     )
   );
@@ -81,7 +81,7 @@ CREATE POLICY "Permitir eliminación de mesas a proveedores y admin"
   USING (
     EXISTS (
       SELECT 1 FROM public.clubs
-      WHERE clubs.id = club_tables.club_id
+      WHERE clubs.id = club_id
         AND (clubs.provider_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
     )
   );
@@ -103,7 +103,7 @@ CREATE POLICY "Proveedores pueden ver y gestionar sesiones de sus clubes"
   USING (
     EXISTS (
       SELECT 1 FROM public.clubs
-      WHERE clubs.id = live_sessions.club_id
+      WHERE clubs.id = club_id
         AND (clubs.provider_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
     )
   );
@@ -115,7 +115,7 @@ CREATE POLICY "Clientes pueden ver sus propias órdenes"
   USING (
     EXISTS (
       SELECT 1 FROM public.live_sessions
-      WHERE live_sessions.id = live_orders.session_id AND live_sessions.user_id = auth.uid()
+      WHERE live_sessions.id = session_id AND live_sessions.user_id = auth.uid()
     )
   );
 
@@ -125,7 +125,7 @@ CREATE POLICY "Clientes pueden crear sus propias órdenes en sesión activa"
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.live_sessions
-      WHERE live_sessions.id = live_orders.session_id AND live_sessions.user_id = auth.uid() AND live_sessions.status = 'open'
+      WHERE live_sessions.id = session_id AND live_sessions.user_id = auth.uid() AND live_sessions.status = 'open'
     )
   );
 
@@ -135,7 +135,7 @@ CREATE POLICY "Clientes pueden actualizar el estado de sus propias órdenes a re
   USING (
     EXISTS (
       SELECT 1 FROM public.live_sessions
-      WHERE live_sessions.id = live_orders.session_id AND live_sessions.user_id = auth.uid()
+      WHERE live_sessions.id = session_id AND live_sessions.user_id = auth.uid()
     )
   )
   WITH CHECK (status IN ('confirmed', 'cancelled'));
@@ -147,7 +147,7 @@ CREATE POLICY "Proveedores pueden gestionar todas las órdenes de sus clubes"
     EXISTS (
       SELECT 1 FROM public.live_sessions
       JOIN public.clubs ON clubs.id = live_sessions.club_id
-      WHERE live_sessions.id = live_orders.session_id
+      WHERE live_sessions.id = session_id
         AND (clubs.provider_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
     )
   );
@@ -160,7 +160,7 @@ CREATE POLICY "Clientes pueden ver ítems de sus propias órdenes"
     EXISTS (
       SELECT 1 FROM public.live_orders
       JOIN public.live_sessions ON live_sessions.id = live_orders.session_id
-      WHERE live_orders.id = live_order_items.order_id AND live_sessions.user_id = auth.uid()
+      WHERE live_orders.id = order_id AND live_sessions.user_id = auth.uid()
     )
   );
 
@@ -171,7 +171,7 @@ CREATE POLICY "Clientes pueden insertar ítems en sus propias órdenes de sesió
     EXISTS (
       SELECT 1 FROM public.live_orders
       JOIN public.live_sessions ON live_sessions.id = live_orders.session_id
-      WHERE live_orders.id = live_order_items.order_id AND live_sessions.user_id = auth.uid() AND live_sessions.status = 'open'
+      WHERE live_orders.id = order_id AND live_sessions.user_id = auth.uid() AND live_sessions.status = 'open'
     )
   );
 
@@ -183,7 +183,7 @@ CREATE POLICY "Proveedores pueden ver y gestionar ítems de órdenes de sus club
       SELECT 1 FROM public.live_orders
       JOIN public.live_sessions ON live_sessions.id = live_orders.session_id
       JOIN public.clubs ON clubs.id = live_sessions.club_id
-      WHERE live_orders.id = live_order_items.order_id
+      WHERE live_orders.id = order_id
         AND (clubs.provider_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
     )
   );
