@@ -43,7 +43,6 @@ interface Order {
     };
     profiles: {
       full_name: string | null;
-      username: string;
     };
   };
   live_order_items: OrderItem[];
@@ -137,7 +136,7 @@ export function LiveOrdersDashboard({ clubs }: LiveOrdersDashboardProps) {
             user_id,
             club_id,
             club_tables!inner(table_number),
-            profiles!inner(full_name, username)
+            profiles!inner(full_name)
           ),
           live_order_items(
             id,
@@ -454,7 +453,7 @@ function OrderCard({ order, onAction, actionBtn, isPending, isArchived = false, 
             <p className="text-[10px] text-zinc-500 flex items-center gap-1 mt-0.5">
               <User className="w-2.5 h-2.5 text-zinc-500 shrink-0" />
               <span className="truncate max-w-[100px]">
-                {order.live_sessions?.profiles?.full_name || `@${order.live_sessions?.profiles?.username}`}
+                {order.live_sessions?.profiles?.full_name || "Cliente"}
               </span>
             </p>
           </div>

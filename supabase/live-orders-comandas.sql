@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.live_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
   table_id UUID NOT NULL REFERENCES public.club_tables(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   status TEXT NOT NULL CHECK (status IN ('open', 'closed', 'paid')) DEFAULT 'open',
   total_amount NUMERIC NOT NULL DEFAULT 0.00,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
