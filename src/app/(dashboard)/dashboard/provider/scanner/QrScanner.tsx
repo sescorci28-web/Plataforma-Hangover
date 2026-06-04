@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { checkQRCode } from "@/app/services/actions";
+import { checkQRCode, confirmQRAdmission } from "@/app/services/actions";
 import { QrCode, Loader2, CheckCircle2, XCircle, AlertTriangle, User, Ticket, Calendar, Users, DollarSign, Camera, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function QrScanner() {
   const [scanResult, setScanResult] = useState<any | null>(null);
-  const [scanStatus, setScanStatus] = useState<"valid" | "used" | "cancelled" | "invalid" | "scanning" | "error" | "processing">("scanning");
+  const [scanStatus, setScanStatus] = useState<"valid" | "used" | "cancelled" | "invalid" | "scanning" | "error" | "processing" | "confirmed_success">("scanning");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
   const scannerRef = useRef<any>(null);
 
   const startScanner = () => {
     setScanResult(null);
     setErrorMsg(null);
     setScanStatus("scanning");
+    setIsConfirming(false);
 
     // Dynamic import to prevent SSR (Server-Side Rendering) failures in Next.js
     import("html5-qrcode").then((module) => {
@@ -108,6 +110,30 @@ export function QrScanner() {
     startScanner();
   };
 
+  const handleConfirmAdmission = async () => {
+    if (!scanResult || !scanResult.id) return;
+    setIsConfirming(true);
+    try {
+      const res = await confirmQRAdmission(scanResult.id);
+      if (res.error) {
+        setScanStatus("error");
+        setErrorMsg(res.error);
+      } else {
+        setScanStatus("confirmed_success");
+        // Update local scanResult with the validation timestamp
+        setScanResult((prev: any) => ({
+          ...prev,
+          qrValidatedAt: res.qrValidatedAt
+        }));
+      }
+    } catch (err: any) {
+      setScanStatus("error");
+      setErrorMsg(err.message || "Error al confirmar el ingreso.");
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <AnimatePresence mode="wait">
@@ -164,9 +190,9 @@ export function QrScanner() {
             <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-start gap-4">
               <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <h4 className="font-bold text-emerald-300 text-sm">¡Entrada Válida!</h4>
+                <h4 className="font-bold text-emerald-300 text-sm">✅ Entrada Válida</h4>
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  El código QR es válido y está listo para registrar el ingreso. (No se ha marcado como usado aún).
+                  El código QR es válido. Haz clic en "Confirmar Ingreso" para registrar el acceso del cliente.
                 </p>
               </div>
             </div>
@@ -174,8 +200,66 @@ export function QrScanner() {
             {/* Booking Details Card */}
             <BookingDetailsCard details={scanResult} />
 
-            {/* Reset Button */}
-            <ResetButton onClick={handleReset} />
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleConfirmAdmission}
+                disabled={isConfirming}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+              >
+                {isConfirming ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Confirmando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Confirmar Ingreso
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleReset}
+                disabled={isConfirming}
+                className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl px-5 py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 border border-white/5 cursor-pointer font-medium"
+              >
+                Cancelar
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {scanStatus === "confirmed_success" && scanResult && (
+          <motion.div
+            key="success-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-4"
+          >
+            {/* Admission Confirmed Success Banner */}
+            <div className="p-5 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl flex items-start gap-4">
+              <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="font-bold text-emerald-300 text-sm">¡Ingreso Confirmado Exitosamente!</h4>
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  El ingreso ha sido registrado a las {scanResult.qrValidatedAt ? new Date(scanResult.qrValidatedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "este momento"}.
+                </p>
+              </div>
+            </div>
+
+            {/* Booking Details Card */}
+            <BookingDetailsCard details={scanResult} />
+
+            {/* Reset Button (Scan Next) */}
+            <button
+              onClick={handleReset}
+              className="w-full bg-accent-600 hover:bg-accent-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Escanear Siguiente
+            </button>
           </motion.div>
         )}
 
@@ -188,12 +272,27 @@ export function QrScanner() {
             className="space-y-4"
           >
             {/* Already Used QR Banner */}
-            <div className="p-5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-4">
-              <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+            <div className="p-5 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-4">
+              <XCircle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <h4 className="font-bold text-amber-300 text-sm">QR Ya Utilizado</h4>
+                <h4 className="font-bold text-red-300 text-sm">❌ QR YA UTILIZADO</h4>
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  Este código QR ya fue escaneado y validado en el sistema con anterioridad.
+                  Este ticket fue validado anteriormente el{" "}
+                  <span className="font-semibold text-white">
+                    {scanResult.qrValidatedAt
+                      ? new Date(scanResult.qrValidatedAt).toLocaleDateString("es-ES", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric"
+                        }) +
+                        " a las " +
+                        new Date(scanResult.qrValidatedAt).toLocaleTimeString("es-ES", {
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        })
+                      : "fecha desconocida"}
+                  </span>.
+                  Ingreso bloqueado.
                 </p>
               </div>
             </div>
@@ -202,7 +301,13 @@ export function QrScanner() {
             <BookingDetailsCard details={scanResult} />
 
             {/* Reset Button */}
-            <ResetButton onClick={handleReset} />
+            <button
+              onClick={handleReset}
+              className="w-full bg-accent-600 hover:bg-accent-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Escanear de Nuevo
+            </button>
           </motion.div>
         )}
 
@@ -229,7 +334,13 @@ export function QrScanner() {
             {scanResult && <BookingDetailsCard details={scanResult} />}
 
             {/* Reset Button */}
-            <ResetButton onClick={handleReset} />
+            <button
+              onClick={handleReset}
+              className="w-full bg-accent-600 hover:bg-accent-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Escanear de Nuevo
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -320,17 +431,5 @@ function BookingDetailsCard({ details }: { details: any }) {
         </div>
       )}
     </div>
-  );
-}
-
-function ResetButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full bg-accent-600 hover:bg-accent-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
-    >
-      <RotateCcw className="w-4 h-4" />
-      Escanear de Nuevo
-    </button>
   );
 }

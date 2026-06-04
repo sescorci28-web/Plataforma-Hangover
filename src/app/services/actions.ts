@@ -569,7 +569,7 @@ export async function checkQRCode(qrCode: string) {
     // 2. Fetch booking by qr_code
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
-      .select("id, status, provider_id, qr_status, number_of_people, user_id, event_id, club_id, total_amount, event_date, booking_type")
+      .select("id, status, provider_id, qr_status, qr_validated_at, number_of_people, user_id, event_id, club_id, total_amount, event_date, booking_type")
       .eq("qr_code", qrCode)
       .maybeSingle();
 
@@ -618,7 +618,8 @@ export async function checkQRCode(qrCode: string) {
       numberOfPeople: booking.number_of_people || 1,
       totalAmount: booking.total_amount,
       eventDate: booking.event_date,
-      bookingType: booking.booking_type
+      bookingType: booking.booking_type,
+      qrValidatedAt: booking.qr_validated_at
     };
 
     // 6. Return specific status states based on the audit
@@ -657,6 +658,87 @@ export async function checkQRCode(qrCode: string) {
   }
 }
 
+/**
+ * Confirms QR admission, marking it as used in Supabase.
+ */
+export async function confirmQRAdmission(bookingId: string) {
+  const supabase = await createClient();
 
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
 
+  // 1. Get validator profile role (provider or admin)
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
 
+  if (profileError || !profile || (profile.role !== "provider" && profile.role !== "admin")) {
+    return { error: "No tienes permisos de proveedor o administrador para validar códigos QR." };
+  }
+
+  try {
+    // 2. Fetch booking by id
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select("id, status, provider_id, qr_status")
+      .eq("id", bookingId)
+      .maybeSingle();
+
+    if (bookingError) {
+      return { error: `Error al buscar la entrada/reserva: ${bookingError.message}` };
+    }
+
+    if (!booking) {
+      return { error: "La reserva ingresada no existe." };
+    }
+
+    // 3. Check authorization (provider must own the service/club/event, i.e. booking.provider_id === user.id)
+    if (profile.role === "provider" && booking.provider_id !== user.id) {
+      return { error: "No estás autorizado para validar este código QR. Pertenece a otro proveedor." };
+    }
+
+    // 4. Validate QR code status
+    if (booking.qr_status === "used") {
+      return { error: "Este código QR ya ha sido usado y validado anteriormente." };
+    }
+
+    if (booking.qr_status === "cancelled") {
+      return { error: "Esta entrada o reserva ha sido cancelada." };
+    }
+
+    // 5. Validate booking status
+    if (booking.status !== "confirmed" && booking.status !== "completed") {
+      return { error: `La reserva asociada a este QR no está confirmada (Estado: ${booking.status}).` };
+    }
+
+    // 6. Mark QR as used
+    const nowStr = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from("bookings")
+      .update({
+        qr_status: "used",
+        qr_validated_at: nowStr,
+        status: "completed" // Automatically complete the booking when validated
+      })
+      .eq("id", booking.id);
+
+    if (updateError) {
+      return { error: `Error al marcar el QR como usado: ${updateError.message}` };
+    }
+
+    revalidatePath("/dashboard/user");
+    revalidatePath("/dashboard/provider");
+
+    return {
+      success: true,
+      qrValidatedAt: nowStr
+    };
+
+  } catch (err: any) {
+    return { error: err.message || "Ocurrió un error inesperado al confirmar la admisión." };
+  }
+}
