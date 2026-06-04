@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin,
@@ -17,7 +18,11 @@ import {
   X,
   AlertCircle,
   CheckCircle2,
+  Loader2,
+  MessageSquare,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { sendLiveOrder } from "@/app/services/liveActions";
 
 // Local SVG icon to avoid version mismatch in lucide-react
 function InstagramIcon({ className }: { className?: string }) {
@@ -67,6 +72,7 @@ interface CartItem {
 
 interface ClubTabsProps {
   clubId: string;
+  clubSlug: string;
   clubName: string;
   clubDescription: string | null;
   clubAddress: string | null;
@@ -92,6 +98,7 @@ const CATEGORIES = [
 
 export function ClubTabs({
   clubId,
+  clubSlug,
   clubName,
   clubDescription,
   clubAddress,
@@ -100,6 +107,7 @@ export function ClubTabs({
   menuItems,
   clubServices,
 }: ClubTabsProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"info" | "menu" | "services">("info");
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
   
@@ -107,7 +115,14 @@ export function ClubTabs({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [orderSimulated, setOrderSimulated] = useState(false);
+
+  // Table selector state
+  const [clubTables, setClubTables] = useState<Array<{ id: string; table_number: string }>>([]);
+  const [selectedTableId, setSelectedTableId] = useState<string>("");
+  const [isManualTable, setIsManualTable] = useState<boolean>(false);
+  const [manualTableNumber, setManualTableNumber] = useState<string>("");
+  const [isSendingOrder, setIsSendingOrder] = useState<boolean>(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
 
   // Sync and validate cart on load
   useEffect(() => {
@@ -128,6 +143,37 @@ export function ClubTabs({
       console.error("Error cargando el carrito:", err);
     }
   }, [clubId]);
+
+  // Fetch tables from Supabase Client
+  useEffect(() => {
+    if (!isMounted) return;
+    const fetchTables = async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("club_tables")
+          .select("id, table_number")
+          .eq("club_id", clubId)
+          .eq("active", true)
+          .order("table_number", { ascending: true });
+        
+        if (!error && data) {
+          setClubTables(data);
+          if (data.length > 0) {
+            setSelectedTableId(data[0].id);
+          } else {
+            setIsManualTable(true);
+          }
+        } else {
+          setIsManualTable(true);
+        }
+      } catch (err) {
+        console.error("Error fetching tables:", err);
+        setIsManualTable(true);
+      }
+    };
+    fetchTables();
+  }, [isMounted, clubId]);
 
   // Save cart changes helper
   const saveCart = (newItems: CartItem[]) => {
@@ -186,13 +232,41 @@ export function ClubTabs({
     saveCart(cart.filter((item) => item.id !== itemId));
   };
 
-  const simulateCheckout = () => {
-    setOrderSimulated(true);
-    setTimeout(() => {
-      setOrderSimulated(false);
-      saveCart([]);
-      setIsCartOpen(false);
-    }, 4000);
+  // Submit Order to Supabase
+  const handleSendLiveOrder = async () => {
+    const tableVal = isManualTable ? manualTableNumber.trim() : selectedTableId;
+    if (!tableVal) {
+      setOrderError("Por favor, selecciona o ingresa tu número de mesa.");
+      return;
+    }
+
+    setIsSendingOrder(true);
+    setOrderError(null);
+
+    try {
+      const itemsPayload = cart.map((item) => ({
+        id: item.id,
+        quantity: item.quantity,
+        price: item.price,
+      }));
+
+      const res = await sendLiveOrder(clubId, tableVal, itemsPayload);
+
+      if (res.error) {
+        setOrderError(res.error);
+        setIsSendingOrder(false);
+      } else {
+        // Success: Clear local cart and redirect
+        saveCart([]);
+        setIsCartOpen(false);
+        setIsSendingOrder(false);
+        router.push(`/discotecas/${clubSlug}/mi-cuenta`);
+      }
+    } catch (err: any) {
+      console.error("Error sending live order:", err);
+      setOrderError("Ocurrió un error inesperado al despachar la comanda.");
+      setIsSendingOrder(false);
+    }
   };
 
   // Calculate totals
@@ -623,7 +697,7 @@ export function ClubTabs({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => {
-                if (!orderSimulated) setIsCartOpen(false);
+                if (!isSendingOrder) setIsCartOpen(false);
               }}
               className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm"
             />
@@ -646,7 +720,7 @@ export function ClubTabs({
                 </div>
                 <button
                   onClick={() => setIsCartOpen(false)}
-                  disabled={orderSimulated}
+                  disabled={isSendingOrder}
                   className="w-8 h-8 rounded-full border border-white/5 bg-white/5 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
@@ -655,32 +729,7 @@ export function ClubTabs({
 
               {/* Items List */}
               <div className="flex-grow overflow-y-auto p-5 space-y-4">
-                {orderSimulated ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 py-8">
-                    <motion.div
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: "spring", damping: 15 }}
-                    >
-                      <CheckCircle2 className="w-16 h-16 text-emerald-400 drop-shadow-[0_0_20px_rgba(52,211,153,0.3)]" />
-                    </motion.div>
-                    <div className="space-y-2 max-w-xs">
-                      <h4 className="text-lg font-bold text-white font-outfit">¡Pedido Generado!</h4>
-                      <p className="text-xs text-zinc-400 leading-relaxed">
-                        Tu pre-pedido local se ha registrado con éxito para esta mesa en{" "}
-                        <span className="text-white font-medium">{clubName}</span>.
-                      </p>
-                      <p className="text-[11px] text-primary-400 font-medium">
-                        Código Temporal: HNGR-{Math.floor(1000 + Math.random() * 9000)}
-                      </p>
-                      <div className="p-3 bg-white/5 rounded-xl border border-white/5 mt-4">
-                        <p className="text-[10px] text-zinc-400">
-                          Muestra esta pantalla a tu mesero o en la barra para que preparen y carguen tu orden a tu mesa.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : cart.length === 0 ? (
+                {cart.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center space-y-2 py-8">
                     <Wine className="w-12 h-12 text-zinc-700" />
                     <p className="text-sm font-bold text-white">El carrito está vacío</p>
@@ -754,8 +803,15 @@ export function ClubTabs({
               </div>
 
               {/* Footer */}
-              {!orderSimulated && cart.length > 0 && (
+              {cart.length > 0 && (
                 <div className="p-5 border-t border-white/5 bg-black/40 space-y-4 shrink-0">
+                  {orderError && (
+                    <div className="flex items-center gap-2.5 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{orderError}</span>
+                    </div>
+                  )}
+
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center text-xs text-zinc-400">
                       <span>Subtotal</span>
@@ -769,20 +825,80 @@ export function ClubTabs({
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-2.5 p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl">
-                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+                  {/* Mesa Selector UI */}
+                  <div className="space-y-2 border-t border-white/5 pt-3">
+                    {clubTables.length > 0 && !isManualTable ? (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[11px] font-semibold text-zinc-400">Selecciona tu Mesa *</label>
+                          <button
+                            onClick={() => setIsManualTable(true)}
+                            className="text-[10px] text-primary-400 hover:underline cursor-pointer"
+                          >
+                            ✍️ Mesa manual
+                          </button>
+                        </div>
+                        <select
+                          value={selectedTableId}
+                          onChange={(e) => setSelectedTableId(e.target.value)}
+                          disabled={isSendingOrder}
+                          className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary-500/50"
+                        >
+                          {clubTables.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              Mesa {t.table_number}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[11px] font-semibold text-zinc-400">Número de Mesa *</label>
+                          {clubTables.length > 0 && (
+                            <button
+                              onClick={() => setIsManualTable(false)}
+                              className="text-[10px] text-primary-400 hover:underline cursor-pointer"
+                            >
+                              📋 Ver lista
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={manualTableNumber}
+                          onChange={(e) => setManualTableNumber(e.target.value)}
+                          disabled={isSendingOrder}
+                          placeholder="Ej. 12, VIP-3 o Barra"
+                          className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-primary-500/50"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-start gap-2.5 p-3 bg-primary-500/5 border border-primary-500/10 rounded-xl">
+                    <MessageSquare className="w-4 h-4 text-primary-400 shrink-0 mt-0.5 animate-pulse" />
                     <p className="text-[10px] text-zinc-400 leading-relaxed">
-                      Este pedido se guarda localmente en tu app. Presiona el botón para confirmar y
-                      poder mostrarlo en barra/mesa para despacho.
+                      Tu comanda se enviará al instante a la barra. Podrás hacer seguimiento de su preparación en tu cuenta de la noche.
                     </p>
                   </div>
 
                   <button
-                    onClick={simulateCheckout}
-                    className="w-full bg-gradient-to-r from-primary-600 to-accent-600 hover:from-primary-500 hover:to-accent-500 text-white py-3 rounded-xl font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-500/15 cursor-pointer active:scale-98"
+                    onClick={handleSendLiveOrder}
+                    disabled={isSendingOrder}
+                    className="w-full bg-gradient-to-r from-primary-600 to-accent-600 hover:from-primary-500 hover:to-accent-500 text-white py-3 rounded-xl font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-500/15 cursor-pointer active:scale-98 disabled:opacity-50"
                   >
-                    <ShoppingBag className="w-4 h-4" />
-                    Confirmar Pedido Local
+                    {isSendingOrder ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Despachando Comanda...
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingBag className="w-4 h-4" />
+                        Despachar Comanda a Barra
+                      </>
+                    )}
                   </button>
                 </div>
               )}

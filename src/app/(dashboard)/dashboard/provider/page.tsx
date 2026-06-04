@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { BarChart3, Settings, Calendar, DollarSign, Plus, Bell, MapPin, User, LogOut, AlertTriangle, Building2, QrCode, Camera } from "lucide-react";
+import { BarChart3, Settings, Calendar, DollarSign, Plus, Bell, MapPin, User, LogOut, AlertTriangle, Building2, QrCode, Camera, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { logout } from "@/app/(auth)/actions";
 import { BookingActions } from "@/components/provider/BookingActions";
@@ -161,6 +161,10 @@ export default async function ProviderDashboard() {
               <Link href="/dashboard/provider/clubs" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
                 <Building2 className="w-5 h-5" />
                 Mis Discotecas
+              </Link>
+              <Link href="/dashboard/provider/orders" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
+                <ShoppingBag className="w-5 h-5 text-emerald-400" />
+                Pedidos en Vivo
               </Link>
               <Link href="/dashboard/provider/validate" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
                 <QrCode className="w-5 h-5 text-primary-400" />

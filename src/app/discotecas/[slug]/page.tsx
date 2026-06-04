@@ -192,6 +192,7 @@ export default async function ClubDetailPage({ params }: PageProps) {
           <div className="w-full">
             <ClubTabs
               clubId={club.id}
+              clubSlug={club.slug}
               clubName={club.name}
               clubDescription={club.description}
               clubAddress={club.address}
