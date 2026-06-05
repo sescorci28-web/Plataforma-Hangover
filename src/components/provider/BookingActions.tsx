@@ -48,7 +48,7 @@ export function BookingActions({ bookingId, currentStatus }: BookingActionsProps
           <button
             onClick={() => handleAction("confirmed", "confirm")}
             disabled={isPending}
-            className="flex-1 sm:flex-none px-4 py-2 bg-accent-600 hover:bg-accent-500 disabled:opacity-50 rounded-xl text-xs font-semibold text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5 glow border border-accent-500/20"
+            className="flex-1 sm:flex-none px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 rounded-xl text-xs font-semibold text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5 glow border border-primary-500/20"
           >
             {isPending && actionType === "confirm" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
@@ -78,7 +78,7 @@ export function BookingActions({ bookingId, currentStatus }: BookingActionsProps
           <button
             onClick={() => handleAction("completed", "complete")}
             disabled={isPending}
-            className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-xl text-xs font-semibold text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5 glow border border-emerald-500/20"
+            className="flex-1 sm:flex-none px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 rounded-xl text-xs font-semibold text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5 glow border border-primary-500/20"
           >
             {isPending && actionType === "complete" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />

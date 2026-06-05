@@ -143,7 +143,7 @@ export default async function ProviderDashboard() {
                   className="w-12 h-12 rounded-full object-cover border border-white/10"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-accent-600 flex items-center justify-center text-xl font-bold font-outfit text-white shrink-0">
+                <div className="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center text-xl font-bold font-outfit text-white shrink-0">
                   {initials}
                 </div>
               )}
@@ -154,8 +154,8 @@ export default async function ProviderDashboard() {
             </div>
             
             <nav className="space-y-2">
-              <Link href="/dashboard/provider" className="flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl text-accent-400 font-medium">
-                <BarChart3 className="w-5 h-5" />
+              <Link href="/dashboard/provider" className="flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl text-primary-400 font-medium">
+                <BarChart3 className="w-5 h-5 text-primary-400" />
                 Panel de Control
               </Link>
               <Link href="/dashboard/provider/clubs" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
@@ -163,7 +163,7 @@ export default async function ProviderDashboard() {
                 Mis Discotecas
               </Link>
               <Link href="/dashboard/provider/orders" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <ShoppingBag className="w-5 h-5 text-emerald-400" />
+                <ShoppingBag className="w-5 h-5 text-primary-400" />
                 Pedidos en Vivo
               </Link>
               <Link href="/dashboard/provider/validate" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
@@ -171,7 +171,7 @@ export default async function ProviderDashboard() {
                 Validar Entrada
               </Link>
               <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <Camera className="w-5 h-5 text-accent-400" />
+                <Camera className="w-5 h-5 text-primary-400" />
                 Escáner Cámara
               </Link>
               <Link href="/dashboard/profile" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
@@ -220,33 +220,33 @@ export default async function ProviderDashboard() {
             <div className="flex flex-wrap items-center gap-3">
               {activeProfile.city && activeProfile.city !== "No especificada" && (
                 <div className="flex items-center gap-1.5 text-zinc-400 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-sm shrink-0">
-                  <MapPin className="w-4 h-4 text-accent-400" />
+                  <MapPin className="w-4 h-4 text-primary-400" />
                   <span>{activeProfile.city}</span>
                 </div>
               )}
-              <Link href="/dashboard/provider/scanner" className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 glow cursor-pointer text-sm">
-                <Camera className="w-5 h-5" />
+              <Link href="/dashboard/provider/scanner" className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 shadow-lg shadow-primary-600/15 active:scale-98 cursor-pointer text-sm">
+                <Camera className="w-4.5 h-4.5 shrink-0" />
                 Validar por Cámara
               </Link>
-              <Link href="/dashboard/provider/validate" className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 glow cursor-pointer text-sm">
-                <QrCode className="w-5 h-5" />
+              <Link href="/dashboard/provider/validate" className="bg-primary-900/40 border border-primary-500/20 hover:border-primary-500/40 hover:bg-primary-900/60 text-primary-300 px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-pointer text-sm">
+                <QrCode className="w-4.5 h-4.5 shrink-0" />
                 Validar Manual
               </Link>
-              <Link href="/dashboard/provider/new-service" className="bg-accent-600 hover:bg-accent-500 text-white px-5 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 glow cursor-pointer text-sm">
-                <Plus className="w-5 h-5" />
+              <Link href="/dashboard/provider/new-service" className="bg-zinc-900/60 border border-white/5 hover:border-primary-500/30 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-pointer text-sm">
+                <Plus className="w-4.5 h-4.5 shrink-0" />
                 Nuevo Servicio
               </Link>
-              <Link href="/dashboard/provider/new-event" className="bg-zinc-800 hover:bg-zinc-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all flex items-center gap-2 border border-white/10 cursor-pointer text-sm">
-                <Plus className="w-5 h-5" />
+              <Link href="/dashboard/provider/new-event" className="bg-zinc-900/60 border border-white/5 hover:border-primary-500/30 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-pointer text-sm">
+                <Plus className="w-4.5 h-4.5 shrink-0" />
                 Nuevo Evento
               </Link>
             </div>
           </header>
 
           {/* Profile Summary Card */}
-          <div className="glass-card p-6 bg-gradient-to-r from-accent-950/20 to-transparent flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="glass-card p-6 bg-gradient-to-r from-primary-950/20 to-transparent flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-accent-400">Presentación / Biografía</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-primary-400">Presentación / Biografía</h3>
               <div className="text-sm text-zinc-300">
                 <p><span className="text-zinc-500">Nombre de Proveedor:</span> {activeProfile.full_name}</p>
                 <p><span className="text-zinc-500">Username:</span> @{activeProfile.username}</p>
@@ -257,7 +257,7 @@ export default async function ProviderDashboard() {
             </div>
             <Link 
               href="/dashboard/profile" 
-              className="bg-accent-600 hover:bg-accent-500 text-white px-5 py-2.5 rounded-xl font-medium transition-all shrink-0 text-sm glow text-center w-full md:w-auto"
+              className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shrink-0 text-sm glow text-center w-full md:w-auto"
             >
               Editar Perfil completo
             </Link>
@@ -265,28 +265,28 @@ export default async function ProviderDashboard() {
 
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="glass-card p-6 border-accent-500/20">
+            <div className="glass-card p-6 border-primary-500/20">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-zinc-400 font-medium">Ingresos Confirmados</h4>
-                <DollarSign className="w-5 h-5 text-emerald-400" />
+                <DollarSign className="w-5 h-5 text-primary-400" />
               </div>
-              <p className="text-3xl font-bold">${monthlyEarnings || "0.00"}</p>
-              <p className="text-xs text-emerald-400 mt-2">Reservas completadas/confirmadas</p>
+              <p className="text-3xl font-bold font-outfit text-white">${monthlyEarnings || "0.00"}</p>
+              <p className="text-xs text-primary-400 mt-2">Reservas completadas/confirmadas</p>
             </div>
             <div className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-zinc-400 font-medium">Servicios Activos</h4>
-                <Settings className="w-5 h-5 text-accent-400" />
+                <Settings className="w-5 h-5 text-primary-400" />
               </div>
-              <p className="text-3xl font-bold">{servicesCount}</p>
+              <p className="text-3xl font-bold font-outfit text-white">{servicesCount}</p>
               <p className="text-xs text-zinc-400 mt-2">{isServicesError ? "Error al consultar servicios de BD" : "Publicados en marketplace"}</p>
             </div>
             <div className="glass-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-zinc-400 font-medium">Total Reservas</h4>
-                <Calendar className="w-5 h-5 text-yellow-400" />
+                <Calendar className="w-5 h-5 text-primary-400" />
               </div>
-              <p className="text-3xl font-bold">{bookingsCount}</p>
+              <p className="text-3xl font-bold font-outfit text-white">{bookingsCount}</p>
               <p className="text-xs text-zinc-400 mt-2">{pendingBookingsCount} pendientes de respuesta</p>
             </div>
           </div>
@@ -296,11 +296,11 @@ export default async function ProviderDashboard() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold flex items-center gap-2 text-white">
                 Mis Servicios
-                <span className="bg-accent-600 text-white text-xs px-2 py-0.5 rounded-full">
+                <span className="bg-primary-650/20 border border-primary-500/20 text-primary-300 text-xs px-2 py-0.5 rounded-full">
                   {servicesCount}
                 </span>
               </h2>
-              <Link href="/dashboard/provider/new-service" className="text-xs text-accent-400 hover:text-accent-300 font-semibold transition-colors flex items-center gap-1 cursor-pointer">
+              <Link href="/dashboard/provider/new-service" className="text-xs text-primary-400 hover:text-primary-300 font-semibold transition-colors flex items-center gap-1 cursor-pointer">
                 + Crear Servicio
               </Link>
             </div>
@@ -312,7 +312,7 @@ export default async function ProviderDashboard() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold flex items-center gap-2 text-white">
                 Solicitudes y Reservas
-                <span className="bg-accent-600 text-white text-xs px-2 py-0.5 rounded-full">
+                <span className="bg-primary-650/20 border border-primary-500/20 text-primary-300 text-xs px-2 py-0.5 rounded-full">
                   {bookingsCount}
                 </span>
               </h2>
@@ -328,28 +328,26 @@ export default async function ProviderDashboard() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h4 className="font-semibold text-white">{(req.user as any)?.full_name || "Usuario"}</h4>
-                          <span className={`text-xs px-2.5 py-0.5 rounded-full border capitalize ${
-                            req.status === 'confirmed'
-                              ? 'bg-accent-500/10 text-accent-300 border-accent-500/20 border-solid'
-                              : req.status === 'completed'
-                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 border-solid'
-                              : req.status === 'pending'
-                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/20 border-solid'
-                              : req.status === 'rejected'
-                              ? 'bg-red-500/10 text-red-300 border-red-500/20 border-solid'
-                              : 'bg-red-500/10 text-red-300 border-red-500/20 border-solid'
-                          }`}>
-                            {req.status === 'confirmed'
-                              ? 'confirmada'
-                              : req.status === 'completed'
-                              ? 'completada'
-                              : req.status === 'pending'
-                              ? 'pendiente'
-                              : req.status === 'rejected'
-                              ? 'rechazada'
-                              : 'cancelada'}
-                          </span>
+                           <h4 className="font-semibold text-white">{(req.user as any)?.full_name || "Usuario"}</h4>
+                           <span className={`text-xs px-2.5 py-0.5 rounded-full border capitalize ${
+                             req.status === 'confirmed'
+                               ? 'bg-primary-500/10 text-primary-300 border-primary-500/20 border-solid'
+                               : req.status === 'completed'
+                               ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 border-solid'
+                               : req.status === 'pending'
+                               ? 'bg-amber-500/10 text-amber-300 border-amber-500/20 border-solid'
+                               : 'bg-red-500/10 text-red-300 border-red-500/20 border-solid'
+                           }`}>
+                             {req.status === 'confirmed'
+                               ? 'confirmada'
+                               : req.status === 'completed'
+                               ? 'completada'
+                               : req.status === 'pending'
+                               ? 'pendiente'
+                               : req.status === 'rejected'
+                               ? 'rechazada'
+                               : 'cancelada'}
+                           </span>
                         </div>
                         <p className="text-sm text-zinc-400">
                           {req.title} • {new Date(req.event_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -358,7 +356,7 @@ export default async function ProviderDashboard() {
                           <p className="text-xs text-zinc-500 mt-1">{req.number_of_people} personas</p>
                         ) : null}
                         {req.notes && <p className="text-xs text-zinc-500 mt-1 italic">Nota: "{req.notes}"</p>}
-                        <p className="text-sm font-medium text-emerald-400 mt-1">${req.total_amount}</p>
+                        <p className="text-sm font-semibold text-white font-outfit mt-1">${Number(req.total_amount).toLocaleString("es-CO")} COP</p>
                       </div>
                     </div>
                     <BookingActions bookingId={req.id} currentStatus={req.status} />

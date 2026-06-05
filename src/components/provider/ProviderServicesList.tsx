@@ -105,16 +105,16 @@ export function ProviderServicesList({ services }: ProviderServicesListProps) {
               {/* Service details */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-accent-400 capitalize">
+                  <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-primary-400 capitalize">
                     {service.category === "dj" ? "DJs & Música" :
                      service.category === "bar" ? "Bares & Coctelería" :
                      service.category === "staff" ? "Personal de Servicio" :
                      service.category === "security" ? "Seguridad" :
                      service.category === "catering" ? "Catering & Comida" : service.category}
                   </span>
-                  <span className="text-md font-bold text-emerald-400">${service.price}</span>
+                  <span className="text-md font-bold text-white font-outfit">${service.price}</span>
                 </div>
-                <h3 className="text-md font-bold text-white group-hover:text-accent-400 transition-colors truncate">
+                <h3 className="text-md font-bold text-white group-hover:text-primary-400 transition-colors truncate">
                   {service.title}
                 </h3>
                 <p className="text-xs text-zinc-400 line-clamp-3">
@@ -130,7 +130,7 @@ export function ProviderServicesList({ services }: ProviderServicesListProps) {
                     href={`/dashboard/provider/edit-service/${service.id}`}
                     className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-lg transition-colors flex items-center gap-1 text-xs cursor-pointer"
                   >
-                    <Edit2 className="w-3.5 h-3.5 text-accent-400" />
+                    <Edit2 className="w-3.5 h-3.5 text-primary-400" />
                     Editar
                   </Link>
                   <button
