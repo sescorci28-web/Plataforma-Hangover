@@ -212,34 +212,44 @@ export default async function ProviderDashboard() {
             </div>
           )}
 
-          <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-zinc-950/40 p-6 rounded-2xl border border-white/5">
             <div>
-              <h1 className="text-3xl font-bold font-outfit mb-2 text-white">Panel de Proveedor</h1>
-              <p className="text-zinc-400">Gestiona tus servicios y solicitudes de reserva.</p>
+              <div className="flex items-center gap-2.5 mb-1 flex-wrap">
+                <h1 className="text-2xl font-bold font-outfit text-white">Panel de Proveedor</h1>
+                {activeProfile.city && activeProfile.city !== "No especificada" && (
+                  <div className="flex items-center gap-1 text-zinc-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full text-xs font-semibold">
+                    <MapPin className="w-3.5 h-3.5 text-primary-400 shrink-0" />
+                    <span>{activeProfile.city}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-zinc-400">Gestiona tus servicios, entradas y solicitudes de reserva.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {activeProfile.city && activeProfile.city !== "No especificada" && (
-                <div className="flex items-center gap-1.5 text-zinc-400 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-sm shrink-0">
-                  <MapPin className="w-4 h-4 text-primary-400" />
-                  <span>{activeProfile.city}</span>
-                </div>
-              )}
-              <Link href="/dashboard/provider/scanner" className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 shadow-lg shadow-primary-600/15 active:scale-98 cursor-pointer text-sm">
-                <Camera className="w-4.5 h-4.5 shrink-0" />
-                Validar por Cámara
-              </Link>
-              <Link href="/dashboard/provider/validate" className="bg-primary-900/40 border border-primary-500/20 hover:border-primary-500/40 hover:bg-primary-900/60 text-primary-300 px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-pointer text-sm">
-                <QrCode className="w-4.5 h-4.5 shrink-0" />
-                Validar Manual
-              </Link>
-              <Link href="/dashboard/provider/new-service" className="bg-zinc-900/60 border border-white/5 hover:border-primary-500/30 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-pointer text-sm">
-                <Plus className="w-4.5 h-4.5 shrink-0" />
-                Nuevo Servicio
-              </Link>
-              <Link href="/dashboard/provider/new-event" className="bg-zinc-900/60 border border-white/5 hover:border-primary-500/30 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-pointer text-sm">
-                <Plus className="w-4.5 h-4.5 shrink-0" />
-                Nuevo Evento
-              </Link>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
+              {/* Group 1: Validaciones (Segmented Pill) */}
+              <div className="flex gap-1.5 p-1 bg-black/40 border border-white/5 rounded-xl shrink-0">
+                <Link href="/dashboard/provider/scanner" className="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs justify-center shrink-0">
+                  <Camera className="w-3.5 h-3.5 shrink-0" />
+                  Cámara
+                </Link>
+                <Link href="/dashboard/provider/validate" className="text-zinc-300 hover:text-white hover:bg-white/5 px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs justify-center shrink-0">
+                  <QrCode className="w-3.5 h-3.5 text-primary-400 shrink-0" />
+                  Manual
+                </Link>
+              </div>
+
+              {/* Group 2: Creaciones */}
+              <div className="flex gap-2">
+                <Link href="/dashboard/provider/new-service" className="bg-zinc-900/60 border border-white/5 hover:border-primary-500/30 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4 py-2 rounded-xl font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none">
+                  <Plus className="w-3.5 h-3.5 shrink-0" />
+                  Servicio
+                </Link>
+                <Link href="/dashboard/provider/new-event" className="bg-zinc-900/60 border border-white/5 hover:border-primary-500/30 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4 py-2 rounded-xl font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none">
+                  <Plus className="w-3.5 h-3.5 shrink-0" />
+                  Evento
+                </Link>
+              </div>
             </div>
           </header>
 
