@@ -110,7 +110,7 @@ export function AvatarUpload({
           ) : (
             <motion.div
               key="fallback"
-              className="w-full h-full bg-gradient-to-br from-primary-950/80 to-accent-950/80 flex items-center justify-center text-3xl font-bold text-white font-outfit"
+              className="w-full h-full bg-gradient-to-br from-primary-950/80 to-primary-900/60 flex items-center justify-center text-3xl font-bold text-white font-outfit"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

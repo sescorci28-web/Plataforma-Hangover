@@ -58,7 +58,7 @@ export default async function ProviderLiveOrdersPage() {
                   className="w-12 h-12 rounded-full object-cover border border-white/10"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-accent-600 flex items-center justify-center text-xl font-bold font-outfit text-white shrink-0">
+                <div className="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center text-xl font-bold font-outfit text-white shrink-0">
                   {profile.full_name?.charAt(0) || "P"}
                 </div>
               )}

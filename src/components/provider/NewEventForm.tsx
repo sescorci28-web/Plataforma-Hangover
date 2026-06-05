@@ -111,7 +111,7 @@ export function NewEventForm() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               disabled={isPending || success}
-              className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm"
+              className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all text-sm"
               placeholder="Ej. Fiesta de Fin de Año VIP"
               required
             />
@@ -131,7 +131,7 @@ export function NewEventForm() {
                 value={eventDate}
                 onChange={(e) => setEventDate(e.target.value)}
                 disabled={isPending || success}
-                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm cursor-pointer"
+                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all text-sm cursor-pointer"
                 required
               />
             </div>
@@ -149,7 +149,7 @@ export function NewEventForm() {
                 value={ticketPrice}
                 onChange={(e) => setTicketPrice(e.target.value)}
                 disabled={isPending || success}
-                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm"
+                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all text-sm"
                 placeholder="Ej. 15 (0 para evento gratuito)"
                 min="0"
                 required
@@ -170,7 +170,7 @@ export function NewEventForm() {
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               disabled={isPending || success}
-              className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm"
+              className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all text-sm"
               placeholder="Ej. Calle Falsa 123, Hangover Club"
               required
             />
@@ -189,7 +189,7 @@ export function NewEventForm() {
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               disabled={isPending || success}
-              className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm"
+              className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all text-sm"
               placeholder="https://ejemplo.com/flyer-evento.jpg"
             />
           </div>
@@ -206,7 +206,7 @@ export function NewEventForm() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={isPending || success}
-              className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all text-sm min-h-[140px] resize-y"
+              className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all text-sm min-h-[140px] resize-y"
               placeholder="Detalla las actividades, line-up de DJs, condiciones de entrada, código de vestimenta, etc."
               required
             />
@@ -227,7 +227,7 @@ export function NewEventForm() {
         <button
           type="submit"
           disabled={isPending || success}
-          className="w-full sm:w-auto min-w-[200px] bg-accent-600 hover:bg-accent-500 text-white rounded-xl py-3 px-6 font-semibold text-sm transition-all glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full sm:w-auto min-w-[200px] bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 px-6 font-semibold text-sm transition-all glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
         >
           {isPending ? (
             <>

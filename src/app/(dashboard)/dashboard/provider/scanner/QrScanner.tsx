@@ -143,10 +143,10 @@ export function QrScanner() {
       {/* Scanner View (Always mounted in DOM to prevent race conditions with html5-qrcode and AnimatePresence) */}
       <div className={scanStatus === "scanning" ? "block" : "hidden"}>
         <div className="glass-card p-6 bg-[#0c0c14] border border-white/10 rounded-2xl relative overflow-hidden">
-          <div className="absolute -top-12 -left-12 w-32 h-32 bg-accent-600/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -top-12 -left-12 w-32 h-32 bg-primary-600/10 rounded-full blur-2xl pointer-events-none" />
           
           <div className="space-y-4 text-center">
-            <div className="flex items-center justify-center gap-2 text-accent-400 font-semibold uppercase tracking-wider text-xs">
+            <div className="flex items-center justify-center gap-2 text-primary-400 font-semibold uppercase tracking-wider text-xs">
               <Camera className="w-4 h-4 animate-pulse" />
               <span>Cámara Activa</span>
             </div>
@@ -171,7 +171,7 @@ export function QrScanner() {
             exit={{ opacity: 0 }}
             className="glass-card p-12 bg-[#0c0c14] border border-white/10 rounded-2xl text-center space-y-4"
           >
-            <Loader2 className="w-12 h-12 text-accent-400 animate-spin mx-auto" />
+            <Loader2 className="w-12 h-12 text-primary-400 animate-spin mx-auto" />
             <h3 className="text-white font-bold font-outfit text-lg">Validando Código QR</h3>
             <p className="text-zinc-400 text-sm">Consultando los detalles de la reserva de forma segura...</p>
           </motion.div>
@@ -254,7 +254,7 @@ export function QrScanner() {
             {/* Reset Button (Scan Next) */}
             <button
               onClick={handleReset}
-              className="w-full bg-accent-600 hover:bg-accent-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+              className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
               Escanear Siguiente
@@ -302,7 +302,7 @@ export function QrScanner() {
             {/* Reset Button */}
             <button
               onClick={handleReset}
-              className="w-full bg-accent-600 hover:bg-accent-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+              className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
               Escanear de Nuevo
@@ -335,7 +335,7 @@ export function QrScanner() {
             {/* Reset Button */}
             <button
               onClick={handleReset}
-              className="w-full bg-accent-600 hover:bg-accent-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+              className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
               Escanear de Nuevo
@@ -350,7 +350,7 @@ export function QrScanner() {
 function BookingDetailsCard({ details }: { details: any }) {
   return (
     <div className="glass-card p-6 bg-[#0c0c14]/40 border border-white/5 rounded-2xl space-y-4">
-      <h3 className="text-xs font-semibold text-accent-400 uppercase tracking-wider">Detalles de la Reserva</h3>
+      <h3 className="text-xs font-semibold text-primary-400 uppercase tracking-wider">Detalles de la Reserva</h3>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="flex items-center gap-3">
@@ -405,11 +405,11 @@ function BookingDetailsCard({ details }: { details: any }) {
 
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-white/5 border border-white/5 rounded-xl flex items-center justify-center text-zinc-400 shrink-0">
-            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <DollarSign className="w-4 h-4 text-primary-400" />
           </div>
           <div>
             <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Monto Total</p>
-            <p className="text-sm font-semibold text-emerald-400">${details.totalAmount}</p>
+            <p className="text-sm font-semibold text-white">${details.totalAmount}</p>
           </div>
         </div>
       </div>

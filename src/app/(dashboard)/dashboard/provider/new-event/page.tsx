@@ -36,7 +36,7 @@ export default async function NewEventPage() {
           </Link>
           <div className="flex items-center gap-2.5">
             <h1 className="text-3xl font-bold font-outfit text-white">Publicar Nuevo Evento</h1>
-            <span className="bg-accent-600/20 text-accent-400 border border-accent-500/20 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+            <span className="bg-primary-600/20 text-primary-400 border border-primary-500/20 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
               {profile.role}
             </span>
           </div>

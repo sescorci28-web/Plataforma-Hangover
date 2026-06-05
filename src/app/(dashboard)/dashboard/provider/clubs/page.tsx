@@ -68,7 +68,7 @@ export default async function ProviderClubsPage() {
                   className="w-12 h-12 rounded-full object-cover border border-white/10"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-accent-600 flex items-center justify-center text-xl font-bold font-outfit text-white shrink-0">
+                <div className="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center text-xl font-bold font-outfit text-white shrink-0">
                   {initials}
                 </div>
               )}
@@ -83,8 +83,8 @@ export default async function ProviderClubsPage() {
                 <BarChart3 className="w-5 h-5" />
                 Panel de Control
               </Link>
-              <Link href="/dashboard/provider/clubs" className="flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl text-accent-400 font-medium">
-                <Building2 className="w-5 h-5" />
+              <Link href="/dashboard/provider/clubs" className="flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl text-primary-400 font-medium">
+                <Building2 className="w-5 h-5 text-primary-400" />
                 Mis Discotecas
               </Link>
               <Link href="/dashboard/provider/validate" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
@@ -92,7 +92,7 @@ export default async function ProviderClubsPage() {
                 Validar Entrada
               </Link>
               <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <Camera className="w-5 h-5 text-accent-400" />
+                <Camera className="w-5 h-5 text-primary-400" />
                 Escáner Cámara
               </Link>
               <Link href="/dashboard/profile" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">

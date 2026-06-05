@@ -375,7 +375,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                     className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-tr from-primary-950 via-zinc-900 to-accent-950 flex items-center justify-center opacity-40">
+                  <div className="w-full h-full bg-gradient-to-tr from-primary-950 via-zinc-900 to-primary-900/40 flex items-center justify-center opacity-40">
                     <Building2 className="w-12 h-12 text-white/20" />
                   </div>
                 )}
@@ -408,7 +408,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs text-zinc-500">
                     <span className="flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-accent-400" /> {club.city}
+                      <MapPin className="w-3.5 h-3.5 text-primary-400" /> {club.city}
                     </span>
                     {club.instagram && (
                       <span className="flex items-center gap-1 text-primary-400">
@@ -673,12 +673,12 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                           <p className="text-xs font-semibold text-zinc-300">Logo</p>
                           <p className="text-[11px] text-zinc-500">Ideal para identidad visual del club.</p>
                         </div>
-                        <div className="rounded-full bg-accent-500/10 px-2 py-1 text-[10px] text-accent-200">
+                        <div className="rounded-full bg-primary-500/10 px-2 py-1 text-[10px] text-primary-200">
                           avatars/clubs/logos
                         </div>
                       </div>
 
-                      <div className="flex h-[160px] items-center justify-center overflow-hidden rounded-[18px] border border-white/10 bg-gradient-to-br from-accent-950/80 to-zinc-950">
+                      <div className="flex h-[160px] items-center justify-center overflow-hidden rounded-[18px] border border-white/10 bg-gradient-to-br from-primary-950/80 to-zinc-950">
                         {logoPreviewUrl ? (
                           <img src={logoPreviewUrl} alt="Preview del logo" className="max-h-full max-w-full object-contain" />
                         ) : (

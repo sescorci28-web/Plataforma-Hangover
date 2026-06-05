@@ -380,7 +380,7 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
             }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wider uppercase transition-all ${
               activeTab === "services"
-                ? "bg-accent-600 text-white shadow-lg shadow-accent-500/20"
+                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
             }`}
           >
@@ -723,7 +723,7 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
                           resetServiceForm();
                           setIsServiceFormOpen(true);
                         }}
-                        className="bg-accent-600 hover:bg-accent-500 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
+                        className="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
                       >
                         <Plus className="w-3.5 h-3.5" /> Agregar Servicio
                       </button>
@@ -783,7 +783,7 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
                                 checked={serviceActive}
                                 onChange={(e) => setServiceActive(e.target.checked)}
                                 disabled={isPending}
-                                className="w-4 h-4 rounded border-white/10 bg-black/60 accent-accent-500 cursor-pointer"
+                                className="w-4 h-4 rounded border-white/10 bg-black/60 accent-primary-500 cursor-pointer"
                               />
                               <label htmlFor="service-active" className="text-xs text-zinc-300 cursor-pointer select-none">
                                 Servicio activo y visible
@@ -807,7 +807,7 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
                         <button
                           type="submit"
                           disabled={isPending}
-                          className="w-full bg-accent-600 hover:bg-accent-500 text-white rounded-xl py-2.5 px-4 font-semibold text-xs transition-all flex items-center justify-center gap-1.5 glow cursor-pointer disabled:opacity-50"
+                          className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-2.5 px-4 font-semibold text-xs transition-all flex items-center justify-center gap-1.5 glow cursor-pointer disabled:opacity-50"
                         >
                           {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : editingService ? "Guardar Cambios" : "Agregar Servicio"}
                         </button>
@@ -838,7 +838,7 @@ export function ClubMenuServicesManager({ club, isOpen, onClose }: ClubMenuServi
                               )}
                             </div>
                             <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{service.description}</p>
-                            <p className="text-xs font-semibold text-accent-400 mt-1.5">
+                            <p className="text-xs font-semibold text-primary-400 mt-1.5">
                               {service.price && Number(service.price) > 0
                                 ? `$${Number(service.price).toLocaleString("es-CO")} COP`
                                 : "Incluido en el Cover"}

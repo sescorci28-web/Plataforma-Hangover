@@ -36,7 +36,7 @@ export default async function QrScannerPage() {
           <ArrowLeft className="w-4 h-4" />
           Volver al Panel
         </Link>
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-500/10 border border-accent-500/20 text-[10px] font-bold uppercase tracking-wider text-accent-400">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-500/10 border border-primary-500/20 text-[10px] font-bold uppercase tracking-wider text-primary-400">
           <ShieldCheck className="w-3.5 h-3.5" /> Acceso Seguro
         </span>
       </div>

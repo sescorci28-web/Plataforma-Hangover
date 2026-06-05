@@ -33,7 +33,7 @@ export function QRValidatorForm() {
     <div className="space-y-6">
       {/* Form Input Card */}
       <div className="glass-card p-6 bg-[#0c0c14] border border-white/10 rounded-2xl relative overflow-hidden">
-        <div className="absolute -top-12 -left-12 w-32 h-32 bg-accent-600/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -top-12 -left-12 w-32 h-32 bg-primary-600/10 rounded-full blur-2xl pointer-events-none" />
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -48,7 +48,7 @@ export function QRValidatorForm() {
                 onChange={(e) => setQrInput(e.target.value)}
                 placeholder="Pega el código QR (Ej: QR-550e8400...)"
                 disabled={isPending}
-                className="w-full bg-black/40 border border-white/10 focus:border-accent-500 focus:ring-1 focus:ring-accent-500 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-all"
+                className="w-full bg-black/40 border border-white/10 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-all"
                 autoFocus
               />
               <QrCode className="w-5 h-5 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -58,7 +58,7 @@ export function QRValidatorForm() {
           <button
             type="submit"
             disabled={isPending || !qrInput.trim()}
-            className="w-full bg-accent-600 hover:bg-accent-500 disabled:opacity-50 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+            className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
           >
             {isPending ? (
               <>
@@ -114,7 +114,7 @@ export function QRValidatorForm() {
 
             {/* Ticket details summary */}
             <div className="glass-card p-6 bg-[#0c0c14]/40 border border-white/5 rounded-2xl space-y-4">
-              <h3 className="text-xs font-semibold text-accent-400 uppercase tracking-wider">Detalles de la Reserva</h3>
+              <h3 className="text-xs font-semibold text-primary-400 uppercase tracking-wider">Detalles de la Reserva</h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center gap-3">
@@ -169,11 +169,11 @@ export function QRValidatorForm() {
 
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-white/5 border border-white/5 rounded-xl flex items-center justify-center text-zinc-400 shrink-0">
-                    <DollarSign className="w-4 h-4 text-emerald-400" />
+                    <DollarSign className="w-4 h-4 text-primary-400" />
                   </div>
                   <div>
                     <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Monto Total</p>
-                    <p className="text-sm font-semibold text-emerald-400">${successData.totalAmount}</p>
+                    <p className="text-sm font-semibold text-white">${successData.totalAmount}</p>
                   </div>
                 </div>
               </div>
