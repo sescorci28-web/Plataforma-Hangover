@@ -129,6 +129,13 @@ export default async function ProviderDashboard() {
     ? activeProfile.full_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
     : "P";
 
+  const formattedEarnings = new Intl.NumberFormat('es-CO', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(monthlyEarnings);
+
+  const displayUsername = activeProfile.username || activeProfile.full_name?.toLowerCase().replace(/\s+/g, "_") || "proveedor";
+
   return (
     <div className="container mx-auto px-4 md:px-6 py-12">
       <div className="flex flex-col md:flex-row gap-8">
@@ -149,7 +156,7 @@ export default async function ProviderDashboard() {
               )}
               <div className="overflow-hidden">
                 <h3 className="font-semibold text-white truncate">{activeProfile.full_name || "Proveedor"}</h3>
-                <p className="text-xs text-zinc-400">@{activeProfile.username || "proveedor"}</p>
+                <p className="text-xs text-zinc-400">@{displayUsername}</p>
               </div>
             </div>
             
@@ -240,13 +247,13 @@ export default async function ProviderDashboard() {
               </div>
 
               {/* Group 2: Creaciones */}
-              <div className="flex gap-2">
-                <Link href="/dashboard/provider/new-service" className="bg-zinc-900/60 border border-white/5 hover:border-primary-500/30 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4 py-2 rounded-xl font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none">
-                  <Plus className="w-3.5 h-3.5 shrink-0" />
+              <div className="flex gap-2.5">
+                <Link href="/dashboard/provider/new-service" className="bg-zinc-900/60 border border-primary-500/20 hover:border-primary-500/50 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none shadow-md hover:shadow-primary-500/10 transform hover:scale-[1.02] active:scale-[0.98]">
+                  <Plus className="w-3.5 h-3.5 shrink-0 text-primary-400" />
                   Servicio
                 </Link>
-                <Link href="/dashboard/provider/new-event" className="bg-zinc-900/60 border border-white/5 hover:border-primary-500/30 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4 py-2 rounded-xl font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none">
-                  <Plus className="w-3.5 h-3.5 shrink-0" />
+                <Link href="/dashboard/provider/new-event" className="bg-zinc-900/60 border border-primary-500/20 hover:border-primary-500/50 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none shadow-md hover:shadow-primary-500/10 transform hover:scale-[1.02] active:scale-[0.98]">
+                  <Plus className="w-3.5 h-3.5 shrink-0 text-primary-400" />
                   Evento
                 </Link>
               </div>
@@ -257,9 +264,9 @@ export default async function ProviderDashboard() {
           <div className="glass-card p-6 bg-gradient-to-r from-primary-950/20 to-transparent flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div className="space-y-2">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-primary-400">Presentación / Biografía</h3>
-              <div className="text-sm text-zinc-300">
-                <p><span className="text-zinc-500">Nombre de Proveedor:</span> {activeProfile.full_name}</p>
-                <p><span className="text-zinc-500">Username:</span> @{activeProfile.username}</p>
+              <div className="text-sm text-zinc-300 space-y-1">
+                <p><span className="text-zinc-500">Nombre de Proveedor:</span> {activeProfile.full_name || "No especificado"}</p>
+                <p><span className="text-zinc-500">Usuario:</span> @{displayUsername}</p>
               </div>
               {activeProfile.bio && (
                 <p className="text-sm text-zinc-400 italic mt-2">"{activeProfile.bio}"</p>
@@ -274,26 +281,26 @@ export default async function ProviderDashboard() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="glass-card p-6 border-primary-500/20">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="glass-card p-6 border border-primary-500/20 hover:border-primary-500/30 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-zinc-400 font-medium">Ingresos Confirmados</h4>
+                <h4 className="text-zinc-400 font-medium text-sm">Ingresos Confirmados</h4>
                 <DollarSign className="w-5 h-5 text-primary-400" />
               </div>
-              <p className="text-3xl font-bold font-outfit text-white">${monthlyEarnings || "0.00"}</p>
+              <p className="text-3xl font-bold font-outfit text-white">${formattedEarnings} COP</p>
               <p className="text-xs text-primary-400 mt-2">Reservas completadas/confirmadas</p>
             </div>
-            <div className="glass-card p-6">
+            <div className="glass-card p-6 border border-white/5 hover:border-primary-500/20 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-zinc-400 font-medium">Servicios Activos</h4>
+                <h4 className="text-zinc-400 font-medium text-sm">Servicios Activos</h4>
                 <Settings className="w-5 h-5 text-primary-400" />
               </div>
               <p className="text-3xl font-bold font-outfit text-white">{servicesCount}</p>
               <p className="text-xs text-zinc-400 mt-2">{isServicesError ? "Error al consultar servicios de BD" : "Publicados en marketplace"}</p>
             </div>
-            <div className="glass-card p-6">
+            <div className="glass-card p-6 border border-white/5 hover:border-primary-500/20 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-zinc-400 font-medium">Total Reservas</h4>
+                <h4 className="text-zinc-400 font-medium text-sm">Total Reservas</h4>
                 <Calendar className="w-5 h-5 text-primary-400" />
               </div>
               <p className="text-3xl font-bold font-outfit text-white">{bookingsCount}</p>
