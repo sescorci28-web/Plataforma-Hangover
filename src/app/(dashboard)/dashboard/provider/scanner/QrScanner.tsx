@@ -2,14 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { checkQRCode, confirmQRAdmission } from "@/app/services/actions";
-import { QrCode, Loader2, CheckCircle2, XCircle, AlertTriangle, User, Ticket, Calendar, Users, DollarSign, Camera, RotateCcw } from "lucide-react";
+import { QrCode, Loader2, CheckCircle2, XCircle, AlertTriangle, User, Ticket, Calendar, Users, DollarSign, Camera, RotateCcw, Keyboard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { QRValidatorForm } from "./QRValidatorForm";
 
 export function QrScanner() {
   const [scanResult, setScanResult] = useState<any | null>(null);
   const [scanStatus, setScanStatus] = useState<"valid" | "used" | "cancelled" | "invalid" | "scanning" | "error" | "processing" | "confirmed_success">("scanning");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [activeMode, setActiveMode] = useState<"camera" | "manual">("camera");
   const scannerRef = useRef<any>(null);
 
   const startScanner = () => {
@@ -99,7 +101,15 @@ export function QrScanner() {
   };
 
   useEffect(() => {
-    startScanner();
+    if (activeMode === "camera") {
+      startScanner();
+    } else {
+      if (scannerRef.current && scannerRef.current.isScanning) {
+        scannerRef.current.stop().catch((err: any) => {
+          console.error("Error stopping scanner on mode change:", err);
+        });
+      }
+    }
 
     return () => {
       if (scannerRef.current && scannerRef.current.isScanning) {
@@ -108,7 +118,7 @@ export function QrScanner() {
         });
       }
     };
-  }, []);
+  }, [activeMode]);
 
   const handleReset = () => {
     startScanner();
@@ -140,209 +150,263 @@ export function QrScanner() {
 
   return (
     <div className="space-y-6">
-      {/* Scanner View (Always mounted in DOM to prevent race conditions with html5-qrcode and AnimatePresence) */}
-      <div className={scanStatus === "scanning" ? "block" : "hidden"}>
-        <div className="glass-card p-6 bg-[#0c0c14] border border-white/10 rounded-2xl relative overflow-hidden">
-          <div className="absolute -top-12 -left-12 w-32 h-32 bg-primary-600/10 rounded-full blur-2xl pointer-events-none" />
-          
-          <div className="space-y-4 text-center">
-            <div className="flex items-center justify-center gap-2 text-primary-400 font-semibold uppercase tracking-wider text-xs">
-              <Camera className="w-4 h-4 animate-pulse" />
-              <span>Cámara Activa</span>
-            </div>
-            
-            <div className="max-w-sm mx-auto overflow-hidden rounded-2xl border border-white/10 bg-black/40 relative">
-              <div id="qr-reader" className="w-full h-full" />
-            </div>
-            
-            <p className="text-xs text-zinc-400">
-              Apunta tu cámara al código QR de la entrada para escanearlo automáticamente.
-            </p>
-          </div>
+      {/* Selector de Modo (Cámara / Manual) */}
+      <div className="flex justify-center">
+        <div className="flex gap-1.5 p-1 bg-black/40 border border-white/5 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setActiveMode("camera")}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all text-xs flex items-center gap-1.5 cursor-pointer ${
+              activeMode === "camera"
+                ? "bg-primary-600 text-white"
+                : "text-zinc-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <Camera className="w-3.5 h-3.5" />
+            Cámara
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMode("manual")}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all text-xs flex items-center gap-1.5 cursor-pointer ${
+              activeMode === "manual"
+                ? "bg-primary-600 text-white"
+                : "text-zinc-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <Keyboard className="w-3.5 h-3.5" />
+            Manual
+          </button>
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {scanStatus === "processing" && (
-          <motion.div
-            key="processing-view"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="glass-card p-12 bg-[#0c0c14] border border-white/10 rounded-2xl text-center space-y-4"
-          >
-            <Loader2 className="w-12 h-12 text-primary-400 animate-spin mx-auto" />
-            <h3 className="text-white font-bold font-outfit text-lg">Validando Código QR</h3>
-            <p className="text-zinc-400 text-sm">Consultando los detalles de la reserva de forma segura...</p>
-          </motion.div>
-        )}
-
-        {scanStatus === "valid" && scanResult && (
-          <motion.div
-            key="valid-view"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-4"
-          >
-            {/* Valid QR Banner */}
-            <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-start gap-4">
-              <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <h4 className="font-bold text-emerald-300 text-sm">✅ Entrada Válida</h4>
-                <p className="text-xs text-zinc-300 leading-relaxed">
-                  El código QR es válido. Haz clic en "Confirmar Ingreso" para registrar el acceso del cliente.
+      {activeMode === "camera" ? (
+        <>
+          {/* Scanner View (Always mounted in DOM to prevent race conditions with html5-qrcode and AnimatePresence) */}
+          <div className={scanStatus === "scanning" ? "block" : "hidden"}>
+            <div className="glass-card p-6 bg-[#0c0c14] border border-white/10 rounded-2xl relative overflow-hidden">
+              <div className="absolute -top-12 -left-12 w-32 h-32 bg-primary-600/10 rounded-full blur-2xl pointer-events-none" />
+              
+              <div className="space-y-4 text-center">
+                <div className="flex items-center justify-center gap-2 text-primary-400 font-semibold uppercase tracking-wider text-xs">
+                  <Camera className="w-4 h-4 animate-pulse" />
+                  <span>Cámara Activa</span>
+                </div>
+                
+                <div className="max-w-sm mx-auto overflow-hidden rounded-2xl border border-white/10 bg-black/40 relative">
+                  <div id="qr-reader" className="w-full h-full" />
+                </div>
+                
+                <p className="text-xs text-zinc-400">
+                  Apunta tu cámara al código QR de la entrada para escanearlo automáticamente.
                 </p>
               </div>
             </div>
+          </div>
 
-            {/* Booking Details Card */}
-            <BookingDetailsCard details={scanResult} />
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleConfirmAdmission}
-                disabled={isConfirming}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+          <AnimatePresence mode="wait">
+            {scanStatus === "processing" && (
+              <motion.div
+                key="processing-view"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="glass-card p-12 bg-[#0c0c14] border border-white/10 rounded-2xl text-center space-y-4"
               >
-                {isConfirming ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Confirmando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    Confirmar Ingreso
-                  </>
-                )}
-              </button>
-              <button
-                onClick={handleReset}
-                disabled={isConfirming}
-                className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl px-5 py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 border border-white/5 cursor-pointer font-medium"
+                <Loader2 className="w-12 h-12 text-primary-400 animate-spin mx-auto" />
+                <h3 className="text-white font-bold font-outfit text-lg">Validando Código QR</h3>
+                <p className="text-zinc-400 text-sm">Consultando los detalles de la reserva de forma segura...</p>
+              </motion.div>
+            )}
+
+            {scanStatus === "valid" && scanResult && (
+              <motion.div
+                key="valid-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
               >
-                Cancelar
-              </button>
-            </div>
-          </motion.div>
-        )}
+                {/* Valid QR Banner */}
+                <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-start gap-4">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-emerald-300 text-sm">✅ Entrada Válida</h4>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      El código QR es válido. Haz clic en "Confirmar Ingreso" para registrar el acceso del cliente.
+                    </p>
+                  </div>
+                </div>
 
-        {scanStatus === "confirmed_success" && scanResult && (
-          <motion.div
-            key="success-view"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-4"
-          >
-            {/* Admission Confirmed Success Banner */}
-            <div className="p-5 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl flex items-start gap-4">
-              <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <h4 className="font-bold text-emerald-300 text-sm">¡Ingreso Confirmado Exitosamente!</h4>
-                <p className="text-xs text-zinc-300 leading-relaxed">
-                  El ingreso ha sido registrado a las {scanResult.qrValidatedAt ? new Date(scanResult.qrValidatedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "este momento"}.
-                </p>
-              </div>
-            </div>
+                {/* Booking Details Card */}
+                <BookingDetailsCard details={scanResult} />
 
-            {/* Booking Details Card */}
-            <BookingDetailsCard details={scanResult} />
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={handleConfirmAdmission}
+                    disabled={isConfirming}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+                  >
+                    {isConfirming ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Confirmando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        Confirmar Ingreso
+                      </>
+                    )}
+                  </button>
 
-            {/* Reset Button (Scan Next) */}
-            <button
-              onClick={handleReset}
-              className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Escanear Siguiente
-            </button>
-          </motion.div>
-        )}
+                  <button
+                    onClick={handleReset}
+                    className="flex-grow-0 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 rounded-xl px-5 py-3 font-semibold text-sm transition-all cursor-pointer"
+                  >
+                    Volver
+                  </button>
+                </div>
+              </motion.div>
+            )}
 
-        {scanStatus === "used" && scanResult && (
-          <motion.div
-            key="used-view"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-4"
-          >
-            {/* Already Used QR Banner */}
-            <div className="p-5 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-4">
-              <XCircle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <h4 className="font-bold text-red-300 text-sm">❌ QR YA UTILIZADO</h4>
-                <p className="text-xs text-zinc-300 leading-relaxed">
-                  Este ticket fue validado anteriormente el{" "}
-                  <span className="font-semibold text-white">
-                    {scanResult.qrValidatedAt
-                      ? new Date(scanResult.qrValidatedAt).toLocaleDateString("es-ES", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric"
-                        }) +
-                        " a las " +
-                        new Date(scanResult.qrValidatedAt).toLocaleTimeString("es-ES", {
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })
-                      : "fecha desconocida"}
-                  </span>.
-                  Ingreso bloqueado.
-                </p>
-              </div>
-            </div>
+            {scanStatus === "confirmed_success" && scanResult && (
+              <motion.div
+                key="confirmed-success-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
+              >
+                {/* Success QR Banner */}
+                <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-start gap-4">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-emerald-300 text-sm">🎉 Ingreso Confirmado</h4>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      El acceso de este cliente ha sido confirmado a las {scanResult.qrValidatedAt ? new Date(scanResult.qrValidatedAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) : "—"}.
+                    </p>
+                  </div>
+                </div>
 
-            {/* Booking Details Card */}
-            <BookingDetailsCard details={scanResult} />
+                {/* Booking Details Card */}
+                <BookingDetailsCard details={scanResult} />
 
-            {/* Reset Button */}
-            <button
-              onClick={handleReset}
-              className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Escanear de Nuevo
-            </button>
-          </motion.div>
-        )}
+                {/* Reset Button (Scan Next) */}
+                <button
+                  onClick={handleReset}
+                  className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Escanear Siguiente
+                </button>
+              </motion.div>
+            )}
 
-        {(scanStatus === "invalid" || scanStatus === "cancelled" || scanStatus === "error") && (
-          <motion.div
-            key="invalid-view"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-4"
-          >
-            {/* Invalid QR Banner */}
-            <div className="p-5 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-4">
-              <XCircle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <h4 className="font-bold text-red-300 text-sm">Entrada Inválida</h4>
-                <p className="text-xs text-zinc-300 leading-relaxed">
-                  {errorMsg || "El código QR ingresado no existe en la base de datos o está cancelado."}
-                </p>
-              </div>
-            </div>
+            {scanStatus === "used" && scanResult && (
+              <motion.div
+                key="used-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
+              >
+                {/* Used QR Banner */}
+                <div className="p-5 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-4">
+                  <XCircle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-red-300 text-sm">❌ QR YA UTILIZADO</h4>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Este código QR ya fue validado e ingresado anteriormente el {scanResult.qrValidatedAt ? new Date(scanResult.qrValidatedAt).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}.
+                    </p>
+                  </div>
+                </div>
 
-            {/* Booking Details Card if exists */}
-            {scanResult && <BookingDetailsCard details={scanResult} />}
+                {/* Booking Details Card */}
+                <BookingDetailsCard details={scanResult} />
 
-            {/* Reset Button */}
-            <button
-              onClick={handleReset}
-              className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Escanear de Nuevo
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                {/* Reset Button */}
+                <button
+                  onClick={handleReset}
+                  className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Escanear de Nuevo
+                </button>
+              </motion.div>
+            )}
+
+            {scanStatus === "cancelled" && (
+              <motion.div
+                key="cancelled-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
+              >
+                {/* Cancelled QR Banner */}
+                <div className="p-5 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-4">
+                  <XCircle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-red-300 text-sm">Reserva Cancelada</h4>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Esta entrada o reserva ha sido cancelada por el cliente o por administración. El ingreso no está autorizado.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Booking Details Card if exists */}
+                {scanResult && <BookingDetailsCard details={scanResult} />}
+
+                {/* Reset Button */}
+                <button
+                  onClick={handleReset}
+                  className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Escanear de Nuevo
+                </button>
+              </motion.div>
+            )}
+
+            {(scanStatus === "invalid" || scanStatus === "error") && (
+              <motion.div
+                key="invalid-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
+              >
+                {/* Invalid QR Banner */}
+                <div className="p-5 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-4">
+                  <XCircle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-red-300 text-sm">Entrada Inválida</h4>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      {errorMsg || "El código QR ingresado no existe en la base de datos o está cancelado."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Booking Details Card if exists */}
+                {scanResult && <BookingDetailsCard details={scanResult} />}
+
+                {/* Reset Button */}
+                <button
+                  onClick={handleReset}
+                  className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Escanear de Nuevo
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      ) : (
+        <QRValidatorForm />
+      )}
     </div>
   );
 }

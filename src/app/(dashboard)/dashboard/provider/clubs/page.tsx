@@ -87,13 +87,9 @@ export default async function ProviderClubsPage() {
                 <Building2 className="w-5 h-5 text-primary-400" />
                 Mis Discotecas
               </Link>
-              <Link href="/dashboard/provider/validate" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <QrCode className="w-5 h-5 text-primary-400" />
-                Validar Entrada
-              </Link>
               <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <Camera className="w-5 h-5 text-primary-400" />
-                Escáner Cámara
+                <QrCode className="w-5 h-5 text-primary-400" />
+                Validar Accesos
               </Link>
               <Link href="/dashboard/profile" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
                 <Settings className="w-5 h-5" />

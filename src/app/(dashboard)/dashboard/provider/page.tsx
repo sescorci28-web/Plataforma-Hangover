@@ -173,13 +173,9 @@ export default async function ProviderDashboard() {
                 <ShoppingBag className="w-5 h-5 text-primary-400" />
                 Pedidos en Vivo
               </Link>
-              <Link href="/dashboard/provider/validate" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <QrCode className="w-5 h-5 text-primary-400" />
-                Validar Entrada
-              </Link>
               <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <Camera className="w-5 h-5 text-primary-400" />
-                Escáner Cámara
+                <QrCode className="w-5 h-5 text-primary-400" />
+                Validar Accesos
               </Link>
               <Link href="/dashboard/profile" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
                 <Settings className="w-5 h-5" />
@@ -234,17 +230,11 @@ export default async function ProviderDashboard() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
-              {/* Group 1: Validaciones (Segmented Pill) */}
-              <div className="flex gap-1.5 p-1 bg-black/40 border border-white/5 rounded-xl shrink-0">
-                <Link href="/dashboard/provider/scanner" className="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs justify-center shrink-0">
-                  <Camera className="w-3.5 h-3.5 shrink-0" />
-                  Cámara
-                </Link>
-                <Link href="/dashboard/provider/validate" className="text-zinc-300 hover:text-white hover:bg-white/5 px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs justify-center shrink-0">
-                  <QrCode className="w-3.5 h-3.5 text-primary-400 shrink-0" />
-                  Manual
-                </Link>
-              </div>
+              {/* Group 1: Validaciones */}
+              <Link href="/dashboard/provider/scanner" className="bg-primary-600 hover:bg-primary-500 text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center shrink-0 shadow-md hover:shadow-primary-500/15 transform hover:scale-[1.02] active:scale-[0.98]">
+                <QrCode className="w-3.5 h-3.5 shrink-0 text-white" />
+                Validar Accesos
+              </Link>
 
               {/* Group 2: Creaciones */}
               <div className="flex gap-2.5">

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { QrScanner } from "./QrScanner";
-import { ArrowLeft, ShieldCheck, Keyboard } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 export const revalidate = 0; // Always dynamic
@@ -42,16 +42,8 @@ export default async function QrScannerPage() {
       </div>
 
       <div className="space-y-2 mb-8">
-        <h1 className="text-3xl font-bold font-outfit text-white">Escáner de Cámara QR</h1>
-        <p className="text-sm text-zinc-400 mb-4">Escanea el código QR de la entrada usando la cámara de tu celular.</p>
-        
-        <Link
-          href="/dashboard/provider/validate"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white transition-all text-xs font-semibold border border-white/5"
-        >
-          <Keyboard className="w-3.5 h-3.5" />
-          Usar Validación Manual
-        </Link>
+        <h1 className="text-3xl font-bold font-outfit text-white">Validar Accesos</h1>
+        <p className="text-sm text-zinc-400">Escanea el código QR de la entrada con la cámara de tu celular o ingresa el código manual si la cámara falla.</p>
       </div>
 
       <QrScanner />
