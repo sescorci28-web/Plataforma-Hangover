@@ -365,7 +365,8 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
           {clubs.map(club => (
             <div
               key={club.id}
-              className="glass-card overflow-hidden hover:border-white/20 transition-all flex flex-col justify-between h-full group"
+              onClick={() => router.push(`/dashboard/provider/clubs/${club.id}`)}
+              className="glass-card overflow-hidden hover:border-white/20 hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between h-full group cursor-pointer"
             >
               <div className="relative h-44 w-full bg-zinc-950 flex-shrink-0">
                 {club.banner_image ? (
@@ -445,21 +446,21 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
 
                 <div className="flex items-center gap-3 pt-3 border-t border-white/5 mt-3 flex-wrap">
                   <button
-                    onClick={() => openEditModal(club)}
-                    className="flex-1 bg-white/5 hover:bg-white/10 text-white rounded-xl py-2.5 px-3 text-xs font-semibold border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-[70px]"
+                    onClick={(e) => { e.stopPropagation(); openEditModal(club); }}
+                    className="flex-grow bg-white/5 hover:bg-white/10 text-white rounded-xl py-2.5 px-3 text-xs font-semibold border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-[70px]"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                     Editar
                   </button>
                   <button
-                    onClick={() => openManageMenuServicesModal(club)}
-                    className="flex-1 bg-primary-600/10 hover:bg-primary-600/20 text-primary-400 border border-primary-500/20 rounded-xl py-2.5 px-3 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-[90px]"
+                    onClick={(e) => { e.stopPropagation(); openManageMenuServicesModal(club); }}
+                    className="flex-grow bg-primary-600/10 hover:bg-primary-600/20 text-primary-400 border border-primary-500/20 rounded-xl py-2.5 px-3 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-[90px]"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Carta / Servicios
                   </button>
                   <button
-                    onClick={() => setDeletingClubId(club.id)}
+                    onClick={(e) => { e.stopPropagation(); setDeletingClubId(club.id); }}
                     className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl py-2.5 px-3 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
