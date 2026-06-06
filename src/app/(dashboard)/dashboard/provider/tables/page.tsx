@@ -1,12 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { LiveOrdersDashboard } from "@/components/provider/LiveOrdersDashboard";
+import { TablesManager } from "@/components/provider/TablesManager";
 import { Building2, ArrowLeft, Sliders, Bell } from "lucide-react";
 import Link from "next/link";
 
 export const revalidate = 0; // Always dynamic
 
-export default async function ProviderLiveOrdersPage() {
+export default async function ProviderTablesPage() {
   const supabase = await createClient();
 
   // 1. Authenticate user
@@ -39,7 +39,7 @@ export default async function ProviderLiveOrdersPage() {
   const { data: clubs, error: clubsError } = await query.order("name", { ascending: true });
 
   if (clubsError) {
-    console.error("Error fetching provider clubs for orders dashboard:", clubsError);
+    console.error("Error fetching provider clubs for tables dashboard:", clubsError);
   }
 
   const providerClubs = clubs || [];
@@ -47,7 +47,7 @@ export default async function ProviderLiveOrdersPage() {
   return (
     <div className="container mx-auto px-4 md:px-6 py-12">
       <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar link navigation */}
+        {/* Sidebar Navigation */}
         <div className="w-full md:w-64 flex-shrink-0">
           <div className="glass-card p-6 sticky top-24">
             <div className="flex items-center gap-4 mb-8">
@@ -73,11 +73,11 @@ export default async function ProviderLiveOrdersPage() {
                 <ArrowLeft className="w-5 h-5" />
                 Volver al Panel
               </Link>
-              <Link href="/dashboard/provider/tables" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
+              <Link href="/dashboard/provider/tables" className="flex items-center gap-3 px-4 py-3 bg-primary-600 text-white rounded-xl transition-colors font-medium">
                 <Sliders className="w-5 h-5" />
                 Control de Mesas
               </Link>
-              <Link href="/dashboard/provider/orders" className="flex items-center gap-3 px-4 py-3 bg-primary-600 text-white rounded-xl transition-colors font-medium">
+              <Link href="/dashboard/provider/orders" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
                 <Bell className="w-5 h-5" />
                 Comandas en Vivo
               </Link>
@@ -89,9 +89,9 @@ export default async function ProviderLiveOrdersPage() {
           </div>
         </div>
 
-        {/* Real-time Dashboard Panel */}
+        {/* Tables Panel */}
         <div className="flex-grow min-w-0">
-          <LiveOrdersDashboard clubs={providerClubs} />
+          <TablesManager clubs={providerClubs} />
         </div>
       </div>
     </div>

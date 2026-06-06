@@ -15,11 +15,13 @@ import {
   UtensilsCrossed,
   HelpCircle,
   TrendingUp,
+  Bell,
+  Coins,
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { confirmLiveOrderItemReceipt } from "@/app/services/liveActions";
+import { confirmLiveOrderItemReceipt, requestAssistance } from "@/app/services/liveActions";
 
 interface MenuItem {
   name: string;
@@ -46,6 +48,7 @@ interface Session {
   status: string;
   total_amount: number;
   created_at: string;
+  table_id: string;
   club_tables: {
     table_number: string;
   };
@@ -71,6 +74,48 @@ export default function MiCuentaPage() {
   const [user, setUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   
+  const [isCallingWaiter, setIsCallingWaiter] = useState(false);
+  const [isRequestingBill, setIsRequestingBill] = useState(false);
+  const [assistanceStatus, setAssistanceStatus] = useState<string | null>(null);
+
+  const handleCallWaiter = async () => {
+    if (!session || !club) return;
+    setIsCallingWaiter(true);
+    setAssistanceStatus(null);
+    try {
+      const res = await requestAssistance(club.id, session.table_id, "waiter");
+      if (res.error) {
+        setAssistanceStatus(`Error: ${res.error}`);
+      } else {
+        setAssistanceStatus("Llamada enviada al mesero 🛎️");
+        setTimeout(() => setAssistanceStatus(null), 3000);
+      }
+    } catch (err) {
+      setAssistanceStatus("Error al solicitar asistencia.");
+    } finally {
+      setIsCallingWaiter(false);
+    }
+  };
+
+  const handleRequestBill = async () => {
+    if (!session || !club) return;
+    setIsRequestingBill(true);
+    setAssistanceStatus(null);
+    try {
+      const res = await requestAssistance(club.id, session.table_id, "bill");
+      if (res.error) {
+        setAssistanceStatus(`Error: ${res.error}`);
+      } else {
+        setAssistanceStatus("Solicitud de cuenta enviada 💵");
+        setTimeout(() => setAssistanceStatus(null), 3000);
+      }
+    } catch (err) {
+      setAssistanceStatus("Error al solicitar la cuenta.");
+    } finally {
+      setIsRequestingBill(false);
+    }
+  };
+
   const [isPending, startTransition] = useTransition();
 
   const getStepIndex = (status: string) => {
@@ -111,7 +156,7 @@ export default function MiCuentaPage() {
       // 3. Get active open session for this user at this club
       const { data: sessionData, error: sessionErr } = await supabase
         .from("live_sessions")
-        .select("id, status, total_amount, created_at, club_tables(table_number)")
+        .select("id, status, total_amount, created_at, table_id, club_tables(table_number)")
         .eq("club_id", clubData.id)
         .eq("user_id", authUser.id)
         .eq("status", "open")
@@ -343,6 +388,50 @@ export default function MiCuentaPage() {
                 </div>
               </div>
             </div>
+
+            {/* Quick Actions / Assistance Calling */}
+            <div className="glass-card p-5 border-white/5 bg-zinc-950/40 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="text-left w-full sm:w-auto">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-outfit">
+                  🛎️ Asistencia en Mesa
+                </h4>
+                <p className="text-[10px] text-zinc-400 mt-0.5">
+                  ¿Necesitas ayuda del personal o estás listo para pagar? Presiona un botón.
+                </p>
+              </div>
+              <div className="flex gap-3 w-full sm:w-auto">
+                <button
+                  onClick={handleCallWaiter}
+                  disabled={isCallingWaiter || isRequestingBill}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/5 hover:border-white/10 py-3 px-6 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isCallingWaiter ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Bell className="w-4 h-4 text-amber-400" />
+                  )}
+                  Llamar Mesero
+                </button>
+                <button
+                  onClick={handleRequestBill}
+                  disabled={isCallingWaiter || isRequestingBill}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/5 hover:border-white/10 py-3 px-6 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isRequestingBill ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Coins className="w-4 h-4 text-emerald-400" />
+                  )}
+                  Pedir Cuenta
+                </button>
+              </div>
+            </div>
+
+            {assistanceStatus && (
+              <div className="bg-primary-950/80 border border-primary-500/30 text-primary-300 rounded-xl px-4 py-2.5 text-xs font-semibold text-center animate-pulse">
+                {assistanceStatus}
+              </div>
+            )}
 
             {/* List of Orders */}
             <div className="space-y-8">

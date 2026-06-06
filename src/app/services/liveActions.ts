@@ -303,3 +303,198 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
     return { error: err.message || "Ocurrió un error inesperado." };
   }
 }
+
+/**
+ * Creates an assistance request (waiter call or bill request) for a table.
+ */
+export async function requestAssistance(
+  clubId: string,
+  tableId: string,
+  type: "bill" | "waiter"
+) {
+  try {
+    const { user, supabase } = await getAuthenticatedUser();
+
+    let resolvedTableId = "";
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(tableId)) {
+      resolvedTableId = tableId;
+    } else {
+      const tableNumber = tableId.trim();
+      const { data: tableData, error: findTableError } = await supabase
+        .from("club_tables")
+        .select("id")
+        .eq("club_id", clubId)
+        .eq("table_number", tableNumber)
+        .maybeSingle();
+
+      if (findTableError) {
+        console.error("Error finding table for assistance:", findTableError);
+        return { error: `Error al buscar la mesa: ${findTableError.message}` };
+      }
+
+      if (tableData) {
+        resolvedTableId = tableData.id;
+      } else {
+        const { data: newTable, error: createTableError } = await supabase
+          .from("club_tables")
+          .insert({
+            club_id: clubId,
+            table_number: tableNumber,
+            active: true
+          })
+          .select("id")
+          .single();
+
+        if (createTableError || !newTable) {
+          console.error("Error creating table for assistance:", createTableError);
+          return { error: `Error al registrar la mesa: ${createTableError?.message || "Error desconocido"}` };
+        }
+        resolvedTableId = newTable.id;
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("assistance_requests")
+      .insert({
+        club_id: clubId,
+        table_id: resolvedTableId,
+        user_id: user.id,
+        type,
+        status: "pending"
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error creating assistance request:", error);
+      return { error: `Error al solicitar asistencia: ${error.message}` };
+    }
+
+    return { success: true, data };
+  } catch (err: any) {
+    console.error("Unhandled error in requestAssistance:", err);
+    return { error: err.message || "Error al procesar la solicitud." };
+  }
+}
+
+/**
+ * Marks an assistance request as attended (staff action).
+ */
+export async function attendAssistanceRequest(requestId: string) {
+  try {
+    const { supabase } = await validateProviderOrAdmin();
+
+    const { error } = await supabase
+      .from("assistance_requests")
+      .update({ status: "attended" })
+      .eq("id", requestId);
+
+    if (error) {
+      console.error("Error updating assistance request status:", error);
+      return { error: `Error al atender solicitud: ${error.message}` };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("Unhandled error in attendAssistanceRequest:", err);
+    return { error: err.message || "Error al procesar la solicitud." };
+  }
+}
+
+/**
+ * Updates the status of a table (staff action).
+ */
+export async function updateTableStatus(tableId: string, status: string) {
+  try {
+    const { supabase } = await validateProviderOrAdmin();
+
+    const allowedStatuses = ["Libre", "Ocupada", "Reservada", "Cerrada"];
+    if (!allowedStatuses.includes(status)) {
+      return { error: `Estado '${status}' no es válido para una mesa.` };
+    }
+
+    const { error } = await supabase
+      .from("club_tables")
+      .update({ status })
+      .eq("id", tableId);
+
+    if (error) {
+      console.error("Error updating table status:", error);
+      return { error: `Error al actualizar estado de mesa: ${error.message}` };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("Unhandled error in updateTableStatus:", err);
+    return { error: err.message || "Error al procesar la solicitud." };
+  }
+}
+
+/**
+ * Creates or updates a table's configuration (staff action).
+ */
+export async function createOrUpdateTable(
+  clubId: string,
+  tableNumber: string,
+  name: string | null,
+  zone: string,
+  status?: string
+) {
+  try {
+    const { supabase } = await validateProviderOrAdmin();
+
+    const payload: any = {
+      club_id: clubId,
+      table_number: tableNumber,
+      name,
+      zone,
+      active: true
+    };
+
+    if (status) {
+      payload.status = status;
+    }
+
+    const { data, error } = await supabase
+      .from("club_tables")
+      .upsert(payload, { onConflict: "club_id,table_number" })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error upserting table:", error);
+      return { error: `Error al guardar la mesa: ${error.message}` };
+    }
+
+    return { success: true, data };
+  } catch (err: any) {
+    console.error("Unhandled error in createOrUpdateTable:", err);
+    return { error: err.message || "Error al procesar la solicitud." };
+  }
+}
+
+/**
+ * Closes a live session (staff action).
+ */
+export async function closeLiveSession(sessionId: string) {
+  try {
+    const { supabase } = await validateProviderOrAdmin();
+
+    const { error } = await supabase
+      .from("live_sessions")
+      .update({ status: "closed", closed_at: new Date().toISOString() })
+      .eq("id", sessionId);
+
+    if (error) {
+      console.error("Error closing live session:", error);
+      return { error: `Error al cerrar la cuenta de la mesa: ${error.message}` };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("Unhandled error in closeLiveSession:", err);
+    return { error: err.message || "Error al procesar la solicitud." };
+  }
+}
+

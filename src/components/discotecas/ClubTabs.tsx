@@ -20,9 +20,11 @@ import {
   CheckCircle2,
   Loader2,
   MessageSquare,
+  Bell,
+  Coins,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { sendLiveOrder } from "@/app/services/liveActions";
+import { sendLiveOrder, requestAssistance } from "@/app/services/liveActions";
 
 // Local SVG icon to avoid version mismatch in lucide-react
 function InstagramIcon({ className }: { className?: string }) {
@@ -123,26 +125,42 @@ export function ClubTabs({
   const [manualTableNumber, setManualTableNumber] = useState<string>("");
   const [isSendingOrder, setIsSendingOrder] = useState<boolean>(false);
   const [orderError, setOrderError] = useState<string | null>(null);
-  const [hasActiveSession, setHasActiveSession] = useState<boolean>(false);
+  const [activeSession, setActiveSession] = useState<{ id: string; tableId: string; tableNumber: string } | null>(null);
+  const [isCallingWaiter, setIsCallingWaiter] = useState(false);
+  const [isRequestingBill, setIsRequestingBill] = useState(false);
+  const [assistanceStatus, setAssistanceStatus] = useState<string | null>(null);
 
-  // Sync and validate cart on load
+  // Sync and validate cart on load & listen to external updates
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const savedCartRaw = localStorage.getItem("hangover_menu_cart");
-      if (savedCartRaw) {
-        const savedCart = JSON.parse(savedCartRaw);
-        if (savedCart.clubId === clubId && Array.isArray(savedCart.items)) {
-          setCart(savedCart.items);
+    const loadCart = () => {
+      try {
+        const savedCartRaw = localStorage.getItem("hangover_menu_cart");
+        if (savedCartRaw) {
+          const savedCart = JSON.parse(savedCartRaw);
+          if (savedCart.clubId === clubId && Array.isArray(savedCart.items)) {
+            setCart(savedCart.items);
+          } else {
+            // Different club or corrupted data, reset
+            localStorage.removeItem("hangover_menu_cart");
+            setCart([]);
+          }
         } else {
-          // Different club or corrupted data, reset
-          localStorage.removeItem("hangover_menu_cart");
           setCart([]);
         }
+      } catch (err) {
+        console.error("Error cargando el carrito:", err);
       }
-    } catch (err) {
-      console.error("Error cargando el carrito:", err);
-    }
+    };
+
+    loadCart();
+
+    window.addEventListener("cart-updated", loadCart);
+    window.addEventListener("storage", loadCart);
+    return () => {
+      window.removeEventListener("cart-updated", loadCart);
+      window.removeEventListener("storage", loadCart);
+    };
   }, [clubId]);
 
   // Check if there is an active open session
@@ -156,14 +174,20 @@ export function ClubTabs({
         
         const { data, error } = await supabase
           .from("live_sessions")
-          .select("id")
+          .select("id, table_id, club_tables(table_number)")
           .eq("club_id", clubId)
           .eq("user_id", user.id)
           .eq("status", "open")
           .maybeSingle();
           
         if (!error && data) {
-          setHasActiveSession(true);
+          setActiveSession({
+            id: data.id,
+            tableId: data.table_id,
+            tableNumber: (data.club_tables as any)?.table_number || ""
+          });
+        } else {
+          setActiveSession(null);
         }
       } catch (err) {
         console.error("Error checking active session:", err);
@@ -171,6 +195,44 @@ export function ClubTabs({
     };
     checkActiveSession();
   }, [isMounted, clubId]);
+
+  const handleCallWaiter = async () => {
+    if (!activeSession) return;
+    setIsCallingWaiter(true);
+    setAssistanceStatus(null);
+    try {
+      const res = await requestAssistance(clubId, activeSession.tableId, "waiter");
+      if (res.error) {
+        setAssistanceStatus(`Error: ${res.error}`);
+      } else {
+        setAssistanceStatus("Llamada enviada al mesero 🛎️");
+        setTimeout(() => setAssistanceStatus(null), 3000);
+      }
+    } catch (err) {
+      setAssistanceStatus("Error al solicitar asistencia.");
+    } finally {
+      setIsCallingWaiter(false);
+    }
+  };
+
+  const handleRequestBill = async () => {
+    if (!activeSession) return;
+    setIsRequestingBill(true);
+    setAssistanceStatus(null);
+    try {
+      const res = await requestAssistance(clubId, activeSession.tableId, "bill");
+      if (res.error) {
+        setAssistanceStatus(`Error: ${res.error}`);
+      } else {
+        setAssistanceStatus("Solicitud de cuenta enviada 💵");
+        setTimeout(() => setAssistanceStatus(null), 3000);
+      }
+    } catch (err) {
+      setAssistanceStatus("Error al solicitar la cuenta.");
+    } finally {
+      setIsRequestingBill(false);
+    }
+  };
 
   // Fetch tables from Supabase Client
   useEffect(() => {
@@ -367,17 +429,54 @@ export function ClubTabs({
           </button>
         </div>
 
-        {/* Active Session Button */}
-        {hasActiveSession && (
-          <button
-            onClick={() => router.push(`/discotecas/${clubSlug}/mi-cuenta`)}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 hover:from-emerald-500/20 hover:to-emerald-600/20 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400 text-xs font-bold py-2.5 px-4.5 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.05)] transition-all cursor-pointer w-full sm:w-auto justify-center"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
-            <span>Mi Mesa 🟢</span>
-          </button>
+        {/* Active Session & Assistance Buttons */}
+        {activeSession && (
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {/* Llamar Mesero */}
+            <button
+              onClick={handleCallWaiter}
+              disabled={isCallingWaiter || isRequestingBill}
+              className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/5 hover:border-white/10 text-[11px] font-bold py-2 px-3 rounded-xl transition-all cursor-pointer flex-1 sm:flex-none justify-center disabled:opacity-50"
+            >
+              {isCallingWaiter ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Bell className="w-3.5 h-3.5 text-amber-400" />
+              )}
+              <span>Llamar Mesero</span>
+            </button>
+
+            {/* Pedir Cuenta */}
+            <button
+              onClick={handleRequestBill}
+              disabled={isCallingWaiter || isRequestingBill}
+              className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/5 hover:border-white/10 text-[11px] font-bold py-2 px-3 rounded-xl transition-all cursor-pointer flex-1 sm:flex-none justify-center disabled:opacity-50"
+            >
+              {isRequestingBill ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Coins className="w-3.5 h-3.5 text-emerald-400" />
+              )}
+              <span>Pedir Cuenta</span>
+            </button>
+
+            {/* Mi Mesa link */}
+            <button
+              onClick={() => router.push(`/discotecas/${clubSlug}/mi-cuenta`)}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 hover:from-emerald-500/20 hover:to-emerald-600/20 border border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400 text-[11px] font-bold py-2 px-3.5 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.05)] transition-all cursor-pointer flex-1 sm:flex-none justify-center"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+              <span>Mesa {activeSession.tableNumber} 🟢</span>
+            </button>
+          </div>
         )}
       </div>
+
+      {assistanceStatus && (
+        <div className="bg-primary-950/80 border border-primary-500/30 text-primary-300 rounded-xl px-4 py-2 text-xs font-semibold text-center animate-pulse z-20">
+          {assistanceStatus}
+        </div>
+      )}
 
       {/* Tab Contents with animations */}
       <div className="mt-6">
@@ -706,26 +805,38 @@ export function ClubTabs({
         </AnimatePresence>
       </div>
 
-      {/* Floating Shopping Cart Button */}
-      {isMounted && cart.length > 0 && activeTab === "menu" && (
+      {/* Floating FAB Button - Always Visible */}
+      {isMounted && (
         <motion.button
           initial={{ scale: 0, opacity: 0, y: 50 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0, opacity: 0, y: 50 }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => setIsCartOpen(true)}
-          className="fixed bottom-6 right-6 z-40 bg-gradient-to-r from-primary-600 to-accent-600 hover:from-primary-500 hover:to-accent-500 text-white px-5 py-4 rounded-full shadow-[0_0_30px_rgba(217,70,239,0.3)] flex items-center gap-3 border border-white/10 cursor-pointer backdrop-blur-md"
+          onClick={() => {
+            if (totalItemsCount > 0) {
+              setIsCartOpen(true);
+            } else {
+              document.getElementById("booking-widget")?.scrollIntoView({ behavior: "smooth" });
+            }
+          }}
+          className="fixed bottom-6 right-6 z-40 bg-gradient-to-r from-primary-600 to-accent-600 hover:from-primary-500 hover:to-accent-500 text-white px-5 py-4 rounded-full shadow-[0_0_30px_rgba(217,70,239,0.35)] flex items-center gap-2.5 border border-white/10 cursor-pointer backdrop-blur-md font-bold uppercase tracking-wider text-xs font-outfit"
         >
-          <div className="relative">
-            <ShoppingBag className="w-5 h-5" />
-            <span className="absolute -top-2.5 -right-2.5 bg-white text-zinc-950 text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-md">
-              {totalItemsCount}
-            </span>
-          </div>
-          <span className="text-xs font-bold font-outfit tracking-wide hidden sm:inline">
-            Ver Pedido (${cartTotal.toLocaleString("es-CO")} COP)
-          </span>
+          {totalItemsCount > 0 ? (
+            <>
+              <div className="relative">
+                <ShoppingBag className="w-5 h-5 text-white" />
+                <span className="absolute -top-2.5 -right-2.5 bg-white text-zinc-950 text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-md">
+                  {totalItemsCount}
+                </span>
+              </div>
+              <span>Mi Pedido ({totalItemsCount})</span>
+            </>
+          ) : (
+            <>
+              <Wine className="w-5 h-5 text-white" />
+              <span>🍾 Reservar</span>
+            </>
+          )}
         </motion.button>
       )}
 

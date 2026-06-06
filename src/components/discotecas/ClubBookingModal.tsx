@@ -2,8 +2,19 @@
 
 import { useState, useActionState, useMemo } from 'react'
 import Link from 'next/link'
-import { CalendarDays, LogIn, ShieldCheck, Sparkles, Ticket, Users } from 'lucide-react'
+import { CalendarDays, LogIn, ShieldCheck, Sparkles, Ticket, Users, Wine } from 'lucide-react'
 import { createClubReservation, buyClubCover, type ClubBookingState } from '@/app/discotecas/[slug]/actions'
+
+interface MenuItem {
+  id: string
+  category: string
+  name: string
+  description: string | null
+  price: number
+  image_url: string | null
+  featured: boolean
+  available: boolean
+}
 
 interface ClubBookingModalProps {
   club: {
@@ -14,15 +25,20 @@ interface ClubBookingModalProps {
   }
   isAuthenticated: boolean
   defaultClientName: string
+  menuItems?: MenuItem[]
 }
 
 const initialState: ClubBookingState = {}
 
-export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: ClubBookingModalProps) {
-  const [activeTab, setActiveTab] = useState<'vip' | 'cover'>('vip')
+export function ClubBookingModal({ club, isAuthenticated, defaultClientName, menuItems = [] }: ClubBookingModalProps) {
+  const [activeTab, setActiveTab] = useState<'vip' | 'cover' | 'bottle'>('vip')
   const [coverName, setCoverName] = useState(defaultClientName ?? '')
   const [coverDate, setCoverDate] = useState('')
   const [coverGuests, setCoverGuests] = useState(1)
+
+  // Bottle selection states
+  const [selectedBottleId, setSelectedBottleId] = useState('')
+  const [bottleComment, setBottleComment] = useState('')
 
   const [state, formAction, isPending] = useActionState(createClubReservation, initialState)
   const [coverState, coverFormAction, isCoverPending] = useActionState(buyClubCover, initialState)
@@ -30,20 +46,41 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
   const coverPrice = club.cover_price ?? 0.00
   const canBook = isAuthenticated && Boolean(club.provider_id)
 
+  const bottleItems = useMemo(() => {
+    return (menuItems || []).filter(item => 
+      item.available &&
+      ["Whisky", "Vodka", "Ron", "Tequila", "Cerveza", "Cócteles", "Combos"].includes(item.category)
+    )
+  }, [menuItems])
+
+  const computedBottleComment = useMemo(() => {
+    const selectedBottle = bottleItems.find(b => b.id === selectedBottleId)
+    if (selectedBottle) {
+      return `[Reserva de Botella: ${selectedBottle.name}] ${bottleComment}`.trim()
+    }
+    return bottleComment
+  }, [selectedBottleId, bottleComment, bottleItems])
+
   const subtitle = useMemo(() => {
     if (!isAuthenticated) {
       return activeTab === 'vip'
         ? 'Inicia sesión para reservar una mesa VIP en esta discoteca.'
-        : 'Inicia sesión para comprar un cover de entrada para esta discoteca.'
+        : activeTab === 'cover'
+        ? 'Inicia sesión para comprar un cover de entrada.'
+        : 'Inicia sesión para reservar botellas y mesas.'
     }
 
     if (!club.provider_id) {
       return 'Esta discoteca no tiene un proveedor asignado para gestionar reservas aún.'
     }
 
-    return activeTab === 'vip'
-      ? 'Completa el formulario premium y confirma tu reserva con un proveedor verificado.'
-      : `Compra tus entradas al instante por $${Math.round(coverPrice).toLocaleString('es-CO')} COP c/u.`
+    if (activeTab === 'vip') {
+      return 'Completa el formulario premium y confirma tu reserva con un proveedor verificado.'
+    } else if (activeTab === 'cover') {
+      return `Compra tus entradas al instante por $${Math.round(coverPrice).toLocaleString('es-CO')} COP c/u.`
+    } else {
+      return 'Reserva botellas y combos directamente de la carta para asegurar consumo en tu mesa.'
+    }
   }, [club.provider_id, isAuthenticated, activeTab, coverPrice])
 
   return (
@@ -55,35 +92,47 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
             Reserva premium
           </div>
           <div>
-            <p className="text-sm text-zinc-300">{subtitle}</p>
+            <p className="text-sm text-zinc-300 leading-relaxed">{subtitle}</p>
           </div>
         </div>
 
         {canBook && (
-          <div className="flex border-b border-white/5 pb-px mb-4">
+          <div className="flex border-b border-white/5 pb-px mb-4 gap-1">
             <button
               type="button"
               onClick={() => setActiveTab('vip')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 border-b-2 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 border-b-2 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === 'vip'
                   ? 'border-primary-500 text-white bg-primary-500/5'
                   : 'border-transparent text-zinc-400 hover:text-white'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              Mesa VIP
+              <span>Mesa VIP</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('cover')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 border-b-2 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 border-b-2 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === 'cover'
                   ? 'border-primary-500 text-white bg-primary-500/5'
                   : 'border-transparent text-zinc-400 hover:text-white'
               }`}
             >
               <Ticket className="w-3.5 h-3.5" />
-              Comprar Cover
+              <span>Cover</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('bottle')}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 border-b-2 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                activeTab === 'bottle'
+                  ? 'border-primary-500 text-white bg-primary-500/5'
+                  : 'border-transparent text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Wine className="w-3.5 h-3.5" />
+              <span>Botellas</span>
             </button>
           </div>
         )}
@@ -190,7 +239,7 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
                 {isPending ? 'Procesando...' : 'Reservar Mesa VIP'}
               </button>
             </form>
-          ) : (
+          ) : activeTab === 'cover' ? (
             <form key="cover-booking-form" action={coverFormAction} className="space-y-4">
               <input key="cover-club-id" type="hidden" name="clubId" value={club.id ?? ''} />
 
@@ -278,13 +327,118 @@ export function ClubBookingModal({ club, isAuthenticated, defaultClientName }: C
                 {isCoverPending ? 'Procesando Compra...' : `Comprar Cover - $${Math.round(coverGuests * coverPrice).toLocaleString('es-CO')} COP`}
               </button>
             </form>
+          ) : (
+            <form key="bottle-booking-form" action={formAction} className="space-y-4">
+              <input key="bottle-club-id" type="hidden" name="clubId" value={club.id ?? ''} />
+              <input type="hidden" name="comment" value={computedBottleComment} />
+
+              <label className="block text-sm text-zinc-200">
+                <span className="mb-1 block font-medium">Nombre del cliente</span>
+                <input
+                  key="bottle-customer-name"
+                  name="customer_name"
+                  defaultValue={defaultClientName ?? ''}
+                  required
+                  placeholder="Tu nombre"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-white outline-none transition focus:border-primary-400"
+                />
+              </label>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm text-zinc-200">
+                  <span className="mb-1 block font-medium">Fecha de reserva</span>
+                  <input
+                    key="bottle-reservation-date"
+                    name="reservation_date"
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    required
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-white outline-none transition focus:border-primary-400"
+                  />
+                </label>
+
+                <label className="block text-sm text-zinc-200">
+                  <span className="mb-1 block font-medium">Personas</span>
+                  <input
+                    key="bottle-guest-count"
+                    name="guest_count"
+                    type="number"
+                    min={1}
+                    max={100}
+                    defaultValue={2}
+                    required
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-white outline-none transition focus:border-primary-400"
+                  />
+                </label>
+              </div>
+
+              <label className="block text-sm text-zinc-200">
+                <span className="mb-1 block font-medium">Seleccionar botella/combo</span>
+                {bottleItems.length > 0 ? (
+                  <select
+                    value={selectedBottleId}
+                    onChange={(e) => setSelectedBottleId(e.target.value)}
+                    required
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-white outline-none transition focus:border-primary-400 focus:bg-zinc-950"
+                  >
+                    <option value="" className="bg-zinc-950">Selecciona una opción...</option>
+                    {bottleItems.map((item) => (
+                      <option key={item.id} value={item.id} className="bg-zinc-950">
+                        {item.name} (${item.price.toLocaleString("es-CO")} COP)
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-zinc-500 text-xs py-2 bg-black/20 px-3 rounded-xl border border-white/5">
+                    No hay botellas o licores cargados en la carta. Puedes indicar lo que quieres en las especificaciones.
+                  </div>
+                )}
+              </label>
+
+              <label className="block text-sm text-zinc-200">
+                <span className="mb-1 block font-medium">Especificaciones del pedido</span>
+                <textarea
+                  value={bottleComment}
+                  onChange={(e) => setBottleComment(e.target.value)}
+                  rows={3}
+                  placeholder="Hielo adicional, vasos, refrescos específicos o indicaciones adicionales..."
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-white outline-none transition focus:border-primary-400"
+                />
+              </label>
+
+              <div className="rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-zinc-300">
+                <p className="font-semibold text-white">Reserva de botella pendiente</p>
+                <p className="mt-1">Confirmaremos la disponibilidad de la mesa y prepararemos tu botella seleccionada.</p>
+              </div>
+
+              {state.error && (
+                <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                  {state.error}
+                </p>
+              )}
+
+              {state.success && (
+                <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
+                  {state.message}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isPending}
+                className="w-full inline-flex justify-center items-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-70 cursor-pointer animate-pulse"
+              >
+                <Wine className="w-4 h-4" />
+                {isPending ? 'Procesando...' : 'Reservar Botellas'}
+              </button>
+            </form>
           )
         ) : !isAuthenticated ? (
           <div className="space-y-3 rounded-[24px] border border-white/10 bg-black/35 p-4">
-            <p className="text-sm text-zinc-300">Necesitas una sesión activa para confirmar tu reserva.</p>
+            <p className="text-sm text-zinc-300 leading-relaxed">Necesitas una sesión activa para confirmar tu reserva.</p>
             <Link
               href="/login"
-              className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-500"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-500 cursor-pointer"
             >
               <LogIn className="w-4 h-4" />
               Iniciar sesión
