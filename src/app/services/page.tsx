@@ -11,6 +11,7 @@ export default async function ServicesPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   // Query all services joined with provider profile details
+  // Query all services joined with provider profile details
   const { data: services } = await supabase
     .from("services")
     .select(`
@@ -23,12 +24,44 @@ export default async function ServicesPage() {
       image_url,
       created_at,
       updated_at,
+      slug,
+      verified,
+      badge_status,
+      availability_status,
+      category_id,
+      subcategory_id,
+      subcategory,
+      base_city,
+      cover_url,
+      video_url,
+      completed_bookings_count,
+      average_rating,
+      provider_status,
       provider:profiles!services_provider_id_fkey (
         full_name,
         city
       )
     `)
     .order("created_at", { ascending: false });
+
+  // Query all bookings to calculate total bookings count per service
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("service_id");
+
+  const bookingsCounts: Record<string, number> = {};
+  if (bookings) {
+    bookings.forEach((b) => {
+      if (b.service_id) {
+        bookingsCounts[b.service_id] = (bookingsCounts[b.service_id] || 0) + 1;
+      }
+    });
+  }
+
+  const servicesWithStats = (services || []).map((s) => ({
+    ...s,
+    bookingsCount: bookingsCounts[s.id] || 0
+  }));
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-12 space-y-10">
@@ -45,7 +78,7 @@ export default async function ServicesPage() {
         </p>
       </header>
 
-      <ServicesList initialServices={(services as any) || []} user={user} />
+      <ServicesList initialServices={(servicesWithStats as any) || []} user={user} />
     </div>
   );
 }

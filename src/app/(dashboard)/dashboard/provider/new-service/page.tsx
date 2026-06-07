@@ -23,6 +23,29 @@ export default async function NewServicePage() {
     redirect("/dashboard");
   }
 
+  // Fetch dynamic categories & subcategories for the form
+  let dbCategories: any[] = [];
+  let dbSubcategories: any[] = [];
+  
+  try {
+    const { data: catData } = await supabase
+      .from("service_categories")
+      .select("id, slug, name, icon")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+      
+    const { data: subData } = await supabase
+      .from("service_subcategories")
+      .select("id, category_id, slug, name")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+
+    dbCategories = catData || [];
+    dbSubcategories = subData || [];
+  } catch (error) {
+    console.error("Error querying taxonomy tables, falling back to static lists:", error);
+  }
+
   return (
     <div className="container mx-auto px-4 md:px-6 py-12 max-w-3xl">
       <div className="space-y-6">
@@ -46,7 +69,7 @@ export default async function NewServicePage() {
         </header>
 
         <div className="glass-card p-6 md:p-8">
-          <NewServiceForm />
+          <NewServiceForm categories={dbCategories} subcategories={dbSubcategories} />
         </div>
       </div>
     </div>

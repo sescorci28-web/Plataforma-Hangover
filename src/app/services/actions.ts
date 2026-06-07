@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
+import { slugify } from "@/lib/slugify";
 
 /**
  * Creates a service booking for a user.
@@ -162,13 +163,28 @@ export async function createEventBooking(
 /**
  * Creates a new service (restricted to providers/admins).
  */
-export async function createService(
-  title: string,
-  description: string,
-  price: number,
-  category: string,
-  imageUrl?: string
-) {
+export async function createService(data: {
+  title: string;
+  description: string;
+  price: number;
+  category: string;
+  category_id?: string | null;
+  subcategory_id?: string | null;
+  subcategory?: string | null;
+  base_city?: string | null;
+  image_url?: string | null;
+  cover_url?: string | null;
+  video_url?: string | null;
+  experience?: string | null;
+  cities_coverage?: string[];
+  social_media?: Record<string, string>;
+  whatsapp_number?: string | null;
+  tags?: string[];
+  specialties?: string[];
+  latitude?: number | null;
+  longitude?: number | null;
+  provider_status?: 'active' | 'vacation' | 'busy' | 'inactive';
+}) {
   const supabase = await createClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -192,11 +208,27 @@ export async function createService(
       .from("services")
       .insert({
         provider_id: user.id,
-        title,
-        description: description || null,
-        price,
-        category,
-        image_url: imageUrl || null
+        title: data.title,
+        slug: slugify(data.title),
+        description: data.description || null,
+        price: data.price,
+        category: data.category, // Dual-writing
+        category_id: data.category_id || null,
+        subcategory_id: data.subcategory_id || null,
+        subcategory: data.subcategory || null,
+        base_city: data.base_city || null,
+        image_url: data.image_url || null,
+        cover_url: data.cover_url || null,
+        video_url: data.video_url || null,
+        experience: data.experience || null,
+        cities_coverage: data.cities_coverage || '{}',
+        social_media: data.social_media || '{}',
+        whatsapp_number: data.whatsapp_number || null,
+        tags: data.tags || '{}',
+        specialties: data.specialties || '{}',
+        latitude: data.latitude || null,
+        longitude: data.longitude || null,
+        provider_status: data.provider_status || 'active'
       });
 
     if (insertError) {
@@ -282,11 +314,28 @@ export async function updateBookingStatus(
  */
 export async function updateService(
   serviceId: string,
-  title: string,
-  description: string,
-  price: number,
-  category: string,
-  imageUrl?: string
+  data: {
+    title: string;
+    description: string;
+    price: number;
+    category: string;
+    category_id?: string | null;
+    subcategory_id?: string | null;
+    subcategory?: string | null;
+    base_city?: string | null;
+    image_url?: string | null;
+    cover_url?: string | null;
+    video_url?: string | null;
+    experience?: string | null;
+    cities_coverage?: string[];
+    social_media?: Record<string, string>;
+    whatsapp_number?: string | null;
+    tags?: string[];
+    specialties?: string[];
+    latitude?: number | null;
+    longitude?: number | null;
+    provider_status?: 'active' | 'vacation' | 'busy' | 'inactive';
+  }
 ) {
   const supabase = await createClient();
 
@@ -310,11 +359,27 @@ export async function updateService(
     const { error: updateError } = await supabase
       .from("services")
       .update({
-        title,
-        description: description || null,
-        price,
-        category,
-        image_url: imageUrl || null
+        title: data.title,
+        slug: slugify(data.title),
+        description: data.description || null,
+        price: data.price,
+        category: data.category, // Dual-writing
+        category_id: data.category_id || null,
+        subcategory_id: data.subcategory_id || null,
+        subcategory: data.subcategory || null,
+        base_city: data.base_city || null,
+        image_url: data.image_url || null,
+        cover_url: data.cover_url || null,
+        video_url: data.video_url || null,
+        experience: data.experience || null,
+        cities_coverage: data.cities_coverage || '{}',
+        social_media: data.social_media || '{}',
+        whatsapp_number: data.whatsapp_number || null,
+        tags: data.tags || '{}',
+        specialties: data.specialties || '{}',
+        latitude: data.latitude || null,
+        longitude: data.longitude || null,
+        provider_status: data.provider_status || 'active'
       })
       .eq("id", serviceId)
       .eq("provider_id", user.id);

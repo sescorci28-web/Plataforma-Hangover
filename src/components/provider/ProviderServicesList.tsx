@@ -12,6 +12,7 @@ interface Service {
   description: string | null;
   price: number;
   category: string;
+  subcategory?: string | null;
   image_url: string | null;
 }
 
@@ -106,11 +107,7 @@ export function ProviderServicesList({ services }: ProviderServicesListProps) {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-primary-400 capitalize">
-                    {service.category === "dj" ? "DJs & Música" :
-                     service.category === "bar" ? "Bares & Coctelería" :
-                     service.category === "staff" ? "Personal de Servicio" :
-                     service.category === "security" ? "Seguridad" :
-                     service.category === "catering" ? "Catering & Comida" : service.category}
+                    {service.subcategory || service.category}
                   </span>
                   <span className="text-md font-bold text-white font-outfit">${service.price}</span>
                 </div>

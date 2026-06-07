@@ -218,6 +218,47 @@ export default async function ClubDetailPage({ params }: PageProps) {
   }
 
   // ==========================================
+  // HANGOVER CONNECT ACCESS VALIDATION
+  // ==========================================
+  let hasConnectAccess = false;
+  let connectBookingId = null;
+  if (user) {
+    const eightHoursAgo = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString();
+    const { data: validatedBookings } = await supabase
+      .from("bookings")
+      .select("id, qr_validated_at")
+      .eq("club_id", club.id)
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .eq("qr_status", "used")
+      .gt("qr_validated_at", eightHoursAgo);
+    
+    if (validatedBookings && validatedBookings.length > 0) {
+      const activeBooking = validatedBookings.find(b => {
+        if (!b.qr_validated_at) return false;
+        const qrValidatedAt = new Date(b.qr_validated_at);
+        const eightHoursLater = new Date(qrValidatedAt.getTime() + 8 * 60 * 60 * 1000);
+        
+        // 6:00 AM boundary logic: if validated after 6 AM, expires at 6 AM tomorrow.
+        // If validated before 6 AM, expires at 6 AM today.
+        const sixAmTodayOrTomorrow = new Date(qrValidatedAt);
+        sixAmTodayOrTomorrow.setHours(6, 0, 0, 0);
+        if (qrValidatedAt.getHours() >= 6) {
+          sixAmTodayOrTomorrow.setDate(sixAmTodayOrTomorrow.getDate() + 1);
+        }
+        
+        const expiresAt = Math.min(eightHoursLater.getTime(), sixAmTodayOrTomorrow.getTime());
+        return Date.now() < expiresAt;
+      });
+
+      if (activeBooking) {
+        hasConnectAccess = true;
+        connectBookingId = activeBooking.id;
+      }
+    }
+  }
+
+  // ==========================================
   // UPCOMING EVENTS FOR THE CLUB
   // ==========================================
   let upcomingEvents = [];
@@ -517,6 +558,9 @@ export default async function ClubDetailPage({ params }: PageProps) {
                 clubInstagram={club.instagram}
                 menuItems={menuItems}
                 clubServices={clubServices}
+                hasConnectAccess={hasConnectAccess}
+                connectBookingId={connectBookingId}
+                currentUser={user}
               />
             </div>
 

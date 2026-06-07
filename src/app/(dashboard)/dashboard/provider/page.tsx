@@ -43,7 +43,7 @@ export default async function ProviderDashboard() {
   try {
     const { data, error } = await supabase
       .from("services")
-      .select("id, title, description, price, category, image_url")
+      .select("id, title, description, price, category, subcategory, image_url")
       .eq("provider_id", user.id)
       .order("created_at", { ascending: false });
     

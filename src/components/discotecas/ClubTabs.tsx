@@ -22,9 +22,11 @@ import {
   MessageSquare,
   Bell,
   Coins,
+  Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { sendLiveOrder, requestAssistance } from "@/app/services/liveActions";
+import { CommunityTab } from "@/components/connect/CommunityTab";
 
 // Local SVG icon to avoid version mismatch in lucide-react
 function InstagramIcon({ className }: { className?: string }) {
@@ -82,6 +84,9 @@ interface ClubTabsProps {
   clubInstagram: string | null;
   menuItems: MenuItem[];
   clubServices: ClubService[];
+  hasConnectAccess?: boolean;
+  connectBookingId?: string | null;
+  currentUser?: any;
 }
 
 const CATEGORIES = [
@@ -108,9 +113,12 @@ export function ClubTabs({
   clubInstagram,
   menuItems,
   clubServices,
+  hasConnectAccess,
+  connectBookingId,
+  currentUser,
 }: ClubTabsProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"info" | "menu" | "services">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "menu" | "services" | "community">("info");
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
   
   // Local Cart State
@@ -393,7 +401,7 @@ export function ClubTabs({
       {/* Navigation and Active Mesa Tab Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 pb-4">
         {/* Navigation Tabs */}
-        <div className="flex p-1 bg-black/30 rounded-2xl gap-2 shrink-0 w-full sm:max-w-md">
+        <div className="flex p-1 bg-black/30 rounded-2xl gap-2 shrink-0 w-full sm:max-w-xl">
           <button
             onClick={() => setActiveTab("info")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
@@ -426,6 +434,17 @@ export function ClubTabs({
           >
             <Settings2 className="w-3.5 h-3.5" />
             Servicios
+          </button>
+          <button
+            onClick={() => setActiveTab("community")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+              activeTab === "community"
+                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            Comunidad
           </button>
         </div>
 
@@ -800,6 +819,22 @@ export function ClubTabs({
                   ))}
                 </div>
               )}
+            </motion.div>
+          )}
+          {activeTab === "community" && (
+            <motion.div
+              key="community-content"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <CommunityTab
+                clubId={clubId}
+                hasAccess={hasConnectAccess || false}
+                bookingId={connectBookingId}
+                currentUser={currentUser}
+              />
             </motion.div>
           )}
         </AnimatePresence>
