@@ -214,14 +214,14 @@ export function ChatWidget({ chatId, otherUser, currentUser, onClose }: ChatWidg
                 className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}
               >
                 <div className={`max-w-[80%] flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}>
-                  <div className={`px-4.5 py-3 rounded-2xl text-xs leading-relaxed ${
+                  <div className={`px-4.5 py-2.5 rounded-[22px] text-xs leading-relaxed ${
                     isMe 
-                      ? 'bg-primary-600 text-white rounded-tr-none' 
-                      : 'bg-zinc-900 border border-white/5 text-zinc-200 rounded-tl-none'
+                      ? 'bg-primary-600 text-white rounded-tr-sm shadow-sm' 
+                      : 'bg-zinc-900 border border-white/5 text-zinc-200 rounded-tl-sm'
                   }`}>
                     <p className="break-words whitespace-pre-wrap">{msg.message_text}</p>
                   </div>
-                  <span className="text-[9px] text-zinc-500 font-semibold px-1.5">
+                  <span className="text-[9px] text-zinc-500 font-semibold px-2">
                     {new Date(msg.created_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </div>
@@ -233,21 +233,23 @@ export function ChatWidget({ chatId, otherUser, currentUser, onClose }: ChatWidg
       </div>
 
       {/* Input controls */}
-      <form onSubmit={handleSendMessage} className="p-4 border-t border-white/5 bg-zinc-950/90 flex gap-2">
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          placeholder="Escribe un mensaje..."
-          className="flex-grow bg-white/3 border border-white/5 rounded-xl px-4 py-3 text-xs text-white placeholder-zinc-650 focus:border-primary-500 outline-none"
-        />
-        <button
-          type="submit"
-          disabled={!inputText.trim() || isPending}
-          className="w-10 h-10 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white flex items-center justify-center transition-all cursor-pointer"
-        >
-          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        </button>
+      <form onSubmit={handleSendMessage} className="p-4 bg-transparent flex gap-2 items-center">
+        <div className="flex-grow flex items-center bg-zinc-950/90 border border-white/10 rounded-full pl-4 pr-1.5 py-1.5 shadow-xl backdrop-blur-md">
+          <input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Escribe un mensaje..."
+            className="flex-grow bg-transparent text-xs text-white placeholder-zinc-500 outline-none py-1.5"
+          />
+          <button
+            type="submit"
+            disabled={!inputText.trim() || isPending}
+            className="w-8 h-8 rounded-full bg-primary-600 hover:bg-primary-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white flex items-center justify-center transition-all cursor-pointer shrink-0"
+          >
+            {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+          </button>
+        </div>
       </form>
     </motion.div>
   );

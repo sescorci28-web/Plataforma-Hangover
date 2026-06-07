@@ -35,6 +35,7 @@ import { createClient } from "@/lib/supabase/client";
 import { updateClub, deleteClub } from "@/app/(dashboard)/dashboard/provider/clubs/actions";
 import { ClubMenuServicesManager } from "@/app/(dashboard)/dashboard/provider/clubs/ClubMenuServicesManager";
 import { ClubDashboardCharts } from "./ClubDashboardCharts";
+import { ClubMediaManager } from "./ClubMediaManager";
 
 interface Club {
   id: string;
@@ -148,6 +149,7 @@ export function ClubDashboardView({ club, stats, chartsData, topProducts }: Club
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isMenuManagerOpen, setIsMenuManagerOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isMediaManagerOpen, setIsMediaManagerOpen] = useState(false);
 
   // Edit club form state
   const [name, setName] = useState(club.name || "");
@@ -678,6 +680,14 @@ export function ClubDashboardView({ club, stats, chartsData, topProducts }: Club
               </button>
 
               <button
+                onClick={() => setIsMediaManagerOpen(true)}
+                className="w-full flex items-center justify-between bg-gradient-to-r from-primary-600/10 to-accent-600/10 hover:from-primary-600/25 hover:to-accent-600/25 text-primary-400 border border-primary-500/25 rounded-xl py-3 px-4 text-xs font-semibold transition-all text-left cursor-pointer"
+              >
+                <span>📸 Historias y Galería (Fotos & Videos)</span>
+                <span className="text-zinc-500">→</span>
+              </button>
+
+              <button
                 onClick={() => setIsMenuManagerOpen(true)}
                 className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 text-white rounded-xl py-3 px-4 text-xs font-semibold border border-white/5 transition-all text-left cursor-pointer"
               >
@@ -1002,6 +1012,15 @@ export function ClubDashboardView({ club, stats, chartsData, topProducts }: Club
           club={club}
           isOpen={isMenuManagerOpen}
           onClose={() => setIsMenuManagerOpen(false)}
+        />
+      )}
+
+      {/* Media Manager (Stories & Gallery) */}
+      {isMediaManagerOpen && (
+        <ClubMediaManager
+          club={club}
+          isOpen={isMediaManagerOpen}
+          onClose={() => setIsMediaManagerOpen(false)}
         />
       )}
     </div>

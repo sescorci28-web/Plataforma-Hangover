@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
+import { MobileNavBar } from "@/components/layout/MobileNavBar";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -48,9 +49,10 @@ export default async function RootLayout({
     <html lang="es" className={`${inter.variable} ${outfit.variable} h-full dark`}>
       <body className="min-h-full flex flex-col font-sans bg-[#05050a] text-zinc-100">
         <Navbar user={navUser} />
-        <main className="flex-grow pt-20">
+        <main className="flex-grow pt-20 pb-24 md:pb-0">
           {children}
         </main>
+        <MobileNavBar />
       </body>
     </html>
   );

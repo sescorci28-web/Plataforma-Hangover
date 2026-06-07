@@ -127,7 +127,7 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
 
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
-    return { error: 'Debes iniciar sesión para reservar una mesa VIP o entradas.' }
+    return { error: 'Debes iniciar sesión para realizar una reserva de mesa o comprar entradas.' }
   }
 
   const clubId = String(formData.get('clubId') || '')
@@ -135,6 +135,8 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
   const reservationDate = String(formData.get('reservation_date') || '').trim()
   const guestCount = parseGuestCount(formData.get('guest_count'))
   const comment = String(formData.get('comment') || '').trim()
+  const tableZone = String(formData.get('table_zone') || '').trim()
+  const tableNumber = String(formData.get('table_number') || '').trim()
 
   if (!clubId) {
     return { error: 'No se encontró la discoteca seleccionada.' }
@@ -185,7 +187,14 @@ export async function createClubReservation(_: ClubBookingState, formData: FormD
     const serviceId = await getOrCreateClubService(supabase, club)
 
     const totalAmount = Number((guestCount * 100).toFixed(2))
-    const notes = buildBookingNotes(customerName, guestCount, comment)
+    
+    const formattedComment = [
+      tableZone ? `Categoría/Zona de Mesa: ${tableZone}` : null,
+      tableNumber ? `Número de Mesa: ${tableNumber}` : null,
+      comment ? `Comentario: ${comment}` : null
+    ].filter(Boolean).join(' | ')
+
+    const notes = buildBookingNotes(customerName, guestCount, formattedComment)
 
     const bookingPayload: ClubBookingPayload = {
       user_id: user.id,

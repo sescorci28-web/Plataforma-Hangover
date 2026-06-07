@@ -1,9 +1,68 @@
 import { createClient } from "@/lib/supabase/server";
 import { ClubBookingModal } from "@/components/discotecas/ClubBookingModal";
-import { Sparkles, MapPin, Clock, ArrowLeft, Building2, Globe, Calendar, ShoppingBag, Eye } from "lucide-react";
+import { Sparkles, MapPin, Clock, ArrowLeft, Building2, Globe, Calendar, ShoppingBag, Eye, Star } from "lucide-react";
 import Link from "next/link";
 import { ClubTabs } from "@/components/discotecas/ClubTabs";
 import { FeaturedProducts } from "@/components/discotecas/FeaturedProducts";
+import { StoriesGallery } from "@/components/discotecas/StoriesGallery";
+import { ClubHeroActions } from "@/components/discotecas/ClubHeroActions";
+
+function isClubOpen(openingHours: string | null): boolean {
+  if (!openingHours) return false;
+
+  const now = new Date();
+  let colombiaDate: Date;
+  try {
+    const colombiaTime = now.toLocaleString("en-US", { timeZone: "America/Bogota" });
+    colombiaDate = new Date(colombiaTime);
+  } catch (e) {
+    colombiaDate = now;
+  }
+
+  const day = colombiaDate.getDay();
+  const hour = colombiaDate.getHours();
+  const hoursLower = openingHours.toLowerCase();
+
+  let isTargetDay = false;
+
+  if (hoursLower.includes("lunes") || hoursLower.includes("lun")) {
+    if (day === 1 || (day === 2 && hour < 6)) isTargetDay = true;
+  }
+  if (hoursLower.includes("martes") || hoursLower.includes("mar")) {
+    if (day === 2 || (day === 3 && hour < 6)) isTargetDay = true;
+  }
+  if (hoursLower.includes("miércoles") || hoursLower.includes("mier") || hoursLower.includes("mié")) {
+    if (day === 3 || (day === 4 && hour < 6)) isTargetDay = true;
+  }
+  if (hoursLower.includes("jueves") || hoursLower.includes("jue")) {
+    if (day === 4 || (day === 5 && hour < 6)) isTargetDay = true;
+  }
+  if (hoursLower.includes("viernes") || hoursLower.includes("vier") || hoursLower.includes("vi")) {
+    if (day === 5 || (day === 6 && hour < 6)) isTargetDay = true;
+  }
+  if (hoursLower.includes("sábado") || hoursLower.includes("sab") || hoursLower.includes("sáb")) {
+    if (day === 6 || (day === 0 && hour < 6)) isTargetDay = true;
+  }
+  if (hoursLower.includes("domingo") || hoursLower.includes("dom")) {
+    if (day === 0 || (day === 1 && hour < 6)) isTargetDay = true;
+  }
+
+  if (!isTargetDay && (hoursLower.includes("fin de semana") || hoursLower.includes("weekend"))) {
+    if (day === 4 || day === 5 || day === 6 || day === 0 || (day === 1 && hour < 6)) {
+      isTargetDay = true;
+    }
+  }
+
+  if (!isTargetDay && !hoursLower.match(/(lunes|martes|miércoles|jueves|viernes|sábado|domingo|lun|mar|mie|jue|vie|sab|dom)/)) {
+    if (day === 4 || day === 5 || day === 6 || (day === 0 && hour < 6)) {
+      isTargetDay = true;
+    }
+  }
+
+  const isNightHour = hour >= 20 || hour < 6;
+
+  return isTargetDay && isNightHour;
+}
 
 export const revalidate = 0; // Dynamic route
 
@@ -80,8 +139,8 @@ export default async function ClubDetailPage({ params }: PageProps) {
     );
   }
 
-  // Fetch menu items and services in parallel
-  const [menuItemsRes, clubServicesRes] = await Promise.all([
+  // Fetch menu items, services, tables, stories and gallery items in parallel
+  const [menuItemsRes, clubServicesRes, clubTablesRes, clubStoriesRes, clubGalleryRes] = await Promise.all([
     supabase
       .from("club_menu_items")
       .select("*")
@@ -94,10 +153,31 @@ export default async function ClubDetailPage({ params }: PageProps) {
       .eq("club_id", club.id)
       .eq("active", true)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("club_tables")
+      .select("id, table_number, zone, status, active")
+      .eq("club_id", club.id)
+      .eq("active", true)
+      .order("table_number", { ascending: true }),
+    supabase
+      .from("club_stories")
+      .select("*")
+      .eq("club_id", club.id)
+      .eq("active", true)
+      .order("display_order", { ascending: true }),
+    supabase
+      .from("club_gallery_items")
+      .select("*")
+      .eq("club_id", club.id)
+      .eq("active", true)
+      .order("display_order", { ascending: true }),
   ]);
 
   const menuItems = menuItemsRes.data || [];
   const clubServices = clubServicesRes.data || [];
+  const clubTables = clubTablesRes.data || [];
+  const clubStories = clubStoriesRes.data || [];
+  const clubGalleryItems = clubGalleryRes.data || [];
 
   // ==========================================
   // REAL STATS & METRICS FROM DATABASE
@@ -282,6 +362,7 @@ export default async function ClubDetailPage({ params }: PageProps) {
 
   // Badges array for categorized hero
   const categories = ["🔥 Más Popular", "🎵 Reggaetón", "🍾 Premium Club"];
+  const isOpen = isClubOpen(club.opening_hours);
 
   return (
     <div className="relative min-h-screen w-full bg-[#05050a] text-zinc-100 pb-20 overflow-hidden">
@@ -322,8 +403,8 @@ export default async function ClubDetailPage({ params }: PageProps) {
         <div className="absolute bottom-0 inset-x-0 z-20 pb-8 pt-20 px-4 md:px-8 container mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-4 max-w-2fr">
-              {/* Category Badges */}
-              <div className="flex flex-wrap gap-2">
+              {/* Status and Category Badges */}
+              <div className="flex flex-wrap items-center gap-2">
                 {categories.map((cat, i) => (
                   <span
                     key={i}
@@ -332,6 +413,22 @@ export default async function ClubDetailPage({ params }: PageProps) {
                     {cat}
                   </span>
                 ))}
+
+                {/* Open/Closed Status */}
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm border ${
+                  isOpen 
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                    : "bg-red-500/10 border-red-500/20 text-red-300"
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? "bg-emerald-400" : "bg-red-400"}`} />
+                  <span>{isOpen ? "Abierto" : "Cerrado"}</span>
+                </span>
+
+                {/* Rating Badge */}
+                <div className="flex items-center gap-1 bg-black/45 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-amber-400 text-xs font-black">
+                  <Star className="w-3.5 h-3.5 fill-amber-400" />
+                  <span>{Number(club.rating || 5.0).toFixed(1)}</span>
+                </div>
               </div>
 
               {/* Title & Info */}
@@ -351,38 +448,35 @@ export default async function ClubDetailPage({ params }: PageProps) {
                 </div>
               </div>
 
-              {/* Direct Buttons */}
-              <div className="flex flex-wrap gap-3 pt-2">
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/10 text-xs font-bold px-4 py-2.5 transition-all cursor-pointer backdrop-blur shadow-md"
-                >
-                  📍 Cómo llegar
-                </a>
-                {instagramUrl && (
+              {/* Action Buttons Row */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 pt-2">
+                <ClubHeroActions
+                  clubId={club.id}
+                  clubSlug={club.slug}
+                  clubName={club.name}
+                />
+
+                <div className="flex flex-wrap gap-2">
                   <a
-                    href={instagramUrl}
+                    href={mapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/10 text-xs font-bold px-4 py-2.5 transition-all cursor-pointer backdrop-blur shadow-md"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/5 text-[11px] font-bold px-3 py-2 transition-all cursor-pointer backdrop-blur"
                   >
-                    <InstagramIcon className="w-4 h-4 text-pink-400" />
-                    <span>Instagram</span>
+                    📍 Cómo llegar
                   </a>
-                )}
-                {websiteUrl && (
-                  <a
-                    href={websiteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/10 text-xs font-bold px-4 py-2.5 transition-all cursor-pointer backdrop-blur shadow-md"
-                  >
-                    <Globe className="w-4 h-4 text-cyan-400" />
-                    <span>Sitio web</span>
-                  </a>
-                )}
+                  {instagramUrl && (
+                    <a
+                      href={instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/5 text-[11px] font-bold px-3 py-2 transition-all cursor-pointer backdrop-blur"
+                    >
+                      <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
+                      <span>Instagram</span>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -402,283 +496,93 @@ export default async function ClubDetailPage({ params }: PageProps) {
 
       {/* Main Info Grid */}
       <div className="container mx-auto px-4 md:px-8 relative z-20 mt-10">
-        
-        {/* ==========================================
-            2. REAL STATS METRICS (SUPABASE)
-            ========================================== */}
-        {(vipReservationsCount || coversSold || reservedTablesCount || totalOrdersCount) ? (
-          <section className="mb-12">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-4 font-outfit">Métricas de Operación Real</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* VIP bookings count */}
-              {Boolean(vipReservationsCount) && (
-                <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
-                  <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Reservas VIP</span>
-                  <span className="text-3xl font-black text-white mt-2 font-outfit block">{vipReservationsCount}</span>
-                  <span className="text-[10px] text-zinc-400 mt-1 block">Mesa reservada confirmada</span>
-                </div>
-              )}
-              {/* Covers sold count */}
-              {Boolean(coversSold) && (
-                <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
-                  <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Covers vendidos</span>
-                  <span className="text-3xl font-black text-emerald-400 mt-2 font-outfit block">{coversSold}</span>
-                  <span className="text-[10px] text-zinc-400 mt-1 block">Accesos rápidos despachados</span>
-                </div>
-              )}
-              {/* Mesas reservadas */}
-              {Boolean(reservedTablesCount) && (
-                <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
-                  <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Mesas reservadas</span>
-                  <span className="text-3xl font-black text-amber-400 mt-2 font-outfit block">{reservedTablesCount}</span>
-                  <span className="text-[10px] text-zinc-400 mt-1 block">Espacios reservados en vivo</span>
-                </div>
-              )}
-              {/* Orders count */}
-              {Boolean(totalOrdersCount) && (
-                <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
-                  <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Pedidos realizados</span>
-                  <span className="text-3xl font-black text-primary-400 mt-2 font-outfit block">{totalOrdersCount}</span>
-                  <span className="text-[10px] text-zinc-400 mt-1 block">Consumos procesados</span>
-                </div>
-              )}
-            </div>
-          </section>
-        ) : null}
-
-        {/* Split Details & Sidebar Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,420px)] gap-10 items-start">
+        <div className="w-full max-w-4xl mx-auto space-y-12">
           
-          {/* Left Column Content */}
-          <div className="space-y-12">
-            
-            {/* ==========================================
-                7. MESA ACTIVA (IF USER HAS OPEN SESSION)
-                ========================================== */}
-            {userActiveSession && (
-              <div className="glass-card p-6 bg-gradient-to-r from-emerald-500/10 via-primary-500/5 to-transparent border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.08)] rounded-[28px] relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-                
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-wider">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                      <span>Sesión de Mesa Activa</span>
-                    </div>
-                    <h3 className="text-2xl font-black text-white font-outfit">
-                      Mesa {userActiveSession.tableNumber}
-                    </h3>
-                    <p className="text-xs text-zinc-400">
-                      Consumo acumulado: <span className="text-emerald-400 font-bold font-outfit">${userActiveSession.consumption.toLocaleString("es-CO")} COP</span> • Pedidos despachados: <span className="text-white font-bold">{userActiveSession.ordersCount}</span>
-                    </p>
-                  </div>
+          {/* ==========================================
+              2. TABS SYSTEM (STICKY)
+              ========================================== */}
+          <ClubTabs
+            clubId={club.id}
+            clubSlug={club.slug}
+            clubName={club.name}
+            clubDescription={club.description}
+            clubAddress={club.address}
+            clubOpeningHours={club.opening_hours}
+            clubInstagram={club.instagram}
+            menuItems={menuItems}
+            clubServices={clubServices}
+            clubTables={clubTables}
+            clubProviderId={club.provider_id ?? null}
+            clubCoverPrice={club.cover_price ?? 0.00}
+            upcomingEvents={upcomingEvents}
+            clubGalleryItems={clubGalleryItems}
+            hasConnectAccess={hasConnectAccess}
+            connectBookingId={connectBookingId}
+            currentUser={user}
+          />
 
-                  <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                    <Link
-                      href={`/discotecas/${club.slug}/mi-cuenta`}
-                      className="flex-1 sm:flex-none inline-flex justify-center items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/10 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Ver mi cuenta</span>
-                    </Link>
-                    <Link
-                      href={`/discotecas/${club.slug}/mi-cuenta`}
-                      className="flex-1 sm:flex-none inline-flex justify-center items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 text-xs font-bold transition-all shadow-md shadow-emerald-500/10 cursor-pointer"
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                      <span>Ver pedidos</span>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ==========================================
-                3. GALERÍA DE FOTOS (REAL ONLY)
-                ========================================== */}
-            <section className="space-y-4">
-              <h3 className="text-lg font-bold text-white font-outfit">📸 Galería de la Discoteca</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Banner - Panoramic left block */}
-                <div className="md:col-span-2 relative h-56 md:h-64 rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 group">
-                  {club.banner_image ? (
-                    <img
-                      src={club.banner_image}
-                      alt="Banner principal"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-zinc-600">
-                      <span>No Banner Available</span>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                  <span className="absolute bottom-3 left-3 text-[10px] text-zinc-300 font-bold uppercase tracking-wider bg-black/40 px-2 py-0.5 rounded-md">
-                    Instalaciones
-                  </span>
-                </div>
-
-                {/* Logo - Right details block */}
-                <div className="relative h-56 md:h-64 rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 flex flex-col items-center justify-center p-6 group bg-gradient-to-b from-zinc-900 to-zinc-950">
-                  <div className="w-24 h-24 rounded-3xl border border-white/10 bg-zinc-900 p-0.5 overflow-hidden shadow-lg mb-3">
-                    {club.logo ? (
-                      <img src={club.logo} alt="Logo" className="w-full h-full object-cover rounded-[20px]" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-zinc-900">
-                        <Building2 className="w-10 h-10 text-zinc-700" />
-                      </div>
-                    )}
-                  </div>
-                  <h4 className="font-black text-white text-xs uppercase tracking-widest text-center mt-1">
-                    {club.name}
-                  </h4>
-                  <p className="text-[9px] text-zinc-500 font-semibold tracking-wider uppercase mt-0.5">
-                    Logo Oficial
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* ==========================================
-                4. PRODUCTOS DESTACADOS
-                ========================================== */}
-            <FeaturedProducts clubId={club.id} menuItems={menuItems} />
-
-            {/* ==========================================
-                TABS SYSTEM (Left Side)
-                ========================================== */}
-            <div className="border-t border-white/5 pt-10">
-              <ClubTabs
-                clubId={club.id}
-                clubSlug={club.slug}
-                clubName={club.name}
-                clubDescription={club.description}
-                clubAddress={club.address}
-                clubOpeningHours={club.opening_hours}
-                clubInstagram={club.instagram}
-                menuItems={menuItems}
-                clubServices={clubServices}
-                hasConnectAccess={hasConnectAccess}
-                connectBookingId={connectBookingId}
-                currentUser={user}
-              />
-            </div>
-
-            {/* ==========================================
-                5. EVENTOS PRÓXIMOS
-                ========================================== */}
-            <section className="space-y-6 border-t border-white/5 pt-10">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-primary-400" />
-                <h3 className="text-xl font-bold text-white font-outfit">Próximos Eventos</h3>
-              </div>
-
-              {upcomingEvents.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {upcomingEvents.map((evt: any) => {
-                    const formattedPrice = evt.ticket_price && Number(evt.ticket_price) > 0
-                      ? `$${Number(evt.ticket_price).toLocaleString("es-CO")} COP`
-                      : "Entrada Libre";
-
-                    const evtDate = new Date(evt.event_date).toLocaleDateString("es-ES", {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    });
-
-                    return (
-                      <div
-                        key={evt.id}
-                        className="glass-card bg-zinc-950/40 border border-white/5 hover:border-primary-500/10 rounded-2xl overflow-hidden flex flex-col justify-between"
-                      >
-                        {/* Event banner/image */}
-                        <div className="w-full h-36 bg-zinc-900 relative">
-                          {evt.image_url ? (
-                            <img
-                              src={evt.image_url}
-                              alt={evt.title}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-700">
-                              <Calendar className="w-10 h-10" />
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                          <div className="absolute bottom-3 left-3 flex flex-col">
-                            <span className="text-[9px] text-primary-300 font-bold uppercase tracking-wider">
-                              Próximo Evento
-                            </span>
-                            <span className="text-[10px] text-white font-medium">
-                              {evtDate}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Event Details */}
-                        <div className="p-4 flex-grow flex flex-col justify-between gap-4">
-                          <div className="space-y-1">
-                            <h4 className="font-bold text-white text-base font-outfit truncate">
-                              {evt.title}
-                            </h4>
-                            {evt.description && (
-                              <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
-                                {evt.description}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2 pt-3 border-t border-white/5 mt-auto">
-                            <div className="text-left">
-                              <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold block">
-                                Ticket Cover
-                              </span>
-                              <span className="text-xs font-bold text-emerald-400 font-outfit block mt-0.5">
-                                {formattedPrice}
-                              </span>
-                            </div>
-
-                            <Link
-                              href={`/events/${evt.id}`}
-                              className="bg-primary-600 hover:bg-primary-500 text-white rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wider transition-colors cursor-pointer shadow-md shadow-primary-500/10"
-                            >
-                              Comprar Ticket
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-10 border border-white/5 bg-zinc-950/20 rounded-2xl">
-                  <Calendar className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-                  <p className="text-xs text-zinc-400 font-medium">No hay eventos programados</p>
-                </div>
-              )}
-            </section>
-          </div>
-
-          {/* Right Column (Sidebar Booking Modal Widget) */}
-          <div id="booking-widget" className="w-full xl:max-w-md xl:justify-self-end">
-            <ClubBookingModal
-              club={{
-                id: club.id,
-                name: club.name,
-                provider_id: club.provider_id ?? null,
-                cover_price: club.cover_price ?? 0.00,
-              }}
-              isAuthenticated={Boolean(user)}
-              defaultClientName={
-                user?.user_metadata?.full_name ||
-                user?.user_metadata?.name ||
-                user?.email?.split("@")[0] ||
-                ""
-              }
-              menuItems={menuItems}
+          {/* ==========================================
+              3. STORIES GALLERY
+              ========================================== */}
+          <div className="border-t border-white/5 pt-10">
+            <StoriesGallery
+              logo={club.logo}
+              bannerImage={club.banner_image}
+              clubName={club.name}
+              stories={clubStories}
+              isProvider={user?.id === club.provider_id}
             />
           </div>
+
+          {/* ==========================================
+              4. CARTA DESTACADA (FEATURED PRODUCTS)
+              ========================================== */}
+          <div className="border-t border-white/5 pt-10">
+            <FeaturedProducts clubId={club.id} menuItems={menuItems} />
+          </div>
+
+          {/* ==========================================
+              5. METRICAS DE OPERACION REAL (AT THE BOTTOM)
+              ========================================== */}
+          {(vipReservationsCount || coversSold || reservedTablesCount || totalOrdersCount) ? (
+            <div className="border-t border-white/5 pt-10 pb-10">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-4 font-outfit">Métricas de Operación Real</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* VIP bookings count */}
+                {Boolean(vipReservationsCount) && (
+                  <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
+                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Reservas VIP</span>
+                    <span className="text-3xl font-black text-white mt-2 font-outfit block">{vipReservationsCount}</span>
+                    <span className="text-[10px] text-zinc-400 mt-1 block">Mesa reservada confirmada</span>
+                  </div>
+                )}
+                {/* Covers sold count */}
+                {Boolean(coversSold) && (
+                  <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
+                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Covers vendidos</span>
+                    <span className="text-3xl font-black text-emerald-400 mt-2 font-outfit block">{coversSold}</span>
+                    <span className="text-[10px] text-zinc-400 mt-1 block">Accesos rápidos despachados</span>
+                  </div>
+                )}
+                {/* Mesas reservadas */}
+                {Boolean(reservedTablesCount) && (
+                  <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
+                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Mesas reservadas</span>
+                    <span className="text-3xl font-black text-amber-400 mt-2 font-outfit block">{reservedTablesCount}</span>
+                    <span className="text-[10px] text-zinc-400 mt-1 block">Espacios reservados en vivo</span>
+                  </div>
+                )}
+                {/* Orders count */}
+                {Boolean(totalOrdersCount) && (
+                  <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
+                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Pedidos realizados</span>
+                    <span className="text-3xl font-black text-primary-400 mt-2 font-outfit block">{totalOrdersCount}</span>
+                    <span className="text-[10px] text-zinc-400 mt-1 block">Consumos procesados</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

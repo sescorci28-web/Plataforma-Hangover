@@ -303,7 +303,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                 </div>
 
                 {/* Progress bar and availability */}
-                <div className="p-4 bg-white/5 border border-white/5 rounded-2xl space-y-3">
+                <div className="space-y-2.5">
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-zinc-400 flex items-center gap-1 font-semibold">
                       <strong>{attendeeCount}</strong> reservados
@@ -311,46 +311,52 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                     <span className="text-primary-400 font-extrabold">{percentSold}% Vendido</span>
                   </div>
                   
-                  <div className="w-full h-2 bg-white/5 border border-white/10 rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-primary-600 to-rose-500 transition-all duration-500"
                       style={{ width: `${percentSold}%` }}
                     />
                   </div>
 
-                  <div className="flex items-center justify-between text-[10px] pt-1">
+                  <div className="flex items-center justify-between text-[10px] text-zinc-500">
                     {remainingTickets <= 80 ? (
                       <span className="text-rose-400 font-bold uppercase tracking-wider animate-pulse flex items-center gap-1">
                         ⚠️ ¡Solo quedan {remainingTickets} entradas!
                       </span>
                     ) : (
-                      <span className="text-zinc-500">
+                      <span>
                         {remainingTickets} entradas restantes
                       </span>
                     )}
-                    <span className="text-zinc-500">Aforo: {capacity}</span>
+                    <span>Aforo: {capacity}</span>
                   </div>
                 </div>
 
-                {/* Trust stats (SECCIÓN 6) */}
-                <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 space-y-2 text-xs">
-                  <div className="flex items-center gap-2 text-emerald-400 font-semibold">
-                    <Users className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <p>👥 {attendeeCount} Asistentes Registrados</p>
+                {/* Trust & Guarantee items */}
+                <div className="space-y-4 pt-1">
+                  <div className="flex items-start gap-3.5 text-xs">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-zinc-200">👥 {attendeeCount} Asistentes Registrados</p>
+                      <p className="text-[10px] text-zinc-400 leading-relaxed">
+                        Únete a los asistentes que ya reservaron sus accesos para este evento oficial.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-zinc-400 leading-relaxed">
-                    Únete a los clientes que ya reservaron sus accesos para este evento oficial a través de la plataforma.
-                  </p>
-                </div>
 
-                <div className="rounded-2xl border border-primary-500/10 bg-primary-500/5 p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-primary-300 font-semibold text-xs">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <p>Garantía de Acceso Seguro</p>
+                  <div className="flex items-start gap-3.5 text-xs">
+                    <div className="w-8 h-8 rounded-full bg-primary-500/10 flex items-center justify-center text-primary-400 shrink-0">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-zinc-200">Garantía de Acceso Seguro</p>
+                      <p className="text-[10px] text-zinc-400 leading-relaxed">
+                        Entradas emitidas al instante en formato QR y guardadas en tu cuenta.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-zinc-400 leading-relaxed">
-                    Las transacciones se procesan y emiten al instante en tu dashboard de cliente en formato QR.
-                  </p>
                 </div>
 
                 <div className="pt-4 flex justify-between items-center border-t border-white/5">

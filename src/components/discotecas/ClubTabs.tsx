@@ -23,10 +23,17 @@ import {
   Bell,
   Coins,
   Users,
+  Calendar,
+  Ticket,
+  Eye,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { sendLiveOrder, requestAssistance } from "@/app/services/liveActions";
 import { CommunityTab } from "@/components/connect/CommunityTab";
+import { ClubBookingModal } from "@/components/discotecas/ClubBookingModal";
+import { ClubGallery } from "./ClubGallery";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 // Local SVG icon to avoid version mismatch in lucide-react
 function InstagramIcon({ className }: { className?: string }) {
@@ -84,6 +91,11 @@ interface ClubTabsProps {
   clubInstagram: string | null;
   menuItems: MenuItem[];
   clubServices: ClubService[];
+  clubTables: any[];
+  clubProviderId: string | null;
+  clubCoverPrice: number;
+  upcomingEvents: any[];
+  clubGalleryItems?: any[];
   hasConnectAccess?: boolean;
   connectBookingId?: string | null;
   currentUser?: any;
@@ -113,13 +125,34 @@ export function ClubTabs({
   clubInstagram,
   menuItems,
   clubServices,
+  clubTables,
+  clubProviderId,
+  clubCoverPrice,
+  upcomingEvents,
+  clubGalleryItems = [],
   hasConnectAccess,
   connectBookingId,
   currentUser,
 }: ClubTabsProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"info" | "menu" | "services" | "community">("info");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<"info" | "menu" | "events" | "community" | "bookings">("community");
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
+
+  // Sync active tab with URL search parameter
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && ["info", "menu", "events", "community", "bookings"].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+      // Smooth scroll to navigation tab bar
+      setTimeout(() => {
+        const element = document.getElementById("club-tabs-nav");
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+    }
+  }, [searchParams]);
   
   // Local Cart State
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -127,13 +160,18 @@ export function ClubTabs({
   const [isMounted, setIsMounted] = useState(false);
 
   // Table selector state
-  const [clubTables, setClubTables] = useState<Array<{ id: string; table_number: string }>>([]);
   const [selectedTableId, setSelectedTableId] = useState<string>("");
   const [isManualTable, setIsManualTable] = useState<boolean>(false);
   const [manualTableNumber, setManualTableNumber] = useState<string>("");
   const [isSendingOrder, setIsSendingOrder] = useState<boolean>(false);
   const [orderError, setOrderError] = useState<string | null>(null);
-  const [activeSession, setActiveSession] = useState<{ id: string; tableId: string; tableNumber: string } | null>(null);
+  const [activeSession, setActiveSession] = useState<{ 
+    id: string; 
+    tableId: string; 
+    tableNumber: string; 
+    consumption?: number; 
+    ordersCount?: number; 
+  } | null>(null);
   const [isCallingWaiter, setIsCallingWaiter] = useState(false);
   const [isRequestingBill, setIsRequestingBill] = useState(false);
   const [assistanceStatus, setAssistanceStatus] = useState<string | null>(null);
@@ -182,17 +220,27 @@ export function ClubTabs({
         
         const { data, error } = await supabase
           .from("live_sessions")
-          .select("id, table_id, club_tables(table_number)")
+          .select(`
+            id,
+            table_id,
+            total_amount,
+            club_tables (table_number),
+            live_orders (id, status)
+          `)
           .eq("club_id", clubId)
           .eq("user_id", user.id)
           .eq("status", "open")
           .maybeSingle();
           
         if (!error && data) {
+          const orders = (data as any).live_orders || [];
+          const nonCancelledOrders = orders.filter((o: any) => o.status !== "cancelled");
           setActiveSession({
             id: data.id,
             tableId: data.table_id,
-            tableNumber: (data.club_tables as any)?.table_number || ""
+            tableNumber: (data.club_tables as any)?.table_number || "",
+            consumption: data.total_amount || 0,
+            ordersCount: nonCancelledOrders.length
           });
         } else {
           setActiveSession(null);
@@ -242,36 +290,16 @@ export function ClubTabs({
     }
   };
 
-  // Fetch tables from Supabase Client
+  // Initialize table selector from prop
   useEffect(() => {
-    if (!isMounted) return;
-    const fetchTables = async () => {
-      try {
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from("club_tables")
-          .select("id, table_number")
-          .eq("club_id", clubId)
-          .eq("active", true)
-          .order("table_number", { ascending: true });
-        
-        if (!error && data) {
-          setClubTables(data);
-          if (data.length > 0) {
-            setSelectedTableId(data[0].id);
-          } else {
-            setIsManualTable(true);
-          }
-        } else {
-          setIsManualTable(true);
-        }
-      } catch (err) {
-        console.error("Error fetching tables:", err);
-        setIsManualTable(true);
-      }
-    };
-    fetchTables();
-  }, [isMounted, clubId]);
+    if (clubTables && clubTables.length > 0) {
+      const firstAvailable = clubTables.find(t => t.status !== "Reservada") || clubTables[0];
+      setSelectedTableId(firstAvailable.id);
+      setIsManualTable(false);
+    } else {
+      setIsManualTable(true);
+    }
+  }, [clubTables]);
 
   // Save cart changes helper
   const saveCart = (newItems: CartItem[]) => {
@@ -399,14 +427,14 @@ export function ClubTabs({
   return (
     <div className="space-y-6 relative">
       {/* Navigation and Active Mesa Tab Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 pb-4">
+      <div id="club-tabs-nav" className="sticky top-0 z-30 bg-[#05050a]/95 backdrop-blur-md border-b border-white/5 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         {/* Navigation Tabs */}
-        <div className="flex p-1 bg-black/30 rounded-2xl gap-2 shrink-0 w-full sm:max-w-xl">
+        <div className="flex flex-wrap p-1 bg-black/30 rounded-2xl gap-1 shrink-0 w-full md:max-w-2xl">
           <button
             onClick={() => setActiveTab("info")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+            className={`flex-1 min-w-[75px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
               activeTab === "info"
-                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
+                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20 font-black"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
             }`}
           >
@@ -415,9 +443,9 @@ export function ClubTabs({
           </button>
           <button
             onClick={() => setActiveTab("menu")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+            className={`flex-1 min-w-[75px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
               activeTab === "menu"
-                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
+                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20 font-black"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
             }`}
           >
@@ -425,26 +453,37 @@ export function ClubTabs({
             Carta / Menú
           </button>
           <button
-            onClick={() => setActiveTab("services")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
-              activeTab === "services"
-                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
+            onClick={() => setActiveTab("events")}
+            className={`flex-1 min-w-[75px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === "events"
+                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20 font-black"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
             }`}
           >
-            <Settings2 className="w-3.5 h-3.5" />
-            Servicios
+            <Calendar className="w-3.5 h-3.5" />
+            Eventos
           </button>
           <button
             onClick={() => setActiveTab("community")}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+            className={`flex-1 min-w-[75px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
               activeTab === "community"
-                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
+                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20 font-black"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
             }`}
           >
             <Users className="w-3.5 h-3.5" />
             Comunidad
+          </button>
+          <button
+            onClick={() => setActiveTab("bookings")}
+            className={`flex-1 min-w-[75px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === "bookings"
+                ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20 font-black"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+            }`}
+          >
+            <Ticket className="w-3.5 h-3.5" />
+            Reservas
           </button>
         </div>
 
@@ -494,6 +533,45 @@ export function ClubTabs({
       {assistanceStatus && (
         <div className="bg-primary-950/80 border border-primary-500/30 text-primary-300 rounded-xl px-4 py-2 text-xs font-semibold text-center animate-pulse z-20">
           {assistanceStatus}
+        </div>
+      )}
+
+      {/* Active Session Card (Repositioned inside ClubTabs for perfect UX) */}
+      {activeSession && activeSession.consumption !== undefined && (
+        <div className="glass-card p-6 bg-gradient-to-r from-emerald-500/10 via-primary-500/5 to-transparent border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.08)] rounded-[28px] relative overflow-hidden mb-6">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+          
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-wider">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                <span>Sesión de Mesa Activa</span>
+              </div>
+              <h3 className="text-2xl font-black text-white font-outfit">
+                Mesa {activeSession.tableNumber}
+              </h3>
+              <p className="text-xs text-zinc-400">
+                Consumo acumulado: <span className="text-emerald-400 font-bold font-outfit">${activeSession.consumption.toLocaleString("es-CO")} COP</span> • Pedidos despachados: <span className="text-white font-bold">{activeSession.ordersCount}</span>
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+              <Link
+                href={`/discotecas/${clubSlug}/mi-cuenta`}
+                className="flex-1 sm:flex-none inline-flex justify-center items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/10 px-4 py-2.5 text-xs font-bold transition-all cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Ver mi cuenta</span>
+              </Link>
+              <Link
+                href={`/discotecas/${clubSlug}/mi-cuenta`}
+                className="flex-1 sm:flex-none inline-flex justify-center items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 text-xs font-bold transition-all shadow-md shadow-emerald-500/10 cursor-pointer"
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>Ver pedidos</span>
+              </Link>
+            </div>
+          </div>
         </div>
       )}
 
@@ -571,6 +649,14 @@ export function ClubTabs({
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Profile Gallery */}
+              <div className="pt-8 border-t border-white/5">
+                <ClubGallery 
+                  items={clubGalleryItems} 
+                  isProvider={currentUser?.id === clubProviderId}
+                />
               </div>
             </motion.div>
           )}
@@ -774,51 +860,131 @@ export function ClubTabs({
               )}
             </motion.div>
           )}
-
-          {activeTab === "services" && (
+          {activeTab === "events" && (
             <motion.div
-              key="services-content"
+              key="events-content"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
+            >
+              {upcomingEvents && upcomingEvents.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {upcomingEvents.map((evt: any) => {
+                    const formattedPrice = evt.ticket_price && Number(evt.ticket_price) > 0
+                      ? `$${Number(evt.ticket_price).toLocaleString("es-CO")} COP`
+                      : "Entrada Libre";
+
+                    const evtDate = new Date(evt.event_date).toLocaleDateString("es-ES", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    });
+
+                    return (
+                      <div
+                        key={evt.id}
+                        className="glass-card bg-zinc-950/40 border border-white/5 hover:border-primary-500/10 rounded-2xl overflow-hidden flex flex-col justify-between"
+                      >
+                        {/* Event banner/image */}
+                        <div className="w-full h-36 bg-zinc-900 relative">
+                          {evt.image_url ? (
+                            <img
+                              src={evt.image_url}
+                              alt={evt.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-700">
+                              <Calendar className="w-10 h-10" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                          <div className="absolute bottom-3 left-3 flex flex-col">
+                            <span className="text-[9px] text-primary-300 font-bold uppercase tracking-wider">
+                              Próximo Evento
+                            </span>
+                            <span className="text-[10px] text-white font-medium">
+                              {evtDate}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Event Details */}
+                        <div className="p-4 flex-grow flex flex-col justify-between gap-4">
+                          <div className="space-y-1">
+                            <h4 className="font-bold text-white text-base font-outfit truncate">
+                              {evt.title}
+                            </h4>
+                            {evt.description && (
+                              <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
+                                {evt.description}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 pt-3 border-t border-white/5 mt-auto">
+                            <div className="text-left">
+                              <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold block">
+                                Ticket Cover
+                              </span>
+                              <span className="text-xs font-bold text-emerald-400 font-outfit block mt-0.5">
+                                {formattedPrice}
+                              </span>
+                            </div>
+
+                            <Link
+                              href={`/events/${evt.id}`}
+                              className="bg-primary-600 hover:bg-primary-500 text-white rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wider transition-colors cursor-pointer shadow-md shadow-primary-500/10"
+                            >
+                              Comprar Ticket
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 border border-white/5 bg-black/20 rounded-2xl">
+                  <Calendar className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+                  <h4 className="text-sm font-bold text-white mb-1">No hay eventos programados</h4>
+                  <p className="text-xs text-zinc-400 max-w-xs mx-auto">
+                    Este establecimiento no tiene eventos próximos programados en este momento.
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === "bookings" && (
+            <motion.div
+              key="bookings-content"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
               className="space-y-4"
             >
-              {!hasServices ? (
-                <div className="text-center py-16 border border-white/5 bg-black/20 rounded-2xl">
-                  <Settings2 className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
-                  <h4 className="text-sm font-bold text-white mb-1">Servicios no especificados</h4>
-                  <p className="text-xs text-zinc-400 max-w-xs mx-auto">
-                    Esta discoteca no tiene catálogo de servicios adicionales en el sistema.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {clubServices.map((service) => (
-                    <div
-                      key={service.id}
-                      className="p-5 bg-zinc-950/40 border border-white/5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                    >
-                      <div className="space-y-1 max-w-xl">
-                        <h5 className="font-bold text-white text-sm font-outfit flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-primary-400" />
-                          {service.name}
-                        </h5>
-                        <p className="text-xs text-zinc-400 leading-relaxed">{service.description}</p>
-                      </div>
-
-                      <div className="shrink-0 sm:text-right">
-                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Precio</p>
-                        <p className="text-sm font-extrabold text-accent-400 font-outfit mt-0.5">
-                          {service.price && Number(service.price) > 0
-                            ? `$${Number(service.price).toLocaleString("es-CO")} COP`
-                            : "Incluido"}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <ClubBookingModal
+                club={{
+                  id: clubId,
+                  name: clubName,
+                  provider_id: clubProviderId,
+                  cover_price: clubCoverPrice,
+                }}
+                isAuthenticated={Boolean(currentUser)}
+                defaultClientName={
+                  currentUser?.user_metadata?.full_name ||
+                  currentUser?.user_metadata?.name ||
+                  currentUser?.email?.split("@")[0] ||
+                  ""
+                }
+                menuItems={menuItems}
+                clubTables={clubTables}
+              />
             </motion.div>
           )}
           {activeTab === "community" && (

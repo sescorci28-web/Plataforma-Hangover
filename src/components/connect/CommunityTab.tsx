@@ -429,36 +429,36 @@ export function CommunityTab({ clubId, eventId, hasAccess, bookingId, currentUse
                       <div className="grid grid-cols-1 gap-2">
                         <button 
                           onClick={() => setSelectedStatus('available')}
-                          className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all text-left ${
+                          className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer ${
                             selectedStatus === 'available' 
-                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                              ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-400' 
                               : 'bg-white/3 border-white/5 text-zinc-400 hover:text-zinc-300'
                           }`}
                         >
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                          <span>🟢 Disponible para conversar</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                          <span>Disponible para conversar</span>
                         </button>
                         <button 
                           onClick={() => setSelectedStatus('observing')}
-                          className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all text-left ${
+                          className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer ${
                             selectedStatus === 'observing' 
-                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                              ? 'bg-amber-500/10 border-amber-500/35 text-amber-400' 
                               : 'bg-white/3 border-white/5 text-zinc-400 hover:text-zinc-300'
                           }`}
                         >
-                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                          <span>🟡 Solo observando</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                          <span>Solo observando</span>
                         </button>
                         <button 
                           onClick={() => setSelectedStatus('do_not_disturb')}
-                          className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all text-left ${
+                          className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all text-left cursor-pointer ${
                             selectedStatus === 'do_not_disturb' 
-                              ? 'bg-red-500/10 border-red-500/30 text-red-400' 
+                              ? 'bg-red-500/10 border-red-500/35 text-red-400' 
                               : 'bg-white/3 border-white/5 text-zinc-400 hover:text-zinc-300'
                           }`}
                         >
-                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                          <span>🔴 No molestar</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+                          <span>No molestar</span>
                         </button>
                       </div>
                     </div>
@@ -763,7 +763,7 @@ export function CommunityTab({ clubId, eventId, hasAccess, bookingId, currentUse
                   return (
                     <div 
                       key={presence.id} 
-                      className="glass-card p-4 bg-zinc-950/40 border-white/5 hover:border-white/10 transition-all rounded-2xl flex flex-col justify-between h-full group"
+                      className="p-5 bg-zinc-900/40 hover:bg-zinc-900/60 transition-all rounded-3xl flex flex-col justify-between h-full group shadow-lg"
                     >
                       {/* Top profile card header */}
                       <div className="flex items-start justify-between gap-3">
@@ -778,11 +778,15 @@ export function CommunityTab({ clubId, eventId, hasAccess, bookingId, currentUse
                                 </div>
                               )}
                             </div>
-                            {/* Live status dot */}
-                            <span 
-                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-zinc-950 ${getStatusDotColor(presence.status)}`}
-                              title={getStatusText(presence.status)}
-                            />
+                            {/* Live status dot with halo pulse */}
+                            <span className="absolute bottom-0 right-0 flex h-3 w-3">
+                              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                                presence.status === 'available' ? 'bg-emerald-400' : presence.status === 'observing' ? 'bg-amber-400' : 'bg-red-400'
+                              }`} />
+                              <span className={`relative inline-flex rounded-full h-3 w-3 border border-zinc-950 ${
+                                presence.status === 'available' ? 'bg-emerald-500' : presence.status === 'observing' ? 'bg-amber-500' : 'bg-red-500'
+                              }`} title={getStatusText(presence.status)} />
+                            </span>
                           </div>
 
                           <div className="min-w-0">

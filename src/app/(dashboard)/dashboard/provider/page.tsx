@@ -1,14 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { BarChart3, Settings, Calendar, DollarSign, Plus, Bell, MapPin, User, LogOut, AlertTriangle, Building2, QrCode, Camera, ShoppingBag, Sliders } from "lucide-react";
+import { BarChart3, Settings, Calendar, DollarSign, Plus, Bell, MapPin, User, LogOut, AlertTriangle, Building2, QrCode, Camera, ShoppingBag, Sliders, Ticket, Clock, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { logout } from "@/app/(auth)/actions";
 import { BookingActions } from "@/components/provider/BookingActions";
 import { ProviderServicesList } from "@/components/provider/ProviderServicesList";
+import { UserBookingsTabs } from "@/components/dashboard/UserBookingsTabs";
 
 export const revalidate = 0; // Always dynamic
 
-export default async function ProviderDashboard() {
+interface ProviderDashboardProps {
+  searchParams: Promise<{
+    view?: string;
+  }>;
+}
+
+export default async function ProviderDashboard({ searchParams }: ProviderDashboardProps) {
   const supabase = await createClient();
 
   // Get current user session
@@ -33,10 +40,15 @@ export default async function ProviderDashboard() {
     redirect(`/dashboard/${profile.role}`);
   }
 
+  const { view = "provider" } = (await searchParams) || {};
+
   const activeProfile = profile;
   const isProfileError = false;
 
-  // Fetch real services offered by this provider with try-catch
+  // ----------------------------------------------------
+  // PROVIDER METRICS & QUERIES
+  // ----------------------------------------------------
+  // Fetch real services offered by this provider
   let services: any[] = [];
   let isServicesError = false;
 
@@ -58,7 +70,7 @@ export default async function ProviderDashboard() {
 
   const servicesCount = services.length;
 
-  // Fetch real bookings requested for this provider with try-catch
+  // Fetch real bookings requested for this provider
   let bookings: any[] = [];
   let isBookingsError = false;
 
@@ -125,14 +137,72 @@ export default async function ProviderDashboard() {
         .reduce((sum, b) => sum + Number(b.total_amount), 0)
     : 0;
 
-  const initials = activeProfile.full_name
-    ? activeProfile.full_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
-    : "P";
-
   const formattedEarnings = new Intl.NumberFormat('es-CO', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(monthlyEarnings);
+
+  // ----------------------------------------------------
+  // CLIENT/PERSONAL USER METRICS & QUERIES
+  // ----------------------------------------------------
+  // Fetch personal bookings (bookings where user_id = user.id)
+  let personalBookings: any[] = [];
+  let isPersonalBookingsError = false;
+
+  try {
+    const { data, error } = await supabase
+      .from("bookings")
+      .select("id, event_date, reservation_date, number_of_people, total_amount, status, notes, club_id, club_slug, qr_code, qr_status, qr_validated_at, booking_type")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      isPersonalBookingsError = true;
+    } else {
+      personalBookings = data || [];
+    }
+  } catch (err) {
+    isPersonalBookingsError = true;
+  }
+
+  const personalClubIds = [...new Set(personalBookings.map((booking: any) => booking.club_id).filter(Boolean))];
+  const personalClubNames = new Map<string, string>();
+
+  if (personalClubIds.length > 0) {
+    const { data: clubsData } = await supabase
+      .from("clubs")
+      .select("id, name")
+      .in("id", personalClubIds);
+
+    (clubsData || []).forEach((club: any) => {
+      personalClubNames.set(club.id, club.name);
+    });
+  }
+
+  const normalizedPersonalBookings = personalBookings.map((booking: any) => ({
+    ...booking,
+    title: personalClubNames.get(booking.club_id) || booking.club_slug || "Reserva de discoteca",
+    displayDate: booking.reservation_date || booking.event_date,
+  }));
+
+  const personalBookingsCount = normalizedPersonalBookings.length;
+  const personalActiveBookingsCount = normalizedPersonalBookings.filter(
+    (b) => b.status === "pending" || b.status === "confirmed"
+  ).length;
+
+  // Calculate total spent on completed/confirmed bookings
+  const totalSpent = normalizedPersonalBookings
+    .filter((b: any) => b.status === "confirmed" || b.status === "completed")
+    .reduce((sum: number, b: any) => sum + Number(b.total_amount), 0);
+
+  const formattedTotalSpent = new Intl.NumberFormat('es-CO', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(totalSpent);
+
+  const initials = activeProfile.full_name
+    ? activeProfile.full_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
+    : "P";
 
   const displayUsername = activeProfile.username || activeProfile.full_name?.toLowerCase().replace(/\s+/g, "_") || "proveedor";
 
@@ -161,27 +231,48 @@ export default async function ProviderDashboard() {
             </div>
             
             <nav className="space-y-2">
-              <Link href="/dashboard/provider" className="flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl text-primary-400 font-medium">
+              <Link 
+                href="/dashboard/provider?view=provider" 
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all cursor-pointer ${
+                  view === "provider"
+                    ? "bg-white/10 text-primary-400"
+                    : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                }`}
+              >
                 <BarChart3 className="w-5 h-5 text-primary-400" />
-                Panel de Control
+                Panel de Negocio
               </Link>
-              <Link href="/dashboard/provider/clubs" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
+              <Link 
+                href="/dashboard/provider?view=client" 
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all cursor-pointer ${
+                  view === "client"
+                    ? "bg-white/10 text-primary-400"
+                    : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <Ticket className="w-5 h-5" />
+                Mi Actividad Cliente
+              </Link>
+
+              <div className="h-px bg-white/5 my-4" />
+
+              <Link href="/dashboard/provider/clubs" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
                 <Building2 className="w-5 h-5" />
                 Mis Discotecas
               </Link>
-              <Link href="/dashboard/provider/tables" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
+              <Link href="/dashboard/provider/tables" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
                 <Sliders className="w-5 h-5 text-primary-400" />
                 Control de Mesas
               </Link>
-              <Link href="/dashboard/provider/orders" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
+              <Link href="/dashboard/provider/orders" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
                 <ShoppingBag className="w-5 h-5 text-primary-400" />
                 Pedidos en Vivo
               </Link>
-              <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
+              <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
                 <QrCode className="w-5 h-5 text-primary-400" />
                 Validar Accesos
               </Link>
-              <Link href="/dashboard/profile" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
+              <Link href="/dashboard/profile" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
                 <Settings className="w-5 h-5" />
                 Editar Perfil
               </Link>
@@ -219,169 +310,227 @@ export default async function ProviderDashboard() {
             </div>
           )}
 
-          <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-zinc-950/40 p-6 rounded-2xl border border-white/5">
-            <div>
-              <div className="flex items-center gap-2.5 mb-1 flex-wrap">
-                <h1 className="text-2xl font-bold font-outfit text-white">Panel de Proveedor</h1>
+          {view === "provider" ? (
+            // ====================================================
+            // VIEW: PROVIDER (BUSINESS PANEL)
+            // ====================================================
+            <>
+              <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-zinc-950/40 p-6 rounded-2xl border border-white/5">
+                <div>
+                  <div className="flex items-center gap-2.5 mb-1 flex-wrap">
+                    <h1 className="text-2xl font-bold font-outfit text-white">Panel de Proveedor (Negocio)</h1>
+                    {activeProfile.city && activeProfile.city !== "No especificada" && (
+                      <div className="flex items-center gap-1 text-zinc-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full text-xs font-semibold">
+                        <MapPin className="w-3.5 h-3.5 text-primary-400 shrink-0" />
+                        <span>{activeProfile.city}</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-400">Gestiona tus servicios, entradas y solicitudes de reserva de clientes.</p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
+                  {/* Group 1: Validaciones */}
+                  <Link href="/dashboard/provider/scanner" className="bg-primary-600 hover:bg-primary-500 text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center shrink-0 shadow-md hover:shadow-primary-500/15 transform hover:scale-[1.02] active:scale-[0.98]">
+                    <QrCode className="w-3.5 h-3.5 shrink-0 text-white" />
+                    Validar Accesos
+                  </Link>
+
+                  {/* Group 2: Creaciones */}
+                  <div className="flex gap-2.5">
+                    <Link href="/dashboard/provider/new-service" className="bg-zinc-900/60 border border-primary-500/20 hover:border-primary-500/50 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none shadow-md hover:shadow-primary-500/10 transform hover:scale-[1.02] active:scale-[0.98]">
+                      <Plus className="w-3.5 h-3.5 shrink-0 text-primary-400" />
+                      Servicio
+                    </Link>
+                    <Link href="/dashboard/provider/new-event" className="bg-zinc-900/60 border border-primary-500/20 hover:border-primary-500/50 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none shadow-md hover:shadow-primary-500/10 transform hover:scale-[1.02] active:scale-[0.98]">
+                      <Plus className="w-3.5 h-3.5 shrink-0 text-primary-400" />
+                      Evento
+                    </Link>
+                  </div>
+                </div>
+              </header>
+
+              {/* Profile Summary Card */}
+              <div className="glass-card p-6 bg-gradient-to-r from-primary-950/20 to-transparent flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-primary-400">Presentación / Biografía</h3>
+                  <div className="text-sm text-zinc-300 space-y-1">
+                    <p><span className="text-zinc-500">Nombre de Proveedor:</span> {activeProfile.full_name || "No especificado"}</p>
+                    <p><span className="text-zinc-500">Usuario:</span> @{displayUsername}</p>
+                  </div>
+                  {activeProfile.bio && (
+                    <p className="text-sm text-zinc-400 italic mt-2">"{activeProfile.bio}"</p>
+                  )}
+                </div>
+                <Link 
+                  href="/dashboard/profile" 
+                  className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shrink-0 text-sm glow text-center w-full md:w-auto"
+                >
+                  Editar Perfil completo
+                </Link>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="glass-card p-6 border border-primary-500/20 hover:border-primary-500/30 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-zinc-400 font-medium text-sm">Ingresos Confirmados</h4>
+                    <DollarSign className="w-5 h-5 text-primary-400" />
+                  </div>
+                  <p className="text-3xl font-bold font-outfit text-white">${formattedEarnings} COP</p>
+                  <p className="text-xs text-primary-400 mt-2">Reservas completadas/confirmadas</p>
+                </div>
+                <div className="glass-card p-6 border border-white/5 hover:border-primary-500/20 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-zinc-400 font-medium text-sm">Servicios Activos</h4>
+                    <Settings className="w-5 h-5 text-primary-400" />
+                  </div>
+                  <p className="text-3xl font-bold font-outfit text-white">{servicesCount}</p>
+                  <p className="text-xs text-zinc-400 mt-2">{isServicesError ? "Error al consultar servicios de BD" : "Publicados en marketplace"}</p>
+                </div>
+                <div className="glass-card p-6 border border-white/5 hover:border-primary-500/20 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-zinc-400 font-medium text-sm">Total Reservas</h4>
+                    <Calendar className="w-5 h-5 text-primary-400" />
+                  </div>
+                  <p className="text-3xl font-bold font-outfit text-white">{bookingsCount}</p>
+                  <p className="text-xs text-zinc-400 mt-2">{pendingBookingsCount} pendientes de respuesta</p>
+                </div>
+              </div>
+
+              {/* Mis Servicios */}
+              <div className="glass-card p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                    Mis Servicios
+                    <span className="bg-primary-650/20 border border-primary-500/20 text-primary-300 text-xs px-2 py-0.5 rounded-full">
+                      {servicesCount}
+                    </span>
+                  </h2>
+                  <Link href="/dashboard/provider/new-service" className="text-xs text-primary-400 hover:text-primary-300 font-semibold transition-colors flex items-center gap-1 cursor-pointer">
+                    + Crear Servicio
+                  </Link>
+                </div>
+                <ProviderServicesList services={services} />
+              </div>
+
+              {/* Solicitudes y Reservas de Clientes */}
+              <div className="glass-card p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                    Solicitudes y Reservas de Clientes
+                    <span className="bg-primary-650/20 border border-primary-500/20 text-primary-300 text-xs px-2 py-0.5 rounded-full">
+                      {bookingsCount}
+                    </span>
+                  </h2>
+                </div>
+                
+                <div className="space-y-4">
+                  {normalizedBookings.length > 0 ? (
+                    normalizedBookings.map((req: any) => (
+                      <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-black/40 rounded-xl border border-white/5">
+                        <div className="flex items-start gap-4 mb-4 sm:mb-0">
+                          <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-semibold shrink-0">
+                            {(req.user as any)?.full_name?.charAt(0) || "U"}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                               <h4 className="font-semibold text-white">{(req.user as any)?.full_name || "Usuario"}</h4>
+                               <span className={`text-xs px-2.5 py-0.5 rounded-full border capitalize ${
+                                 req.status === 'confirmed'
+                                   ? 'bg-primary-500/10 text-primary-300 border-primary-500/20 border-solid'
+                                   : req.status === 'completed'
+                                   ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 border-solid'
+                                   : req.status === 'pending'
+                                   ? 'bg-amber-500/10 text-amber-300 border-amber-500/20 border-solid'
+                                   : 'bg-red-500/10 text-red-300 border-red-500/20 border-solid'
+                               }`}>
+                                 {req.status === 'confirmed'
+                                   ? 'confirmada'
+                                   : req.status === 'completed'
+                                   ? 'completada'
+                                   : req.status === 'pending'
+                                   ? 'pendiente'
+                                   : req.status === 'rejected'
+                                   ? 'rechazada'
+                                   : 'cancelada'}
+                               </span>
+                            </div>
+                            <p className="text-sm text-zinc-400">
+                              {req.title} • {new Date(req.event_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                            {req.number_of_people ? (
+                              <p className="text-xs text-zinc-500 mt-1">{req.number_of_people} personas</p>
+                            ) : null}
+                            {req.notes && <p className="text-xs text-zinc-500 mt-1 italic">Nota: "{req.notes}"</p>}
+                            <p className="text-sm font-semibold text-white font-outfit mt-1">${Number(req.total_amount).toLocaleString("es-CO")} COP</p>
+                          </div>
+                        </div>
+                        <BookingActions bookingId={req.id} currentStatus={req.status} />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-zinc-500 text-sm border-b border-white/5 mb-4">
+                      {isBookingsError
+                        ? "No se pudieron obtener solicitudes de reserva de la base de datos."
+                        : "No tienes solicitudes de reservas pendientes."}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            // ====================================================
+            // VIEW: CLIENT (PERSONAL USER ACTIVITY)
+            // ====================================================
+            <>
+              <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold font-outfit text-white mb-1">Mi Actividad como Cliente</h1>
+                  <p className="text-xs text-zinc-400">Tus entradas de eventos y reservas personales para salir de fiesta.</p>
+                </div>
                 {activeProfile.city && activeProfile.city !== "No especificada" && (
-                  <div className="flex items-center gap-1 text-zinc-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full text-xs font-semibold">
+                  <div className="flex items-center gap-1.5 text-zinc-400 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs shrink-0">
                     <MapPin className="w-3.5 h-3.5 text-primary-400 shrink-0" />
                     <span>{activeProfile.city}</span>
                   </div>
                 )}
-              </div>
-              <p className="text-xs text-zinc-400">Gestiona tus servicios, entradas y solicitudes de reserva.</p>
-            </div>
+              </header>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
-              {/* Group 1: Validaciones */}
-              <Link href="/dashboard/provider/scanner" className="bg-primary-600 hover:bg-primary-500 text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center shrink-0 shadow-md hover:shadow-primary-500/15 transform hover:scale-[1.02] active:scale-[0.98]">
-                <QrCode className="w-3.5 h-3.5 shrink-0 text-white" />
-                Validar Accesos
-              </Link>
-
-              {/* Group 2: Creaciones */}
-              <div className="flex gap-2.5">
-                <Link href="/dashboard/provider/new-service" className="bg-zinc-900/60 border border-primary-500/20 hover:border-primary-500/50 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none shadow-md hover:shadow-primary-500/10 transform hover:scale-[1.02] active:scale-[0.98]">
-                  <Plus className="w-3.5 h-3.5 shrink-0 text-primary-400" />
-                  Servicio
-                </Link>
-                <Link href="/dashboard/provider/new-event" className="bg-zinc-900/60 border border-primary-500/20 hover:border-primary-500/50 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none shadow-md hover:shadow-primary-500/10 transform hover:scale-[1.02] active:scale-[0.98]">
-                  <Plus className="w-3.5 h-3.5 shrink-0 text-primary-400" />
-                  Evento
-                </Link>
-              </div>
-            </div>
-          </header>
-
-          {/* Profile Summary Card */}
-          <div className="glass-card p-6 bg-gradient-to-r from-primary-950/20 to-transparent flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-primary-400">Presentación / Biografía</h3>
-              <div className="text-sm text-zinc-300 space-y-1">
-                <p><span className="text-zinc-500">Nombre de Proveedor:</span> {activeProfile.full_name || "No especificado"}</p>
-                <p><span className="text-zinc-500">Usuario:</span> @{displayUsername}</p>
-              </div>
-              {activeProfile.bio && (
-                <p className="text-sm text-zinc-400 italic mt-2">"{activeProfile.bio}"</p>
-              )}
-            </div>
-            <Link 
-              href="/dashboard/profile" 
-              className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shrink-0 text-sm glow text-center w-full md:w-auto"
-            >
-              Editar Perfil completo
-            </Link>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="glass-card p-6 border border-primary-500/20 hover:border-primary-500/30 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-zinc-400 font-medium text-sm">Ingresos Confirmados</h4>
-                <DollarSign className="w-5 h-5 text-primary-400" />
-              </div>
-              <p className="text-3xl font-bold font-outfit text-white">${formattedEarnings} COP</p>
-              <p className="text-xs text-primary-400 mt-2">Reservas completadas/confirmadas</p>
-            </div>
-            <div className="glass-card p-6 border border-white/5 hover:border-primary-500/20 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-zinc-400 font-medium text-sm">Servicios Activos</h4>
-                <Settings className="w-5 h-5 text-primary-400" />
-              </div>
-              <p className="text-3xl font-bold font-outfit text-white">{servicesCount}</p>
-              <p className="text-xs text-zinc-400 mt-2">{isServicesError ? "Error al consultar servicios de BD" : "Publicados en marketplace"}</p>
-            </div>
-            <div className="glass-card p-6 border border-white/5 hover:border-primary-500/20 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-zinc-400 font-medium text-sm">Total Reservas</h4>
-                <Calendar className="w-5 h-5 text-primary-400" />
-              </div>
-              <p className="text-3xl font-bold font-outfit text-white">{bookingsCount}</p>
-              <p className="text-xs text-zinc-400 mt-2">{pendingBookingsCount} pendientes de respuesta</p>
-            </div>
-          </div>
-
-          {/* Mis Servicios */}
-          <div className="glass-card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                Mis Servicios
-                <span className="bg-primary-650/20 border border-primary-500/20 text-primary-300 text-xs px-2 py-0.5 rounded-full">
-                  {servicesCount}
-                </span>
-              </h2>
-              <Link href="/dashboard/provider/new-service" className="text-xs text-primary-400 hover:text-primary-300 font-semibold transition-colors flex items-center gap-1 cursor-pointer">
-                + Crear Servicio
-              </Link>
-            </div>
-            <ProviderServicesList services={services} />
-          </div>
-
-          {/* Solicitudes y Reservas */}
-          <div className="glass-card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                Solicitudes y Reservas
-                <span className="bg-primary-650/20 border border-primary-500/20 text-primary-300 text-xs px-2 py-0.5 rounded-full">
-                  {bookingsCount}
-                </span>
-              </h2>
-            </div>
-            
-            <div className="space-y-4">
-              {normalizedBookings.length > 0 ? (
-                normalizedBookings.map((req: any) => (
-                  <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-black/40 rounded-xl border border-white/5">
-                    <div className="flex items-start gap-4 mb-4 sm:mb-0">
-                      <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-semibold shrink-0">
-                        {(req.user as any)?.full_name?.charAt(0) || "U"}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                           <h4 className="font-semibold text-white">{(req.user as any)?.full_name || "Usuario"}</h4>
-                           <span className={`text-xs px-2.5 py-0.5 rounded-full border capitalize ${
-                             req.status === 'confirmed'
-                               ? 'bg-primary-500/10 text-primary-300 border-primary-500/20 border-solid'
-                               : req.status === 'completed'
-                               ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 border-solid'
-                               : req.status === 'pending'
-                               ? 'bg-amber-500/10 text-amber-300 border-amber-500/20 border-solid'
-                               : 'bg-red-500/10 text-red-300 border-red-500/20 border-solid'
-                           }`}>
-                             {req.status === 'confirmed'
-                               ? 'confirmada'
-                               : req.status === 'completed'
-                               ? 'completada'
-                               : req.status === 'pending'
-                               ? 'pendiente'
-                               : req.status === 'rejected'
-                               ? 'rechazada'
-                               : 'cancelada'}
-                           </span>
-                        </div>
-                        <p className="text-sm text-zinc-400">
-                          {req.title} • {new Date(req.event_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </p>
-                        {req.number_of_people ? (
-                          <p className="text-xs text-zinc-500 mt-1">{req.number_of_people} personas</p>
-                        ) : null}
-                        {req.notes && <p className="text-xs text-zinc-500 mt-1 italic">Nota: "{req.notes}"</p>}
-                        <p className="text-sm font-semibold text-white font-outfit mt-1">${Number(req.total_amount).toLocaleString("es-CO")} COP</p>
-                      </div>
-                    </div>
-                    <BookingActions bookingId={req.id} currentStatus={req.status} />
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="glass-card p-6 border border-primary-500/20 hover:border-primary-500/30 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-zinc-400 font-medium text-sm">Reservas Activas</h4>
+                    <Calendar className="w-5 h-5 text-primary-400" />
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-6 text-zinc-500 text-sm border-b border-white/5 mb-4">
-                  {isBookingsError
-                    ? "No se pudieron obtener solicitudes de reserva de la base de datos. Revisa las políticas de RLS y ejecuta el script de integración."
-                    : "No tienes solicitudes de reservas reales pendientes."}
+                  <p className="text-3xl font-bold font-outfit text-white">{personalActiveBookingsCount}</p>
+                  <p className="text-xs text-primary-400 mt-2">Listas para usar o en espera</p>
                 </div>
-              )}
-            </div>
-          </div>
+                <div className="glass-card p-6 border border-white/5 hover:border-primary-500/20 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-zinc-400 font-medium text-sm">Total Compras</h4>
+                    <Clock className="w-5 h-5 text-primary-400" />
+                  </div>
+                  <p className="text-3xl font-bold font-outfit text-white">{personalBookingsCount}</p>
+                  <p className="text-xs text-zinc-400 mt-2">Reservas y tickets históricos</p>
+                </div>
+                <div className="glass-card p-6 border border-white/5 hover:border-primary-500/20 transition-all duration-300 shadow-md hover:shadow-primary-500/5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-zinc-400 font-medium text-sm">Inversión Total</h4>
+                    <CreditCard className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <p className="text-3xl font-bold font-outfit text-white">${formattedTotalSpent} COP</p>
+                  <p className="text-xs text-zinc-400 mt-2">Total gastado en covers y eventos</p>
+                </div>
+              </div>
+
+              {/* User Bookings Tabs */}
+              <div className="glass-card p-6">
+                <UserBookingsTabs initialBookings={normalizedPersonalBookings} />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
