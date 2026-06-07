@@ -113,6 +113,36 @@ FOR ALL TO authenticated
 USING (auth.uid() = blocker_id)
 WITH CHECK (auth.uid() = blocker_id);
 
+-- 9.5 FUNCIÓN HELPER DE PRESENCIA ACTIVA (Evita recursión en políticas RLS)
+CREATE OR REPLACE FUNCTION public.has_active_presence(
+  p_user_id UUID,
+  p_club_id UUID,
+  p_event_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+    FROM public.connect_presence
+    WHERE user_id = p_user_id
+      AND (
+        (p_club_id IS NOT NULL AND club_id = p_club_id)
+        OR
+        (p_event_id IS NOT NULL AND event_id = p_event_id)
+      )
+      AND expires_at > now()
+      AND last_seen_at > now() - INTERVAL '15 minutes'
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.has_active_presence(UUID, UUID, UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.has_active_presence(UUID, UUID, UUID) TO authenticated;
+
 -- 10. POLÍTICAS RLS DE PRESENCIA (connect_presence)
 -- Lectura: Solo visibles si el usuario actual está en el mismo local, la fila es visible y no hay bloqueos mutuos
 DROP POLICY IF EXISTS "Users can read presence in the same venue" ON public.connect_presence;
@@ -127,24 +157,8 @@ USING (
     -- Comprobar si la sesión de presencia consultada no ha expirado
     AND expires_at > now()
     AND last_seen_at > now() - INTERVAL '15 minutes'
-    -- Validar que el usuario que consulta tiene presencia activa en el mismo local
-    AND (
-      (club_id IS NOT NULL AND EXISTS (
-        SELECT 1 FROM public.connect_presence self
-        WHERE self.user_id = auth.uid() 
-          AND self.club_id = connect_presence.club_id
-          AND self.expires_at > now()
-          AND self.last_seen_at > now() - INTERVAL '15 minutes'
-      ))
-      OR
-      (event_id IS NOT NULL AND EXISTS (
-        SELECT 1 FROM public.connect_presence self
-        WHERE self.user_id = auth.uid() 
-          AND self.event_id = connect_presence.event_id
-          AND self.expires_at > now()
-          AND self.last_seen_at > now() - INTERVAL '15 minutes'
-      ))
-    )
+    -- Validar que el usuario que consulta tiene presencia activa en el mismo local (llamada segura)
+    AND public.has_active_presence(auth.uid(), club_id, event_id)
     -- Excluir si hay bloqueos entre los usuarios
     AND NOT EXISTS (
       SELECT 1 FROM public.connect_blocks b
