@@ -53,29 +53,71 @@ export async function checkInUser(data: {
   const now = new Date();
 
   try {
-    // Clean up any stale presence records for this user first
-    await supabase
-      .from("connect_presence")
-      .delete()
-      .eq("user_id", user.id)
-      .or(`club_id.eq.${data.clubId || 'null'},event_id.eq.${data.eventId || 'null'}`);
+    // 1. Clean up any presence records for this user in *other* venues
+    if (data.clubId) {
+      await supabase
+        .from("connect_presence")
+        .delete()
+        .eq("user_id", user.id)
+        .neq("club_id", data.clubId);
+    } else if (data.eventId) {
+      await supabase
+        .from("connect_presence")
+        .delete()
+        .eq("user_id", user.id)
+        .neq("event_id", data.eventId);
+    }
 
-    const { error: insertError } = await supabase
+    // 2. Search for existing presence in this specific venue
+    const presenceQuery = supabase
       .from("connect_presence")
-      .insert({
-        user_id: user.id,
-        club_id: data.clubId || null,
-        event_id: data.eventId || null,
-        booking_id: data.bookingId,
-        visibility: data.visibility,
-        status: data.status,
-        check_in_at: now.toISOString(),
-        last_seen_at: now.toISOString(),
-        expires_at: expiresAt.toISOString()
-      });
+      .select("id, check_in_at, expires_at")
+      .eq("user_id", user.id);
+      
+    if (data.clubId) {
+      presenceQuery.eq("club_id", data.clubId);
+    } else {
+      presenceQuery.eq("event_id", data.eventId);
+    }
 
-    if (insertError) {
-      return { error: `Error al registrar tu ingreso: ${insertError.message}` };
+    const { data: existingPresence } = await presenceQuery.maybeSingle();
+
+    let checkInAtTime = now.toISOString();
+    if (existingPresence) {
+      const isExpired = new Date(existingPresence.expires_at) < now;
+      if (!isExpired) {
+        // Keep original check-in time if not expired yet
+        checkInAtTime = existingPresence.check_in_at;
+      }
+    }
+
+    // 3. Atomically upsert the presence record
+    const upsertData: any = {
+      user_id: user.id,
+      visibility: data.visibility,
+      status: data.status,
+      check_in_at: checkInAtTime,
+      last_seen_at: now.toISOString(),
+      expires_at: expiresAt.toISOString(),
+      booking_id: data.bookingId
+    };
+
+    if (data.clubId) {
+      upsertData.club_id = data.clubId;
+      upsertData.event_id = null;
+    } else if (data.eventId) {
+      upsertData.event_id = data.eventId;
+      upsertData.club_id = null;
+    }
+
+    const onConflict = data.clubId ? 'user_id,club_id' : 'user_id,event_id';
+
+    const { error: upsertError } = await supabase
+      .from("connect_presence")
+      .upsert(upsertData, { onConflict });
+
+    if (upsertError) {
+      return { error: `Error al registrar tu ingreso: ${upsertError.message}` };
     }
 
     if (data.clubId) revalidatePath(`/discotecas/${data.clubId}`);
