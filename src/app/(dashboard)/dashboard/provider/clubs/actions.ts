@@ -53,6 +53,7 @@ export async function createClub(data: {
   rating: number;
   active: boolean;
   cover_price: number;
+  amenities?: string[];
 }) {
   const { error: authError, user, supabase } = await validateProvider();
   if (authError || !user) {
@@ -77,7 +78,8 @@ export async function createClub(data: {
         opening_hours: data.opening_hours || null,
         rating: Number(data.rating) || 5.0,
         active: data.active,
-        cover_price: Number(data.cover_price) || 0.00
+        cover_price: Number(data.cover_price) || 0.00,
+        amenities: data.amenities || []
       });
 
     if (insertError) {
@@ -110,6 +112,7 @@ export async function updateClub(
     rating: number;
     active: boolean;
     cover_price: number;
+    amenities?: string[];
   }
 ) {
   const { error: authError, user, supabase } = await validateProvider();
@@ -142,7 +145,8 @@ export async function updateClub(
         opening_hours: data.opening_hours || null,
         rating: Number(data.rating) || 5.0,
         active: data.active,
-        cover_price: Number(data.cover_price) || 0.00
+        cover_price: Number(data.cover_price) || 0.00,
+        amenities: data.amenities || []
       })
       .eq("id", id);
 

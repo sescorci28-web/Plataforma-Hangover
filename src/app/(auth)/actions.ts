@@ -33,7 +33,6 @@ export async function signup(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const name = formData.get('name') as string
-  const type = formData.get('type') as string // 'user' or 'provider'
 
   if (!email || !password || !name) {
     return { error: 'Por favor completa todos los campos.' }
@@ -45,7 +44,6 @@ export async function signup(formData: FormData) {
     options: {
       data: {
         name,
-        type,
       }
     }
   })
@@ -55,7 +53,7 @@ export async function signup(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  redirect('/onboarding')
 }
 
 export async function logout() {

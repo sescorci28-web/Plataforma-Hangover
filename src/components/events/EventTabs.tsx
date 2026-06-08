@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Info, Users, Clock, Shirt, ShieldAlert, MapPin, Navigation } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Info, Users, Clock, Shirt, ShieldAlert, MapPin, Navigation, Image as ImageIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CommunityTab } from "@/components/connect/CommunityTab";
+import { EventGallery } from "@/components/events/EventGallery";
+import { EventGalleryManager } from "@/components/events/EventGalleryManager";
 
 interface EventTabsProps {
   eventId: string;
@@ -16,6 +18,8 @@ interface EventTabsProps {
   hasConnectAccess: boolean;
   connectBookingId: string | null;
   currentUser: any;
+  galleryItems?: any[];
+  creatorId?: string;
 }
 
 export function EventTabs({
@@ -28,9 +32,18 @@ export function EventTabs({
   minAge,
   hasConnectAccess,
   connectBookingId,
-  currentUser
+  currentUser,
+  galleryItems = [],
+  creatorId
 }: EventTabsProps) {
-  const [activeTab, setActiveTab] = useState<"info" | "community">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "gallery" | "community">("info");
+  const [gallery, setGallery] = useState(galleryItems);
+
+  useEffect(() => {
+    if (galleryItems) {
+      setGallery(galleryItems);
+    }
+  }, [galleryItems]);
 
   // Google Maps URL
   const mapsSearchQuery = encodeURIComponent(eventLocation);
@@ -39,7 +52,7 @@ export function EventTabs({
   return (
     <div className="space-y-6">
       {/* Navigation Tabs Header */}
-      <div className="flex p-1 bg-black/30 rounded-2xl gap-2 shrink-0 w-full sm:max-w-md border border-white/5">
+      <div className="flex p-1 bg-black/30 rounded-2xl gap-2 shrink-0 w-full sm:max-w-lg border border-white/5">
         <button
           onClick={() => setActiveTab("info")}
           className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
@@ -50,6 +63,17 @@ export function EventTabs({
         >
           <Info className="w-3.5 h-3.5" />
           Información
+        </button>
+        <button
+          onClick={() => setActiveTab("gallery")}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+            activeTab === "gallery"
+              ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+          }`}
+        >
+          <ImageIcon className="w-3.5 h-3.5" />
+          Galería
         </button>
         <button
           onClick={() => setActiveTab("community")}
@@ -160,6 +184,26 @@ export function EventTabs({
                   </a>
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === "gallery" && (
+            <motion.div
+              key="event-gallery-tab"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
+            >
+              {currentUser && creatorId && currentUser.id === creatorId && (
+                <EventGalleryManager
+                  eventId={eventId}
+                  initialItems={gallery}
+                  onItemsChange={setGallery}
+                />
+              )}
+              <EventGallery items={gallery.filter((item: any) => item.active)} />
             </motion.div>
           )}
 

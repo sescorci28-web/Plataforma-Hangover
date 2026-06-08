@@ -209,6 +209,60 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
     .eq("status", "pending");
 
   // ==========================================
+  // REAL MULTIMEDIA STATS
+  // ==========================================
+  const [
+    activeStoriesRes,
+    galleryItemsRes,
+    galleryVideosRes,
+    storiesVideosRes,
+    featuredGalleryRes,
+    featuredStoriesRes
+  ] = await Promise.all([
+    supabase
+      .from("club_stories")
+      .select("id", { count: "exact", head: true })
+      .eq("club_id", club.id)
+      .eq("active", true),
+    supabase
+      .from("club_gallery_items")
+      .select("id", { count: "exact", head: true })
+      .eq("club_id", club.id)
+      .eq("active", true),
+    supabase
+      .from("club_gallery_items")
+      .select("id", { count: "exact", head: true })
+      .eq("club_id", club.id)
+      .eq("active", true)
+      .eq("media_type", "video"),
+    supabase
+      .from("club_stories")
+      .select("id", { count: "exact", head: true })
+      .eq("club_id", club.id)
+      .eq("active", true)
+      .eq("media_type", "video"),
+    supabase
+      .from("club_gallery_items")
+      .select("id", { count: "exact", head: true })
+      .eq("club_id", club.id)
+      .eq("active", true)
+      .eq("featured", true),
+    supabase
+      .from("club_stories")
+      .select("id", { count: "exact", head: true })
+      .eq("club_id", club.id)
+      .eq("active", true)
+      .eq("featured", true)
+  ]);
+
+  const multimediaStats = {
+    activeStories: activeStoriesRes.count || 0,
+    galleryItems: galleryItemsRes.count || 0,
+    totalVideos: (galleryVideosRes.count || 0) + (storiesVideosRes.count || 0),
+    featuredItems: (featuredGalleryRes.count || 0) + (featuredStoriesRes.count || 0)
+  };
+
+  // ==========================================
   // FASE 7 - PRODUCTOS MAS VENDIDOS (LIVE_ORDER_ITEMS)
   // ==========================================
   const sessionIds = sessions.map(s => s.id);
@@ -388,6 +442,7 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
             stats={stats}
             chartsData={chartsData}
             topProducts={topProducts}
+            multimediaStats={multimediaStats}
           />
         </div>
       </div>

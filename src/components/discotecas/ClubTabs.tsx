@@ -32,6 +32,7 @@ import { sendLiveOrder, requestAssistance } from "@/app/services/liveActions";
 import { CommunityTab } from "@/components/connect/CommunityTab";
 import { ClubBookingModal } from "@/components/discotecas/ClubBookingModal";
 import { ClubGallery } from "./ClubGallery";
+import { StoriesGallery } from "./StoriesGallery";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -96,9 +97,21 @@ interface ClubTabsProps {
   clubCoverPrice: number;
   upcomingEvents: any[];
   clubGalleryItems?: any[];
+  clubStories?: any[];
+  clubLogo?: string | null;
+  clubBannerImage?: string | null;
   hasConnectAccess?: boolean;
   connectBookingId?: string | null;
   currentUser?: any;
+  connectStats?: {
+    activeConnectCount: number;
+    visibleConnectCount: number;
+    newConnectionsToday: number;
+    activeSessionsCount?: number;
+    activeOrdersCount?: number;
+  };
+  connectAttendees?: any[];
+  clubAmenities?: string[];
 }
 
 const CATEGORIES = [
@@ -130,9 +143,15 @@ export function ClubTabs({
   clubCoverPrice,
   upcomingEvents,
   clubGalleryItems = [],
+  clubStories = [],
+  clubLogo = null,
+  clubBannerImage = null,
   hasConnectAccess,
   connectBookingId,
   currentUser,
+  connectStats = { activeConnectCount: 0, visibleConnectCount: 0, newConnectionsToday: 0, activeSessionsCount: 0, activeOrdersCount: 0 },
+  connectAttendees = [],
+  clubAmenities = []
 }: ClubTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -585,78 +604,488 @@ export function ClubTabs({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="space-y-6"
+              className="space-y-10"
             >
-              {/* Description */}
-              <div className="space-y-4">
-                <h3 className="text-xl font-bold text-white font-outfit">Sobre {clubName}</h3>
-                <p className="text-zinc-300 text-sm md:text-base leading-relaxed whitespace-pre-line">
-                  {clubDescription || "Esta discoteca no cuenta con una descripción detallada en este momento."}
-                </p>
+              {/* 1. STORIES */}
+              <div className="pb-2">
+                <StoriesGallery
+                  ownerType="club"
+                  ownerName={clubName}
+                  ownerAvatar={clubLogo}
+                  ownerCover={clubBannerImage}
+                  stories={clubStories}
+                  isProvider={currentUser?.id === clubProviderId}
+                  onNavigateToEvents={() => setActiveTab("events")}
+                />
               </div>
 
-              {/* Grid cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                <div className="p-5 rounded-2xl border border-white/5 bg-gradient-to-tr from-white/5 to-transparent">
-                  <h4 className="font-bold text-white mb-2 text-sm font-outfit">Servicio de Reservas</h4>
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    Reserva mesas VIP, botellas y accesos rápidos directamente sin comisiones adicionales.
-                  </p>
+              {/* 2. EVENTO DEL DÍA */}
+              <div className="pt-6 border-t border-white/5 space-y-4">
+                <h3 className="text-sm font-bold text-white uppercase tracking-widest pl-1 border-l-2 border-primary-500 flex items-center gap-2 font-outfit">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  </span>
+                  🔥 Evento del Día
+                </h3>
+
+                {(() => {
+                  const nowColombia = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bogota" }));
+                  const todayStr = nowColombia.toISOString().split("T")[0];
+                  const todayEvent = upcomingEvents.find((evt: any) => evt.event_date === todayStr);
+
+                  if (!todayEvent) {
+                    return (
+                      <div className="glass-card p-8 bg-zinc-950/40 border border-dashed border-white/5 rounded-3xl text-center space-y-2 max-w-2xl mx-auto">
+                        <Calendar className="w-8 h-8 text-zinc-500 mx-auto" />
+                        <h4 className="text-white text-xs font-bold font-outfit uppercase tracking-wider">No hay eventos para hoy</h4>
+                        <p className="text-[11px] text-zinc-500 leading-normal max-w-xs mx-auto">
+                          No hay eventos especiales programados para esta noche. ¡Pero puedes ingresar y conocer quiénes están en el local!
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  const formattedPrice = todayEvent.ticket_price && Number(todayEvent.ticket_price) > 0
+                    ? `$${Number(todayEvent.ticket_price).toLocaleString("es-CO")} COP`
+                    : "Entrada Libre";
+
+                  return (
+                    <div className="glass-card bg-gradient-to-tr from-[#0b0b14] via-zinc-950/60 to-purple-950/10 border border-primary-500/15 rounded-3xl overflow-hidden flex flex-col md:flex-row gap-6 p-5 relative group">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/5 rounded-full blur-3xl pointer-events-none" />
+                      
+                      <div className="w-full md:w-56 h-40 rounded-2xl overflow-hidden border border-white/5 shrink-0 relative">
+                        {todayEvent.image_url ? (
+                          <img src={todayEvent.image_url} alt={todayEvent.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        ) : (
+                          <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-zinc-600">
+                            <Calendar className="w-10 h-10" />
+                          </div>
+                        )}
+                        <span className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-red-600 text-[8px] font-black uppercase tracking-widest text-white shadow-md animate-pulse">
+                          Hoy en Vivo
+                        </span>
+                      </div>
+
+                      <div className="flex-grow flex flex-col justify-between space-y-4 md:space-y-0">
+                        <div className="space-y-2">
+                          <span className="text-[9px] text-primary-400 font-extrabold uppercase tracking-widest block">
+                            {todayEvent.event_type || "VIP Party Experience"}
+                          </span>
+                          <h4 className="text-lg font-black text-white font-outfit leading-tight truncate group-hover:text-primary-400 transition-colors">
+                            {todayEvent.title}
+                          </h4>
+                          <p className="text-[11px] text-zinc-400 leading-relaxed line-clamp-2">
+                            {todayEvent.description || "Prepárate para la mejor atmósfera en vivo. Te esperamos esta noche con DJs invitados y cócteles de cortesía en zona VIP."}
+                          </p>
+                          
+                          <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1.5 text-[11px] text-zinc-500">
+                            <span className="flex items-center gap-1">
+                              🎧 <span className="font-semibold text-zinc-300">DJs Residentes & Invitados</span>
+                            </span>
+                            <span className="flex items-center gap-1">
+                              ⏰ <span className="font-semibold text-zinc-350">{clubOpeningHours || "Apertura 10:00 PM"}</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-4 pt-3 border-t border-white/5 mt-auto">
+                          <div>
+                            <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold block">
+                              Ticket Cover desde
+                            </span>
+                            <span className="text-xs font-black text-emerald-400 font-outfit mt-0.5 block">
+                              {formattedPrice}
+                            </span>
+                          </div>
+
+                          <div className="flex gap-2 shrink-0">
+                            <Link
+                              href={`/events/${todayEvent.id}`}
+                              className="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider transition-all border border-white/5"
+                            >
+                              Ver Detalles
+                            </Link>
+                            <Link
+                              href={`/events/${todayEvent.id}`}
+                              className="px-4.5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-primary-500/15 active:scale-95"
+                            >
+                              Comprar Entrada
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* 3. PRÓXIMOS EVENTOS */}
+              <div className="pt-6 border-t border-white/5 space-y-4">
+                <h3 className="text-sm font-bold text-white uppercase tracking-widest pl-1 border-l-2 border-primary-500 font-outfit">
+                  🗓️ Próximos Eventos
+                </h3>
+
+                {(() => {
+                  const nowColombia = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bogota" }));
+                  const todayStr = nowColombia.toISOString().split("T")[0];
+                  const futureEvents = upcomingEvents.filter((evt: any) => evt.event_date !== todayStr);
+
+                  if (futureEvents.length === 0) {
+                    return (
+                      <p className="text-[11px] text-zinc-500 italic pl-1">
+                        No hay otros eventos programados en este momento.
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide shrink-0">
+                      {futureEvents.map((evt: any) => {
+                        const formattedPrice = evt.ticket_price && Number(evt.ticket_price) > 0
+                          ? `$${Number(evt.ticket_price).toLocaleString("es-CO")} COP`
+                          : "Entrada Libre";
+
+                        const evtDate = new Date(evt.event_date).toLocaleDateString("es-ES", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        });
+
+                        return (
+                          <div
+                            key={evt.id}
+                            className="glass-card bg-zinc-950/50 border border-white/5 hover:border-primary-500/10 rounded-2xl overflow-hidden flex flex-col justify-between w-60 shrink-0 shadow-lg relative group"
+                          >
+                            <div className="h-28 w-full bg-zinc-900 overflow-hidden relative">
+                              {evt.image_url ? (
+                                <img src={evt.image_url} alt={evt.title} className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-700">
+                                  <Calendar className="w-8 h-8" />
+                                </div>
+                              )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                              <span className="absolute top-2 left-2 px-2.5 py-0.5 rounded-md bg-black/60 backdrop-blur-sm border border-white/10 text-[8px] font-black uppercase tracking-wider text-zinc-300">
+                                {evtDate}
+                              </span>
+                            </div>
+
+                            <div className="p-3.5 flex-grow flex flex-col justify-between gap-3">
+                              <div>
+                                <h5 className="font-bold text-white text-xs truncate font-outfit">
+                                  {evt.title}
+                                </h5>
+                                <p className="text-[10px] text-zinc-500 font-extrabold uppercase mt-0.5 tracking-wider">
+                                  {formattedPrice}
+                                </p>
+                              </div>
+
+                              <Link
+                                href={`/events/${evt.id}`}
+                                className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/5 text-[10px] font-bold uppercase tracking-wider text-white text-center rounded-xl transition-all cursor-pointer block active:scale-97"
+                              >
+                                Ver evento
+                              </Link>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* 4. ESTA NOCHE EN HANGOVER (Métricas sociales reales y anónimas) */}
+              <div className="pt-6 border-t border-white/5 space-y-4">
+                <h3 className="text-sm font-bold text-white uppercase tracking-widest pl-1 border-l-2 border-primary-500 font-outfit">
+                  🔥 Esta Noche en Hangover
+                </h3>
+
+                {(() => {
+                  const activeSessionsCount = connectStats.activeSessionsCount || 0;
+                  const activeOrdersCount = connectStats.activeOrdersCount || 0;
+                  
+                  let occupancyText = "Baja ocupación";
+                  let occupancyColorClass = "text-emerald-400";
+                  let occupancyDotClass = "bg-emerald-500";
+                  
+                  if (activeSessionsCount >= 3 && activeSessionsCount <= 7) {
+                    occupancyText = "Ocupación media";
+                    occupancyColorClass = "text-amber-400";
+                    occupancyDotClass = "bg-amber-500";
+                  } else if (activeSessionsCount >= 8) {
+                    occupancyText = "Alta ocupación";
+                    occupancyColorClass = "text-red-400";
+                    occupancyDotClass = "bg-red-500";
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="glass-card p-5 border-white/5 bg-[#08080f]/70 hover:border-primary-500/10 transition-all flex items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest block">Asistentes en Connect</span>
+                          <span className="text-3xl font-black text-white font-outfit block">
+                            👥 {connectStats.visibleConnectCount} personas
+                          </span>
+                          <span className="text-[10px] text-emerald-400 font-bold block">Visibles en el local</span>
+                        </div>
+                        <span className="text-3xl">👋</span>
+                      </div>
+
+                      <div className="glass-card p-5 border-white/5 bg-[#08080f]/70 hover:border-primary-500/10 transition-all flex items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest block">Actividad hoy</span>
+                          <span className="text-3xl font-black text-primary-400 font-outfit block">
+                            🤝 {connectStats.newConnectionsToday} conexiones
+                          </span>
+                          <span className="text-[10px] text-zinc-400 block">Establecidas en vivo</span>
+                        </div>
+                        <span className="text-3xl">✨</span>
+                      </div>
+
+                      <div className="glass-card p-5 border-white/5 bg-[#08080f]/70 hover:border-primary-500/10 transition-all flex items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[9px] text-zinc-500 uppercase font-black tracking-widest block">Ocupación en vivo</span>
+                          <span className={`text-2xl font-black font-outfit block flex items-center gap-1.5 ${occupancyColorClass}`}>
+                            <span className={`w-2 h-2 rounded-full ${occupancyDotClass} animate-pulse`} />
+                            {occupancyText}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 block">
+                            {activeSessionsCount} mesas y {activeOrdersCount} pedidos
+                          </span>
+                        </div>
+                        <span className="text-3xl">🔥</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex justify-center pt-2">
+                  <button
+                    onClick={() => {
+                      setActiveTab("community");
+                      setTimeout(() => {
+                        document.getElementById("club-tabs-nav")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }, 100);
+                    }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-primary-600 to-accent-600 hover:from-primary-500 hover:to-accent-500 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-primary-500/15 cursor-pointer hover:scale-[1.02] active:scale-95 animate-pulse"
+                  >
+                    Entrar a Connect
+                  </button>
                 </div>
-                <div className="p-5 rounded-2xl border border-white/5 bg-gradient-to-tr from-white/5 to-transparent">
-                  <h4 className="font-bold text-white mb-2 text-sm font-outfit">Seguridad Garantizada</h4>
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    Acceso seguro con control digital de entradas. Tu diversión está protegida con Hangover.
-                  </p>
+              </div>
+
+              {/* 5. QUIÉNES ESTÁN AQUÍ */}
+              <div className="pt-6 border-t border-white/5 space-y-4">
+                <div className="flex items-center justify-between gap-4 pl-1">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-widest font-outfit">
+                    👥 Quiénes están aquí
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setActiveTab("community");
+                      setTimeout(() => {
+                        document.getElementById("club-tabs-nav")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }, 100);
+                    }}
+                    className="text-[10px] text-primary-400 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
+                  >
+                    Ver comunidad
+                  </button>
                 </div>
+
+                {connectAttendees.length === 0 ? (
+                  <p className="text-[11px] text-zinc-500 italic pl-1">
+                    Aún no hay asistentes visibles en Connect esta noche. ¡Conéctate tú primero!
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-4.5 p-4 rounded-2xl bg-zinc-950/40 border border-white/5">
+                    <div className="flex -space-x-3 overflow-hidden">
+                      {connectAttendees.slice(0, 12).map((attendee) => {
+                        const profile = attendee.user;
+                        if (!profile) return null;
+
+                        const borderColors = {
+                          available: "border-emerald-500",
+                          observing: "border-amber-500",
+                          do_not_disturb: "border-red-500"
+                        };
+                        const statusColor = borderColors[attendee.status as keyof typeof borderColors] || "border-zinc-700";
+
+                        return (
+                          <div
+                            key={attendee.id}
+                            className={`w-10 h-10 rounded-full border-2 bg-zinc-900 overflow-hidden relative shrink-0 shadow-md ${statusColor}`}
+                            title={`${profile.full_name || "Usuario"} - ${attendee.status}`}
+                          >
+                            {profile.avatar_url ? (
+                              <img src={profile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-primary-500/10 flex items-center justify-center text-primary-400 font-extrabold text-[10px]">
+                                {profile.full_name?.charAt(0) || "U"}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex-grow min-w-0">
+                      <p className="text-[11px] text-zinc-350 leading-normal">
+                        <span className="text-white font-extrabold font-outfit">
+                          {connectAttendees.slice(0, 3).map(a => a.user?.full_name?.split(" ")[0]).join(", ")}
+                        </span>
+                        {connectAttendees.length > 3 && (
+                          <> y <span className="text-primary-400 font-extrabold">+{connectAttendees.length - 3} personas más</span></>
+                        )} están compartiendo la noche en Connect en este local.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Location details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {clubAddress && (
-                  <div className="p-5 rounded-2xl border border-white/5 bg-black/30">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Dirección</p>
-                    <div className="flex gap-3">
-                      <MapPin className="w-5 h-5 text-accent-400 shrink-0 mt-0.5" />
-                      <p className="text-sm text-zinc-300 leading-relaxed">{clubAddress}</p>
-                    </div>
-                  </div>
-                )}
-
-                {clubOpeningHours && (
-                  <div className="p-5 rounded-2xl border border-white/5 bg-black/30">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Horario</p>
-                    <div className="flex gap-3">
-                      <Clock className="w-5 h-5 text-primary-400 shrink-0 mt-0.5" />
-                      <p className="text-sm text-zinc-300 leading-relaxed">{clubOpeningHours}</p>
-                    </div>
-                  </div>
-                )}
-
-                {clubInstagram && (
-                  <div className="p-5 rounded-2xl border border-white/5 bg-black/30 sm:col-span-2">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Redes Sociales</p>
-                    <div className="flex gap-3">
-                      <InstagramIcon className="w-5 h-5 text-primary-400 shrink-0 mt-0.5" />
-                      <a
-                        href={`https://instagram.com/${clubInstagram.replace("@", "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary-400 hover:text-primary-300 transition-colors hover:underline font-semibold"
-                      >
-                        {clubInstagram}
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Profile Gallery */}
-              <div className="pt-8 border-t border-white/5">
+              {/* 6. GALERÍA MULTIMEDIA */}
+              <div className="pt-6 border-t border-white/5">
                 <ClubGallery 
                   items={clubGalleryItems} 
                   isProvider={currentUser?.id === clubProviderId}
                 />
+              </div>
+
+              {/* 7. INFORMACIÓN DEL CLUB */}
+              <div className="space-y-4 pt-6 border-t border-white/5">
+                <h3 className="text-sm font-bold text-white uppercase tracking-widest font-outfit pl-1 border-l-2 border-primary-500">Sobre {clubName}</h3>
+                <p className="text-zinc-305 text-xs md:text-sm leading-relaxed whitespace-pre-line">
+                  {clubDescription || "Esta discoteca no cuenta con una descripción detallada en este momento."}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  {clubAddress && (
+                    <div className="p-4 rounded-xl border border-white/5 bg-[#09090f]/50">
+                      <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 mb-2 font-bold">Dirección</p>
+                      <div className="flex gap-2.5">
+                        <MapPin className="w-4 h-4 text-accent-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-zinc-300 leading-relaxed">{clubAddress}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {clubOpeningHours && (
+                    <div className="p-4 rounded-xl border border-white/5 bg-[#09090f]/50">
+                      <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 mb-2 font-bold">Horario</p>
+                      <div className="flex gap-2.5">
+                        <Clock className="w-4 h-4 text-primary-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-zinc-300 leading-relaxed">{clubOpeningHours}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {clubInstagram && (
+                    <div className="p-4 rounded-xl border border-white/5 bg-[#09090f]/50 sm:col-span-2">
+                      <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 mb-2 font-bold">Instagram Oficial</p>
+                      <div className="flex gap-2.5">
+                        <InstagramIcon className="w-4 h-4 text-pink-400 shrink-0 mt-0.5" />
+                        <a
+                          href={`https://instagram.com/${clubInstagram.replace("@", "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary-400 hover:text-primary-300 font-semibold hover:underline"
+                        >
+                          {clubInstagram}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 8. ¿POR QUÉ VISITAR ESTE LUGAR? (Características configurables) */}
+              <div className="pt-6 border-t border-white/5 space-y-4">
+                <h3 className="text-sm font-bold text-white uppercase tracking-widest pl-1 border-l-2 border-primary-500 font-outfit">
+                  ✨ ¿Por Qué Visitar Este Lugar?
+                </h3>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {(() => {
+                    const defaultAmenities = [
+                      "DJs invitados",
+                      "Eventos semanales",
+                      "Zona VIP",
+                      "Parqueadero",
+                      "Seguridad privada",
+                      "Ambiente premium"
+                    ];
+                    const features = clubAmenities.length > 0 ? clubAmenities : defaultAmenities;
+
+                    return features.map((feat, idx) => (
+                      <div key={idx} className="p-4 bg-zinc-950/40 border border-white/5 rounded-2xl flex items-center gap-2.5 hover:border-white/10 transition-colors">
+                        <span className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[10px] text-emerald-400 font-bold shrink-0">
+                          ✓
+                        </span>
+                        <span className="text-zinc-200 text-xs font-semibold font-outfit truncate" title={feat}>
+                          {feat}
+                        </span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              {/* 9. COMUNIDAD PROMO CTA */}
+              <div className="pt-6 border-t border-white/5">
+                <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-purple-950/15 via-[#0b0b14] to-zinc-950 border border-white/10 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/5 rounded-full blur-3xl pointer-events-none" />
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-primary-400 text-[10px] font-black uppercase tracking-wider">
+                      <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
+                      <span>Comunidad Activa en Connect</span>
+                    </div>
+                    <h4 className="text-lg font-black text-white font-outfit">Encuentra asistentes esta noche</h4>
+                    <p className="text-xs text-zinc-400 max-w-lg leading-relaxed">
+                      ¿Estás en el local? Únete a Connect para ver quiénes están aquí, enviar solicitudes de chat y conocer gente real en vivo.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setActiveTab("community");
+                      setTimeout(() => {
+                        document.getElementById("club-tabs-nav")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }, 100);
+                    }}
+                    className="w-full md:w-auto px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
+                  >
+                    Abrir Comunidad
+                  </button>
+                </div>
+              </div>
+
+              {/* 10. RESERVAS PROMO CTA */}
+              <div className="pt-6">
+                <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-primary-950/10 via-[#0b0b14] to-zinc-950 border border-white/10 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Reservas VIP & Covers</span>
+                    </div>
+                    <h4 className="text-lg font-black text-white font-outfit">Asegura tu mesa VIP esta noche</h4>
+                    <p className="text-xs text-zinc-400 max-w-lg leading-relaxed">
+                      Reserva mesas exclusivas, licores y covers digitales con validación QR inmediata en taquilla.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setActiveTab("bookings");
+                      setTimeout(() => {
+                        document.getElementById("club-tabs-nav")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }, 100);
+                    }}
+                    className="w-full md:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-primary-600 to-accent-600 hover:from-primary-500 hover:to-accent-500 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
+                  >
+                    Reservar Ahora
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -948,11 +1377,13 @@ export function ClubTabs({
                   })}
                 </div>
               ) : (
-                <div className="text-center py-12 border border-white/5 bg-black/20 rounded-2xl">
+                <div className="text-center py-12 border border-white/5 bg-black/20 rounded-2xl p-6">
                   <Calendar className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-                  <h4 className="text-sm font-bold text-white mb-1">No hay eventos programados</h4>
-                  <p className="text-xs text-zinc-400 max-w-xs mx-auto">
-                    Este establecimiento no tiene eventos próximos programados en este momento.
+                  <h4 className="text-sm font-bold text-white mb-1 font-outfit">
+                    🎉 No hay eventos programados actualmente.
+                  </h4>
+                  <p className="text-xs text-zinc-400 max-w-xs mx-auto leading-relaxed">
+                    Sigue esta discoteca para recibir notificaciones cuando publique nuevos eventos.
                   </p>
                 </div>
               )}

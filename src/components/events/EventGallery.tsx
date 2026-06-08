@@ -1,91 +1,33 @@
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
-import { Play, X, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useMemo } from "react";
+import { Play, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface GalleryItem {
   id: string;
   url: string;
-  media_type: 'image' | 'video';
+  media_type: "image" | "video";
   thumbnail_url?: string | null;
   title?: string | null;
   description?: string | null;
   featured?: boolean;
 }
 
-interface ClubGalleryProps {
+interface EventGalleryProps {
   items: GalleryItem[];
-  isProvider?: boolean;
 }
 
-export function ClubGallery({ items = [], isProvider = false }: ClubGalleryProps) {
+export function EventGallery({ items = [] }: EventGalleryProps) {
   const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
-  const [showDemo, setShowDemo] = useState(false);
-
-  // Fallback high-quality demo gallery items (4 images, 2 videos)
-  const demoItems = useMemo<GalleryItem[]>(() => [
-    {
-      id: 'demo-img-1',
-      url: 'https://images.unsplash.com/photo-1574169208507-84376144848b?w=800&auto=format&fit=crop',
-      media_type: 'image' as const,
-      title: 'Zona VIP Premium',
-      description: 'Mesas exclusivas con atención personalizada.',
-      featured: true
-    },
-    {
-      id: 'demo-img-2',
-      url: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop',
-      media_type: 'image' as const,
-      title: 'Pista de Baile',
-      description: 'Energía y luces en la pista principal.',
-      featured: false
-    },
-    {
-      id: 'demo-img-3',
-      url: 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?w=800&auto=format&fit=crop',
-      media_type: 'image' as const,
-      title: 'Coctelería Exclusiva',
-      description: 'Tragos diseñados por nuestros mixólogos.',
-      featured: false
-    },
-    {
-      id: 'demo-img-4',
-      url: 'https://images.unsplash.com/photo-1516873240891-4bf014598ab4?w=800&auto=format&fit=crop',
-      media_type: 'image' as const,
-      title: 'DJ Set en Vivo',
-      description: 'Los mejores exponentes nacionales e internacionales.',
-      featured: false
-    },
-    {
-      id: 'demo-vid-1',
-      url: 'https://assets.mixkit.co/videos/preview/mixkit-people-dancing-at-a-party-with-neon-lights-40013-large.mp4',
-      thumbnail_url: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&auto=format&fit=crop',
-      media_type: 'video' as const,
-      title: 'Ambiente en Luces Neon',
-      description: 'Una experiencia visual única bajo luces ultravioleta.',
-      featured: true
-    },
-    {
-      id: 'demo-vid-2',
-      url: 'https://assets.mixkit.co/videos/preview/mixkit-dj-playing-music-at-a-club-42292-large.mp4',
-      thumbnail_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&auto=format&fit=crop',
-      media_type: 'video' as const,
-      title: 'Performance de DJ',
-      description: 'Sincronización perfecta de audio y efectos especiales.',
-      featured: true
-    }
-  ], []);
-
-  const activeItems = (items && items.length > 0) ? items : (showDemo ? demoItems : []);
 
   const sortedItems = useMemo(() => {
-    return [...activeItems].sort((a, b) => {
+    return [...items].sort((a, b) => {
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
       return 0;
     });
-  }, [activeItems]);
+  }, [items]);
 
   const handleOpenLightbox = (index: number) => {
     setActiveItemIndex(index);
@@ -111,36 +53,20 @@ export function ClubGallery({ items = [], isProvider = false }: ClubGalleryProps
     });
   };
 
-  if (items.length === 0 && !showDemo) {
+  if (items.length === 0) {
     return (
       <div className="space-y-4">
         <h4 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 font-outfit">
-          🎥 Galería del Club
+          🎥 Galería del Evento
         </h4>
-        <div className="text-center py-12 border border-dashed border-white/10 bg-zinc-950/20 rounded-[28px] space-y-4 shadow-lg p-6">
+        <div className="text-center py-16 border border-dashed border-white/10 bg-zinc-950/20 rounded-[28px] space-y-3 p-6 backdrop-blur-md">
           <div className="max-w-md mx-auto space-y-1">
             <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider font-outfit">
-              🎥 Esta discoteca aún no ha publicado contenido multimedia.
+              🎥 Aún no hay contenido multimedia publicado.
             </p>
-            <p className="text-[11px] text-zinc-500 leading-relaxed">
-              Próximamente podrás descubrir fotos, videos y experiencias exclusivas.
+            <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
+              El organizador del evento podrá publicar fotos y videos exclusivos de la fiesta muy pronto.
             </p>
-          </div>
-          <div className="flex flex-wrap justify-center items-center gap-3">
-            <button
-              onClick={() => setShowDemo(true)}
-              className="bg-white/5 hover:bg-white/10 text-zinc-300 text-[10px] font-black uppercase tracking-widest px-4 py-3 min-h-[44px] rounded-xl border border-white/10 transition-all cursor-pointer flex items-center justify-center"
-            >
-              ✨ Ver demo visual
-            </button>
-            {isProvider && (
-              <a
-                href="/dashboard/provider/clubs"
-                className="bg-primary-600 hover:bg-primary-500 text-white text-[10px] font-black uppercase tracking-widest px-4.5 py-3 min-h-[44px] rounded-xl transition-all shadow-md shadow-primary-500/10 cursor-pointer flex items-center justify-center font-outfit"
-              >
-                Agregar contenido
-              </a>
-            )}
           </div>
         </div>
       </div>
@@ -150,15 +76,15 @@ export function ClubGallery({ items = [], isProvider = false }: ClubGalleryProps
   return (
     <div className="space-y-4">
       <h4 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 font-outfit">
-        🖼️ Galería del Perfil
+        🖼️ Galería del Evento
       </h4>
 
       {/* Grid of gallery items */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {sortedItems.map((item, index) => {
-          const isVideo = item.media_type === 'video';
+          const isVideo = item.media_type === "video";
           const coverUrl = isVideo ? (item.thumbnail_url || item.url) : item.url;
-          
+
           return (
             <motion.div
               key={item.id}
@@ -170,7 +96,7 @@ export function ClubGallery({ items = [], isProvider = false }: ClubGalleryProps
               {/* Thumbnail image */}
               <img
                 src={coverUrl}
-                alt={item.title || 'Galería'}
+                alt={item.title || "Multimedia del evento"}
                 loading="lazy"
                 className="w-full h-full object-cover filter brightness-90 group-hover:brightness-100 transition-all duration-300"
               />
@@ -207,8 +133,7 @@ export function ClubGallery({ items = [], isProvider = false }: ClubGalleryProps
       {/* Lightbox Slider Modal */}
       <AnimatePresence>
         {activeItemIndex !== null && (
-          <div className="fixed inset-0 z-55 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
-            
+          <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
             {/* Desktop arrows */}
             <button
               onClick={handlePrevItem}
@@ -226,17 +151,20 @@ export function ClubGallery({ items = [], isProvider = false }: ClubGalleryProps
 
             {/* Modal Body Container */}
             <div className="relative w-full max-w-md aspect-[9/16] rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col justify-between bg-[#050508]">
-              
               {/* Top Bar controls */}
               <div className="absolute top-4 inset-x-4 z-20 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent p-2 rounded-t-xl">
                 <div>
                   {sortedItems[activeItemIndex].title ? (
-                    <h4 className="text-white text-xs font-bold font-outfit truncate">{sortedItems[activeItemIndex].title}</h4>
+                    <h4 className="text-white text-xs font-bold font-outfit truncate">
+                      {sortedItems[activeItemIndex].title}
+                    </h4>
                   ) : (
-                    <h4 className="text-white text-xs font-bold font-outfit truncate">Galería</h4>
+                    <h4 className="text-white text-xs font-bold font-outfit truncate">Multimedia</h4>
                   )}
                   {sortedItems[activeItemIndex].description && (
-                    <p className="text-[10px] text-zinc-400 truncate mt-0.5">{sortedItems[activeItemIndex].description}</p>
+                    <p className="text-[10px] text-zinc-400 truncate mt-0.5">
+                      {sortedItems[activeItemIndex].description}
+                    </p>
                   )}
                 </div>
 
@@ -250,7 +178,7 @@ export function ClubGallery({ items = [], isProvider = false }: ClubGalleryProps
 
               {/* Main Content (Image or Video) */}
               <div className="flex-grow w-full h-full relative flex items-center justify-center bg-black">
-                {sortedItems[activeItemIndex].media_type === 'video' ? (
+                {sortedItems[activeItemIndex].media_type === "video" ? (
                   <video
                     key={sortedItems[activeItemIndex].id}
                     src={sortedItems[activeItemIndex].url}
@@ -263,7 +191,7 @@ export function ClubGallery({ items = [], isProvider = false }: ClubGalleryProps
                 ) : (
                   <img
                     src={sortedItems[activeItemIndex].url}
-                    alt={sortedItems[activeItemIndex].title || 'Galería'}
+                    alt={sortedItems[activeItemIndex].title || "Detalle multimedia"}
                     className="w-full h-full object-cover"
                   />
                 )}

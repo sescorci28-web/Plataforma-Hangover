@@ -57,6 +57,7 @@ interface Club {
   active: boolean
   cover_price: number | null
   created_at: string
+  amenities?: string[] | null
 }
 
 interface ClubsManagerProps {
@@ -129,6 +130,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
   const [rating, setRating] = useState(5.0)
   const [active, setActive] = useState(true)
   const [coverPrice, setCoverPrice] = useState(0.00)
+  const [amenitiesText, setAmenitiesText] = useState("")
 
   const [bannerPreviewUrl, setBannerPreviewUrl] = useState<string | null>(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
@@ -159,6 +161,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
     setRating(5.0)
     setActive(true)
     setCoverPrice(0.00)
+    setAmenitiesText("")
     setEditingClub(null)
     cleanupBlobUrl(bannerPreviewUrl)
     cleanupBlobUrl(logoPreviewUrl)
@@ -189,6 +192,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
     setRating(club.rating || 5.0)
     setActive(club.active ?? true)
     setCoverPrice(club.cover_price || 0.00)
+    setAmenitiesText(club.amenities ? club.amenities.join(", ") : "")
     setBannerPreviewUrl(club.banner_image || null)
     setLogoPreviewUrl(club.logo || null)
     setIsModalOpen(true)
@@ -275,6 +279,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
         rating: Number(rating) || 5.0,
         active,
         cover_price: Number(coverPrice) || 0,
+        amenities: amenitiesText ? amenitiesText.split(",").map(s => s.trim()).filter(Boolean) : []
       }
 
       // Direct await — startTransition(async()=>) does NOT properly await
@@ -605,7 +610,19 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                     onChange={e => setDescription(e.target.value)}
                     disabled={isFormLocked}
                     placeholder="Describe el ambiente, la música y los servicios VIP de tu discoteca..."
-                    className="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 px-4 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-primary-500/50 min-h-[110px] resize-none"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 px-4 text-xs text-white placeholder:text-zinc-650 focus:outline-none focus:ring-1 focus:ring-primary-500/50 min-h-[110px] resize-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-semibold text-zinc-300 ml-1">¿Por qué visitar este lugar? (Características separadas por comas)</label>
+                  <input
+                    type="text"
+                    value={amenitiesText}
+                    onChange={e => setAmenitiesText(e.target.value)}
+                    disabled={isFormLocked}
+                    placeholder="Ej. DJs invitados, Parqueadero privado, Zona VIP, Seguridad privada, Crossover"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-primary-500/50"
                   />
                 </div>
 

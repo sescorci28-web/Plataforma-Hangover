@@ -17,20 +17,45 @@ interface StoryItem {
 }
 
 interface StoriesGalleryProps {
-  logo: string | null;
-  bannerImage: string | null;
-  clubName: string;
+  // New generic props
+  ownerType?: 'club' | 'event' | 'user';
+  ownerName?: string;
+  ownerAvatar?: string | null;
+  ownerCover?: string | null;
+
+  // Backward compatibility:
+  logo?: string | null;
+  bannerImage?: string | null;
+  clubName?: string;
+
   stories?: StoryItem[];
   isProvider?: boolean;
+  onNavigateToEvents?: () => void;
 }
 
-export function StoriesGallery({ logo, bannerImage, clubName, stories = [], isProvider = false }: StoriesGalleryProps) {
+export function StoriesGallery({
+  ownerType = 'club',
+  ownerName,
+  ownerAvatar,
+  ownerCover,
+  logo,
+  bannerImage,
+  clubName,
+  stories = [],
+  isProvider = false,
+  onNavigateToEvents,
+}: StoriesGalleryProps) {
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [progress, setProgress] = useState(0);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [showDemo, setShowDemo] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const resolvedOwnerType = ownerType;
+  const resolvedName = ownerName || clubName || 'Discoteca';
+  const resolvedAvatar = ownerAvatar !== undefined ? ownerAvatar : logo;
+  const resolvedCover = ownerCover !== undefined ? ownerCover : bannerImage;
 
   // Parse and build stories array (prioritizing DB stories, with demo fallbacks if showDemo is true or empty)
   const storiesList = useMemo(() => {
@@ -82,7 +107,7 @@ export function StoriesGallery({ logo, bannerImage, clubName, stories = [], isPr
       duration: s.duration || 5,
       featured: s.featured || false,
     }));
-  }, [stories, logo, bannerImage]);
+  }, [stories, resolvedAvatar, resolvedCover]);
 
   // Synchronize HTML5 video playback with isPlaying state
   useEffect(() => {
@@ -169,26 +194,40 @@ export function StoriesGallery({ logo, bannerImage, clubName, stories = [], isPr
     return (
       <section className="space-y-4">
         <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 font-outfit pl-1">
-          📸 Historias de {clubName}
+          📸 Historias de {resolvedName}
         </h3>
         <div className="flex flex-col items-center justify-center p-8 border border-dashed border-white/10 rounded-[28px] bg-zinc-950/20 text-center space-y-4 shadow-lg">
           <div className="space-y-1">
-            <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Historias no disponibles</p>
+            <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider font-outfit">
+              {resolvedOwnerType === 'club' 
+                ? "📸 Esta discoteca aún no ha publicado historias."
+                : `📸 No hay historias para este ${resolvedOwnerType === 'event' ? 'evento' : 'usuario'}.`}
+            </p>
             <p className="text-[11px] text-zinc-500 max-w-xs leading-relaxed">
-              Esta discoteca aún no ha publicado historias de su ambiente, DJ o eventos.
+              {resolvedOwnerType === 'club' 
+                ? "Comparte momentos, promociones y experiencias para conectar con tus visitantes."
+                : "Vuelve más tarde para ver el contenido compartido en tiempo real."}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => setShowDemo(true)}
-              className="bg-white/5 hover:bg-white/10 text-zinc-300 text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl border border-white/10 transition-all cursor-pointer"
+              className="bg-white/5 hover:bg-white/10 text-zinc-300 text-[10px] font-black uppercase tracking-widest px-4 py-3 min-h-[44px] rounded-xl border border-white/10 transition-all cursor-pointer flex items-center justify-center"
             >
               ✨ Ver demo visual
             </button>
+            {resolvedOwnerType === 'club' && onNavigateToEvents && (
+              <button
+                onClick={onNavigateToEvents}
+                className="bg-primary-600 hover:bg-primary-500 text-white text-[10px] font-black uppercase tracking-widest px-4.5 py-3 min-h-[44px] rounded-xl transition-all shadow-md shadow-primary-500/10 cursor-pointer flex items-center justify-center"
+              >
+                Ver eventos
+              </button>
+            )}
             {isProvider && (
               <a
                 href="/dashboard/provider/clubs"
-                className="bg-primary-600 hover:bg-primary-500 text-white text-[10px] font-black uppercase tracking-widest px-4.5 py-2.5 rounded-xl transition-all shadow-md shadow-primary-500/10 cursor-pointer"
+                className="bg-primary-600 hover:bg-primary-500 text-white text-[10px] font-black uppercase tracking-widest px-4.5 py-3 min-h-[44px] rounded-xl transition-all shadow-md shadow-primary-500/10 cursor-pointer flex items-center justify-center"
               >
                 Agregar historias
               </a>
@@ -202,7 +241,7 @@ export function StoriesGallery({ logo, bannerImage, clubName, stories = [], isPr
   return (
     <section className="space-y-4">
       <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 font-outfit pl-1">
-        📸 Historias de {clubName}
+        📸 Historias de {resolvedName}
       </h3>
       
       {/* Stories horizontal bubble row */}
@@ -290,10 +329,10 @@ export function StoriesGallery({ logo, bannerImage, clubName, stories = [], isPr
               <div className="absolute top-8 inset-x-4 z-20 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent p-2 rounded-t-xl">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-zinc-900">
-                    <img src={logo || bannerImage || ""} alt={clubName} className="w-full h-full object-cover" />
+                    <img src={resolvedAvatar || resolvedCover || ""} alt={resolvedName} className="w-full h-full object-cover" />
                   </div>
                   <div>
-                    <h4 className="text-white text-xs font-bold font-outfit leading-none">{clubName}</h4>
+                    <h4 className="text-white text-xs font-bold font-outfit leading-none">{resolvedName}</h4>
                     <p className="text-[9px] text-zinc-400 font-semibold uppercase tracking-wider mt-0.5">
                       {storiesList[activeStoryIndex].label}
                     </p>

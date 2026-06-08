@@ -472,3 +472,205 @@ export async function updateSocialProfile(data: {
     return { error: err.message || "Error al actualizar perfil social." };
   }
 }
+
+/**
+ * Updates status and visibility in user's active presence in the database.
+ */
+export async function updateActivePresenceStatus(data: {
+  status: 'available' | 'observing' | 'do_not_disturb';
+  visibility: 'visible' | 'invisible';
+}) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  try {
+    const { error: updateError } = await supabase
+      .from("connect_presence")
+      .update({
+        status: data.status,
+        visibility: data.visibility,
+        last_seen_at: new Date().toISOString()
+      })
+      .eq("user_id", user.id);
+
+    if (updateError) {
+      return { error: `Error al actualizar presencia: ${updateError.message}` };
+    }
+
+    // Attempt to revalidate paths for active clubs or events
+    const { data: presence } = await supabase
+      .from("connect_presence")
+      .select("club_id, event_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (presence) {
+      if (presence.club_id) revalidatePath(`/discotecas/${presence.club_id}`);
+      if (presence.event_id) revalidatePath(`/events/${presence.event_id}`);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error al actualizar presencia." };
+  }
+}
+
+/**
+ * Toggles a club in the user's favorites list in the database.
+ */
+export async function toggleFavoriteClub(clubId: string) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  try {
+    // Check if already favorited
+    const { data: existing, error: fetchError } = await supabase
+      .from("user_favorite_clubs")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("club_id", clubId)
+      .maybeSingle();
+
+    if (fetchError) {
+      return { error: `Error al verificar favorito: ${fetchError.message}` };
+    }
+
+    if (existing) {
+      // Remove it
+      const { error: deleteError } = await supabase
+        .from("user_favorite_clubs")
+        .delete()
+        .eq("id", existing.id);
+
+      if (deleteError) {
+        return { error: `Error al eliminar favorito: ${deleteError.message}` };
+      }
+      return { success: true, action: "removed" };
+    } else {
+      // Add it
+      const { error: insertError } = await supabase
+        .from("user_favorite_clubs")
+        .insert({
+          user_id: user.id,
+          club_id: clubId
+        });
+
+      if (insertError) {
+        return { error: `Error al agregar favorito: ${insertError.message}` };
+      }
+      return { success: true, action: "added" };
+    }
+  } catch (err: any) {
+    return { error: err.message || "Error al modificar favoritos." };
+  }
+}
+
+/**
+ * Toggles an event in the user's favorites list in the database.
+ */
+export async function toggleFavoriteEvent(eventId: string) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  try {
+    const { data: existing, error: fetchError } = await supabase
+      .from("user_favorite_events")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("event_id", eventId)
+      .maybeSingle();
+
+    if (fetchError) {
+      return { error: `Error al verificar favorito: ${fetchError.message}` };
+    }
+
+    if (existing) {
+      const { error: deleteError } = await supabase
+        .from("user_favorite_events")
+        .delete()
+        .eq("id", existing.id);
+
+      if (deleteError) {
+        return { error: `Error al eliminar favorito: ${deleteError.message}` };
+      }
+      return { success: true, action: "removed" };
+    } else {
+      const { error: insertError } = await supabase
+        .from("user_favorite_events")
+        .insert({
+          user_id: user.id,
+          event_id: eventId
+        });
+
+      if (insertError) {
+        return { error: `Error al agregar favorito: ${insertError.message}` };
+      }
+      return { success: true, action: "added" };
+    }
+  } catch (err: any) {
+    return { error: err.message || "Error al modificar favoritos." };
+  }
+}
+
+/**
+ * Toggles a service in the user's favorites list in the database.
+ */
+export async function toggleFavoriteService(serviceId: string) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  try {
+    const { data: existing, error: fetchError } = await supabase
+      .from("user_favorite_services")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("service_id", serviceId)
+      .maybeSingle();
+
+    if (fetchError) {
+      return { error: `Error al verificar favorito: ${fetchError.message}` };
+    }
+
+    if (existing) {
+      const { error: deleteError } = await supabase
+        .from("user_favorite_services")
+        .delete()
+        .eq("id", existing.id);
+
+      if (deleteError) {
+        return { error: `Error al eliminar favorito: ${deleteError.message}` };
+      }
+      return { success: true, action: "removed" };
+    } else {
+      const { error: insertError } = await supabase
+        .from("user_favorite_services")
+        .insert({
+          user_id: user.id,
+          service_id: serviceId
+        });
+
+      if (insertError) {
+        return { error: `Error al agregar favorito: ${insertError.message}` };
+      }
+      return { success: true, action: "added" };
+    }
+  } catch (err: any) {
+    return { error: err.message || "Error al modificar favoritos." };
+  }
+}

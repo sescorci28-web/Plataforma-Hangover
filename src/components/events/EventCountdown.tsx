@@ -56,11 +56,11 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
       );
     }
     return (
-      <div className="grid grid-cols-4 gap-2 md:gap-4 max-w-sm mx-auto text-center font-mono">
+      <div className="grid grid-cols-4 gap-2.5 sm:gap-4 max-w-md mx-auto text-center font-mono">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-2 md:p-3 animate-pulse">
-            <span className="block text-xl md:text-2xl font-bold text-zinc-500">--</span>
-            <span className="text-[10px] text-zinc-600 uppercase tracking-wider">...</span>
+          <div key={i} className="flex flex-col items-center justify-center bg-white/5 border border-white/10 rounded-2xl px-2 py-3 sm:px-3 sm:py-4 animate-pulse w-full min-w-0">
+            <span className="block text-xl md:text-2xl font-bold text-zinc-500 leading-none">--</span>
+            <span className="text-[9px] sm:text-[10px] text-zinc-650 uppercase tracking-wider block mt-1.5 leading-none">...</span>
           </div>
         ))}
       </div>
@@ -92,33 +92,33 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
 
   return (
     <div className="grid grid-cols-4 gap-2.5 sm:gap-4 max-w-md mx-auto text-center select-none font-mono">
-      <div className="bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl p-2.5 sm:p-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300">
+      <div className="flex flex-col items-center justify-center bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl px-2 py-3 sm:px-3 sm:py-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300 w-full min-w-0">
         <div className="absolute inset-0 bg-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        <span className="block text-2xl sm:text-4xl font-extrabold text-white text-gradient">
+        <span className="block text-2xl sm:text-3xl font-extrabold text-gradient leading-none tracking-tight text-center select-none w-full">
           {padZero(timeLeft.days)}
         </span>
-        <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1">Días</span>
+        <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1.5 leading-none">Días</span>
       </div>
-      <div className="bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl p-2.5 sm:p-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300">
+      <div className="flex flex-col items-center justify-center bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl px-2 py-3 sm:px-3 sm:py-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300 w-full min-w-0">
         <div className="absolute inset-0 bg-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        <span className="block text-2xl sm:text-4xl font-extrabold text-white text-gradient">
+        <span className="block text-2xl sm:text-3xl font-extrabold text-gradient leading-none tracking-tight text-center select-none w-full">
           {padZero(timeLeft.hours)}
         </span>
-        <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1">Horas</span>
+        <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1.5 leading-none">Horas</span>
       </div>
-      <div className="bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl p-2.5 sm:p-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300">
+      <div className="flex flex-col items-center justify-center bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl px-2 py-3 sm:px-3 sm:py-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300 w-full min-w-0">
         <div className="absolute inset-0 bg-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        <span className="block text-2xl sm:text-4xl font-extrabold text-white text-gradient">
+        <span className="block text-2xl sm:text-3xl font-extrabold text-gradient leading-none tracking-tight text-center select-none w-full">
           {padZero(timeLeft.minutes)}
         </span>
-        <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1">Mins</span>
+        <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1.5 leading-none">Mins</span>
       </div>
-      <div className="bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl p-2.5 sm:p-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300">
+      <div className="flex flex-col items-center justify-center bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl px-2 py-3 sm:px-3 sm:py-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300 w-full min-w-0">
         <div className="absolute inset-0 bg-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        <span className="block text-2xl sm:text-4xl font-extrabold text-white text-gradient">
+        <span className="block text-2xl sm:text-3xl font-extrabold text-gradient leading-none tracking-tight text-center select-none w-full">
           {padZero(timeLeft.seconds)}
         </span>
-        <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1">Segs</span>
+        <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1.5 leading-none">Segs</span>
       </div>
     </div>
   );

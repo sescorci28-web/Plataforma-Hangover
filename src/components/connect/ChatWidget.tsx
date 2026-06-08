@@ -149,16 +149,16 @@ export function ChatWidget({ chatId, otherUser, currentUser, onClose }: ChatWidg
       initial={{ opacity: 0, x: 100 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 100 }}
-      className="fixed inset-y-0 right-0 w-full md:max-w-md bg-[#07070c] border-l border-white/10 shadow-2xl flex flex-col z-50 pt-16 md:pt-0"
+      className="fixed inset-0 w-full h-full bg-[#07070c] md:inset-auto md:bottom-6 md:right-6 md:w-[380px] md:h-[550px] md:max-w-[30vw] md:border md:border-white/10 md:rounded-3xl md:shadow-[0_20px_50px_rgba(0,0,0,0.8)] flex flex-col z-50 pt-10 md:pt-0 overflow-hidden"
     >
       {/* Header */}
-      <div className="p-4 border-b border-white/5 flex items-center justify-between bg-zinc-950/80 backdrop-blur-md">
+      <div className="p-4 border-b border-white/5 flex items-center justify-between bg-zinc-950/80 backdrop-blur-md shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={onClose}
-            className="md:hidden w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white"
+            className="md:hidden w-11 h-11 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer active:scale-95"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
           
           <div className="w-9 h-9 rounded-full border border-white/10 bg-zinc-900 overflow-hidden p-0.5">

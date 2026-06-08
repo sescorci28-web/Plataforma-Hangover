@@ -3,12 +3,21 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Wine, Mail, Lock, User, Briefcase, Loader2, ArrowRight } from "lucide-react";
-import clsx from "clsx";
+import { Wine, Mail, Lock, User, Loader2, ArrowRight } from "lucide-react";
 import { signup } from "../actions";
+import { createClient } from "@/lib/supabase/client";
+
+// Inline SVG components for social logo to avoid import errors
+const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" width="24" height="24" {...props}>
+    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.48 15 1 12 1 7.24 1 3.2 3.74 1.25 7.74l3.96 3.07C6.18 7.72 8.86 5.04 12 5.04z" />
+    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.43c-.28 1.44-1.1 2.67-2.33 3.49l3.61 2.8c2.12-1.95 3.78-5.17 3.78-8.44z" />
+    <path fill="#FBBC05" d="M5.21 14.81c-.24-.72-.38-1.49-.38-2.31s.14-1.59.38-2.31L1.25 7.12C.45 8.73 0 10.52 0 12.43s.45 3.7 1.25 5.31l3.96-3.07z" />
+    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.61-2.8c-1.2.8-2.73 1.28-4.35 1.28-3.14 0-5.82-2.68-6.79-5.77l-3.96 3.07C3.2 19.26 7.24 23 12 23z" />
+  </svg>
+);
 
 export default function RegisterPage() {
-  const [type, setType] = useState<"user" | "provider">("user");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +33,6 @@ export default function RegisterPage() {
       formData.append("name", name);
       formData.append("email", email);
       formData.append("password", password);
-      formData.append("type", type);
       
       const result = await signup(formData);
       
@@ -34,132 +42,150 @@ export default function RegisterPage() {
     });
   };
 
+  const handleGoogleRegister = async () => {
+    try {
+      const supabase = createClient();
+      const { error: googleErr } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (googleErr) {
+        setError(googleErr.message);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError("Error al conectar con Google.");
+    }
+  };
+
   return (
     <div className="min-h-[90vh] flex items-center justify-center relative py-20 px-4">
-      {/* Background Orbs */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-accent-900/20 rounded-full blur-[120px] pointer-events-none" />
+      {/* Background Neon Glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-950/15 rounded-full blur-[140px] pointer-events-none" />
       
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <div className="glass-card p-8 relative overflow-hidden">
-          {/* Shine effect */}
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent-500 to-transparent opacity-50" />
+        <div className="glass-card p-8 relative overflow-hidden bg-zinc-950/50 border border-white/5 shadow-2xl rounded-[32px]">
+          {/* Subtle top indicator bar */}
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-primary-500/40 to-transparent" />
           
-          <div className="flex flex-col items-center mb-8">
-            <div className="bg-accent-600/20 p-3 rounded-2xl mb-4">
-              <Wine className="w-8 h-8 text-accent-400" />
+          <div className="flex flex-col items-center mb-6 text-center">
+            <div className="bg-primary-600/10 border border-primary-500/20 p-3.5 rounded-2xl mb-4">
+              <Wine className="w-8 h-8 text-primary-400 animate-pulse" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2 font-outfit">Crea tu cuenta</h1>
-            <p className="text-zinc-400 text-sm text-center">
-              Únete a la mejor plataforma de nightlife.
+            <h1 className="text-2xl font-black text-white mb-2 font-outfit uppercase tracking-wider">
+              La vida nocturna comienza aquí
+            </h1>
+            <p className="text-zinc-400 text-xs leading-relaxed max-w-[280px]">
+              Descubre eventos, discotecas, reservas VIP y experiencias únicas.
             </p>
           </div>
 
-          <div className="flex bg-black/40 p-1 rounded-xl mb-6">
-            <button
-              type="button"
-              onClick={() => setType("user")}
-              className={clsx(
-                "flex-1 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2",
-                type === "user" ? "bg-white/10 text-white shadow-sm" : "text-zinc-400 hover:text-white"
-              )}
-            >
-              <User className="w-4 h-4" />
-              Usuario
-            </button>
-            <button
-              type="button"
-              onClick={() => setType("provider")}
-              className={clsx(
-                "flex-1 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2",
-                type === "provider" ? "bg-white/10 text-white shadow-sm" : "text-zinc-400 hover:text-white"
-              )}
-            >
-              <Briefcase className="w-4 h-4" />
-              Proveedor
-            </button>
-          </div>
-
-          <form onSubmit={handleRegister} className="space-y-4">
+          <div className="space-y-4">
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
+              <div className="p-3.5 bg-red-500/10 border border-red-500/25 rounded-2xl text-red-400 text-xs text-center font-medium">
                 {error}
               </div>
             )}
-            
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-300 ml-1">Nombre Completo</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-zinc-500" />
-                </div>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-black/50 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all"
-                  placeholder="Juan Pérez"
-                  required
-                />
-              </div>
-            </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-300 ml-1">Correo Electrónico</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-zinc-500" />
-                </div>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-black/50 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all"
-                  placeholder="ejemplo@correo.com"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-300 ml-1">Contraseña</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-zinc-500" />
-                </div>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-black/50 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-all"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-            </div>
-
+            {/* Google OAuth Button */}
             <button
-              type="submit"
-              disabled={isPending}
-              className="w-full bg-accent-600 hover:bg-accent-500 text-white rounded-xl py-3 mt-6 font-semibold transition-all glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              onClick={handleGoogleRegister}
+              type="button"
+              className="w-full min-h-[48px] bg-white hover:bg-zinc-200 text-black rounded-2xl font-bold text-xs uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-3 active:scale-95 shadow-md shadow-white/5"
             >
-              {isPending ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  Crear Cuenta
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </>
-              )}
+              <GoogleIcon className="w-4 h-4" />
+              Continuar con Google
             </button>
-          </form>
 
-          <div className="mt-8 text-center text-sm text-zinc-400">
+            {/* Separator */}
+            <div className="flex items-center gap-3 my-4">
+              <div className="h-px bg-white/5 flex-grow" />
+              <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">o continúa con correo</span>
+              <div className="h-px bg-white/5 flex-grow" />
+            </div>
+
+            {/* Email form */}
+            <form onSubmit={handleRegister} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 ml-1">Nombre Completo</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <User className="h-4 w-4 text-zinc-500" />
+                  </div>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 hover:border-white/15 rounded-xl py-3 pl-10 pr-4 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-500/50 transition-all"
+                    placeholder="Juan Pérez"
+                    required
+                    disabled={isPending}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 ml-1">Correo Electrónico</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <Mail className="h-4 w-4 text-zinc-500" />
+                  </div>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 hover:border-white/15 rounded-xl py-3 pl-10 pr-4 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-500/50 transition-all"
+                    placeholder="ejemplo@correo.com"
+                    required
+                    disabled={isPending}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 ml-1">Contraseña</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <Lock className="h-4 w-4 text-zinc-500" />
+                  </div>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 hover:border-white/15 rounded-xl py-3 pl-10 pr-4 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-500/50 transition-all"
+                    placeholder="••••••••"
+                    required
+                    disabled={isPending}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isPending}
+                className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-2xl py-3.5 mt-5 text-xs font-black uppercase tracking-widest transition-all glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer active:scale-95 shadow-lg shadow-primary-600/10"
+              >
+                {isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    Crear Cuenta
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          <div className="mt-6 text-center text-xs text-zinc-400">
             ¿Ya tienes una cuenta?{" "}
-            <Link href="/login" className="text-accent-400 hover:text-accent-300 font-medium transition-colors">
+            <Link href="/login" className="text-primary-400 hover:text-primary-300 font-bold transition-colors">
               Inicia sesión
             </Link>
           </div>

@@ -180,6 +180,24 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
     attendeeCount: relatedBookingCounts[e.id] || 0
   }));
 
+  // Fetch event gallery items safely (resilient to missing table)
+  let galleryItems = [];
+  try {
+    const { data: galleryData, error: galleryError } = await supabase
+      .from("event_gallery_items")
+      .select("*")
+      .eq("event_id", event.id)
+      .order("display_order", { ascending: true });
+    
+    if (galleryError) {
+      console.warn("Event gallery table issue (could be missing migration):", galleryError.message);
+    } else if (galleryData) {
+      galleryItems = galleryData;
+    }
+  } catch (err) {
+    console.error("Failed to query event_gallery_items:", err);
+  }
+
   return (
     <div className="relative min-h-screen w-full bg-[#05050a] text-zinc-100 pb-28 md:pb-20 overflow-hidden">
       {/* Background Neon Ambient Glows */}
@@ -276,6 +294,8 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
               hasConnectAccess={hasConnectAccess}
               connectBookingId={connectBookingId}
               currentUser={user}
+              galleryItems={galleryItems}
+              creatorId={event.creator_id}
             />
 
             {/* SECCIÓN 8: COMPARTIR y SECCIÓN 9: FAVORITOS */}

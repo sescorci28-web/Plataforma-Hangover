@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { Heart, Share2, Copy, Check, MessageCircle, Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
+import { toggleFavoriteEvent } from "@/app/services/connectActions";
 
 const FacebookIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -25,43 +27,70 @@ interface EventClientInteractiveProps {
   eventTitle: string;
   eventDescription: string;
 }
-
 export function EventClientInteractive({ eventId, eventTitle, eventDescription }: EventClientInteractiveProps) {
   const [isFavorited, setIsFavorited] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     // Determine share URL on client side
     setShareUrl(window.location.href);
 
-    // Read favorites from localStorage
-    try {
-      const favorites = JSON.parse(localStorage.getItem("hangover_favorite_events") || "[]");
-      setIsFavorited(favorites.includes(eventId));
-    } catch (e) {
-      console.error("Error loading favorites:", e);
+    // Read favorites from database, fallback to localStorage
+    async function checkFavorite() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        const { data, error } = await supabase
+          .from("user_favorite_events")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("event_id", eventId)
+          .maybeSingle();
+        if (!error && data) {
+          setIsFavorited(true);
+        }
+      } else {
+        try {
+          const favorites = JSON.parse(localStorage.getItem("hangover_favorite_events") || "[]");
+          setIsFavorited(favorites.includes(eventId));
+        } catch (e) {
+          console.error("Error loading favorites:", e);
+        }
+      }
     }
+    checkFavorite();
   }, [eventId]);
 
-  const toggleFavorite = () => {
-    try {
-      const favorites = JSON.parse(localStorage.getItem("hangover_favorite_events") || "[]");
-      let newFavorites;
-      if (favorites.includes(eventId)) {
-        newFavorites = favorites.filter((id: string) => id !== eventId);
-        setIsFavorited(false);
-      } else {
-        newFavorites = [...favorites, eventId];
-        setIsFavorited(true);
+  const toggleFavorite = async () => {
+    if (userId) {
+      const nextState = !isFavorited;
+      setIsFavorited(nextState);
+      const res = await toggleFavoriteEvent(eventId);
+      if (res.error) {
+        setIsFavorited(!nextState); // revert
+        console.error("Error toggling favorite event:", res.error);
       }
-      localStorage.setItem("hangover_favorite_events", JSON.stringify(newFavorites));
-    } catch (e) {
-      console.error("Error saving favorites:", e);
+    } else {
+      try {
+        const favorites = JSON.parse(localStorage.getItem("hangover_favorite_events") || "[]");
+        let newFavorites;
+        if (favorites.includes(eventId)) {
+          newFavorites = favorites.filter((id: string) => id !== eventId);
+          setIsFavorited(false);
+        } else {
+          newFavorites = [...favorites, eventId];
+          setIsFavorited(true);
+        }
+        localStorage.setItem("hangover_favorite_events", JSON.stringify(newFavorites));
+      } catch (e) {
+        console.error("Error saving favorites:", e);
+      }
     }
   };
-
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);

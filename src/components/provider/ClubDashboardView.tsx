@@ -98,6 +98,12 @@ interface ClubDashboardViewProps {
   stats: ClubDashboardStats;
   chartsData: any[];
   topProducts: TopProduct[];
+  multimediaStats?: {
+    activeStories: number;
+    galleryItems: number;
+    totalVideos: number;
+    featuredItems: number;
+  };
 }
 
 const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
@@ -142,7 +148,13 @@ async function uploadClubAsset(file: File, bucket: "banners" | "logos") {
   return data.publicUrl;
 }
 
-export function ClubDashboardView({ club, stats, chartsData, topProducts }: ClubDashboardViewProps) {
+export function ClubDashboardView({
+  club,
+  stats,
+  chartsData,
+  topProducts,
+  multimediaStats = { activeStories: 0, galleryItems: 0, totalVideos: 0, featuredItems: 0 },
+}: ClubDashboardViewProps) {
   const router = useRouter();
 
   // Modals management
@@ -659,6 +671,51 @@ export function ClubDashboardView({ club, stats, chartsData, topProducts }: Club
                 <span className="text-xl font-black text-zinc-400 mt-1 block font-outfit">{stats.attendedRequests}</span>
               </div>
             </div>
+          </div>
+
+          {/* ==========================================
+              CONTENIDO MULTIMEDIA (Instagram/Meta Business Suite style)
+              ========================================== */}
+          <div className="glass-card p-6 bg-zinc-950/40 border border-white/5 rounded-2xl space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-white text-sm font-outfit">Contenido Multimedia</h4>
+                <p className="text-xs text-zinc-500 font-medium">Estadísticas de Historias y Galería</p>
+              </div>
+              <span className="text-[10px] bg-primary-500/10 border border-primary-500/20 text-primary-400 font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider font-outfit">
+                Meta Business
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3.5">
+              {/* Historias activas */}
+              <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 text-center">
+                <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Historias Activas</span>
+                <span className="text-xl font-black text-primary-400 mt-1.5 block font-outfit">{multimediaStats.activeStories}</span>
+              </div>
+              {/* Elementos Galería */}
+              <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 text-center">
+                <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Elementos Galería</span>
+                <span className="text-xl font-black text-cyan-400 mt-1.5 block font-outfit">{multimediaStats.galleryItems}</span>
+              </div>
+              {/* Videos publicados */}
+              <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 text-center">
+                <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Videos Publicados</span>
+                <span className="text-xl font-black text-amber-400 mt-1.5 block font-outfit">{multimediaStats.totalVideos}</span>
+              </div>
+              {/* Contenido destacado */}
+              <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 text-center">
+                <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Destacados ★</span>
+                <span className="text-xl font-black text-emerald-400 mt-1.5 block font-outfit">{multimediaStats.featuredItems}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsMediaManagerOpen(true)}
+              className="w-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-white rounded-xl py-2.5 px-4 text-xs font-bold border border-white/5 transition-all text-center cursor-pointer min-h-[44px] font-outfit"
+            >
+              Administrar Multimedia
+            </button>
           </div>
 
           {/* ==========================================

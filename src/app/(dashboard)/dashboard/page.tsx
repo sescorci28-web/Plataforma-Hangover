@@ -12,16 +12,21 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Fetch the role from the profile table
+  // Fetch the role and onboarding status from the profile table
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, onboarding_completed")
     .eq("id", user.id)
     .single();
 
   if (profileError || !profile) {
     // If user exists but no profile, redirect to login/register to reset
     redirect("/login");
+  }
+
+  // Redirect to onboarding if not completed
+  if (!profile.onboarding_completed) {
+    redirect("/onboarding");
   }
 
   // Redirect to the appropriate dashboard

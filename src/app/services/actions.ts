@@ -807,3 +807,537 @@ export async function confirmQRAdmission(bookingId: string) {
     return { error: err.message || "Ocurrió un error inesperado al confirmar la admisión." };
   }
 }
+
+/**
+ * Validates a QR code and logs the entry attempt (approved/rejected/warning) in admission_logs.
+ * Resilient fallback: if the logs table does not exist, validation still works!
+ */
+export async function validateQRCodeAndLog(
+  qrCode: string,
+  device: string = "Dispositivo desconocido",
+  autoConfirm: boolean = true
+) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  // 1. Get validator profile role (provider or admin)
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile || (profile.role !== "provider" && profile.role !== "admin")) {
+    return { error: "No tienes permisos de proveedor o administrador para validar códigos QR." };
+  }
+
+  try {
+    // 2. Fetch booking by qr_code
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select("id, status, provider_id, qr_status, number_of_people, user_id, event_id, club_id, total_amount, event_date, booking_type")
+      .eq("qr_code", qrCode)
+      .maybeSingle();
+
+    if (bookingError) {
+      return { error: `Error al buscar la entrada/reserva: ${bookingError.message}` };
+    }
+
+    if (!booking) {
+      // Log rejected attempt (QR does not exist)
+      try {
+        await supabase.from("admission_logs").insert({
+          operator_id: user.id,
+          status: "rejected",
+          access_type: "unknown",
+          buyer_name: "Código Inexistente",
+          device,
+          error_reason: "Código QR no existe en la base de datos."
+        });
+      } catch (logErr) {
+        console.warn("Could not insert log (table may not exist):", logErr);
+      }
+      return { error: "El código QR ingresado no existe en la base de datos." };
+    }
+
+    // 3. Fetch buyer profile name
+    const { data: buyerProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", booking.user_id)
+      .single();
+
+    const buyerName = buyerProfile?.full_name || "Cliente Hangover";
+
+    // 4. Fetch target title (event name or club name)
+    let targetTitle = "Entrada/Reserva";
+    if (booking.event_id) {
+      const { data: eventData } = await supabase
+        .from("events")
+        .select("title")
+        .eq("id", booking.event_id)
+        .single();
+      if (eventData) targetTitle = eventData.title;
+    } else if (booking.club_id) {
+      const { data: clubData } = await supabase
+        .from("clubs")
+        .select("name")
+        .eq("id", booking.club_id)
+        .single();
+      if (clubData) targetTitle = clubData.name;
+    }
+
+    const bookingDetails = {
+      id: booking.id,
+      buyerName,
+      title: targetTitle,
+      numberOfPeople: booking.number_of_people || 1,
+      totalAmount: booking.total_amount,
+      eventDate: booking.event_date,
+      bookingType: booking.booking_type
+    };
+
+    // 5. Check authorization (provider must own the booking)
+    if (profile.role === "provider" && booking.provider_id !== user.id) {
+      try {
+        await supabase.from("admission_logs").insert({
+          provider_id: booking.provider_id,
+          booking_id: booking.id,
+          user_id: booking.user_id,
+          operator_id: user.id,
+          status: "rejected",
+          access_type: booking.booking_type,
+          buyer_name: buyerName,
+          device,
+          error_reason: "No estás autorizado para validar este código QR. Pertenece a otro proveedor."
+        });
+      } catch (logErr) {
+        console.warn("Could not insert log:", logErr);
+      }
+      return { error: "No estás autorizado para validar este código QR. Pertenece a otro proveedor." };
+    }
+
+    // 6. Validate QR code status
+    if (booking.qr_status === "used") {
+      try {
+        await supabase.from("admission_logs").insert({
+          provider_id: booking.provider_id,
+          booking_id: booking.id,
+          user_id: booking.user_id,
+          operator_id: user.id,
+          status: "warning",
+          access_type: booking.booking_type,
+          buyer_name: buyerName,
+          device,
+          error_reason: "Este código QR ya ha sido usado y validado anteriormente."
+        });
+      } catch (logErr) {
+        console.warn("Could not insert log:", logErr);
+      }
+      return {
+        status: "used",
+        error: "Este código QR ya ha sido usado y validado anteriormente.",
+        bookingDetails
+      };
+    }
+
+    if (booking.qr_status === "cancelled") {
+      try {
+        await supabase.from("admission_logs").insert({
+          provider_id: booking.provider_id,
+          booking_id: booking.id,
+          user_id: booking.user_id,
+          operator_id: user.id,
+          status: "rejected",
+          access_type: booking.booking_type,
+          buyer_name: buyerName,
+          device,
+          error_reason: "Esta entrada o reserva ha sido cancelada."
+        });
+      } catch (logErr) {
+        console.warn("Could not insert log:", logErr);
+      }
+      return {
+        status: "cancelled",
+        error: "Esta entrada o reserva ha sido cancelada.",
+        bookingDetails
+      };
+    }
+
+    // 7. Validate booking status
+    if (booking.status !== "confirmed" && booking.status !== "completed") {
+      try {
+        await supabase.from("admission_logs").insert({
+          provider_id: booking.provider_id,
+          booking_id: booking.id,
+          user_id: booking.user_id,
+          operator_id: user.id,
+          status: "rejected",
+          access_type: booking.booking_type,
+          buyer_name: buyerName,
+          device,
+          error_reason: `La reserva asociada a este QR no está confirmada (Estado: ${booking.status}).`
+        });
+      } catch (logErr) {
+        console.warn("Could not insert log:", logErr);
+      }
+      return {
+        status: "invalid",
+        error: `La reserva asociada a este QR no está confirmada (Estado: ${booking.status}).`,
+        bookingDetails
+      };
+    }
+
+    // If autoConfirm is FALSE, return valid without marking it used yet
+    if (!autoConfirm) {
+      return {
+        success: true,
+        status: "valid",
+        bookingDetails
+      };
+    }
+
+    // 8. Auto-Confirm: Mark QR as used
+    const nowStr = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from("bookings")
+      .update({
+        qr_status: "used",
+        qr_validated_at: nowStr,
+        status: "completed"
+      })
+      .eq("id", booking.id);
+
+    if (updateError) {
+      return { error: `Error al marcar el QR como usado: ${updateError.message}` };
+    }
+
+    // Write successful audit log
+    try {
+      await supabase.from("admission_logs").insert({
+        provider_id: booking.provider_id,
+        booking_id: booking.id,
+        user_id: booking.user_id,
+        operator_id: user.id,
+        status: "approved",
+        access_type: booking.booking_type,
+        buyer_name: buyerName,
+        device
+      });
+    } catch (logErr) {
+      console.warn("Could not insert log:", logErr);
+    }
+
+    revalidatePath("/dashboard/user");
+    revalidatePath("/dashboard/provider");
+
+    return {
+      success: true,
+      status: "valid",
+      bookingDetails: {
+        ...bookingDetails,
+        qrValidatedAt: nowStr
+      }
+    };
+
+  } catch (err: any) {
+    return { error: err.message || "Ocurrió un error inesperado al procesar el QR." };
+  }
+}
+
+/**
+ * Manually confirms QR admission, marking it as used and writing an approved log.
+ */
+export async function confirmQRAdmissionAndLog(bookingId: string, device: string = "Dispositivo desconocido") {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  // 1. Get validator profile role
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile || (profile.role !== "provider" && profile.role !== "admin")) {
+    return { error: "No tienes permisos de proveedor o administrador para validar códigos QR." };
+  }
+
+  try {
+    // 2. Fetch booking by id
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select("id, status, provider_id, qr_status, user_id, booking_type")
+      .eq("id", bookingId)
+      .maybeSingle();
+
+    if (bookingError) {
+      return { error: `Error al buscar la entrada/reserva: ${bookingError.message}` };
+    }
+
+    if (!booking) {
+      return { error: "La reserva ingresada no existe." };
+    }
+
+    // 3. Check authorization
+    if (profile.role === "provider" && booking.provider_id !== user.id) {
+      return { error: "No estás autorizado para validar este código QR. Pertenece a otro proveedor." };
+    }
+
+    // 4. Validate QR code status
+    if (booking.qr_status === "used") {
+      return { error: "Este código QR ya ha sido usado y validado anteriormente." };
+    }
+
+    if (booking.qr_status === "cancelled") {
+      return { error: "Esta entrada o reserva ha sido cancelada." };
+    }
+
+    // 5. Mark QR as used
+    const nowStr = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from("bookings")
+      .update({
+        qr_status: "used",
+        qr_validated_at: nowStr,
+        status: "completed"
+      })
+      .eq("id", booking.id);
+
+    if (updateError) {
+      return { error: `Error al marcar el QR como usado: ${updateError.message}` };
+    }
+
+    // 6. Fetch buyer profile name
+    const { data: buyerProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", booking.user_id)
+      .single();
+    const buyerName = buyerProfile?.full_name || "Cliente Hangover";
+
+    // 7. Write successful audit log
+    try {
+      await supabase.from("admission_logs").insert({
+        provider_id: booking.provider_id,
+        booking_id: booking.id,
+        user_id: booking.user_id,
+        operator_id: user.id,
+        status: "approved",
+        access_type: booking.booking_type,
+        buyer_name: buyerName,
+        device
+      });
+    } catch (logErr) {
+      console.warn("Could not insert log:", logErr);
+    }
+
+    revalidatePath("/dashboard/user");
+    revalidatePath("/dashboard/provider");
+
+    return {
+      success: true,
+      qrValidatedAt: nowStr
+    };
+
+  } catch (err: any) {
+    return { error: err.message || "Ocurrió un error inesperado al confirmar la admisión." };
+  }
+}
+
+/**
+ * Retrieves gate/access stats for today.
+ * Falls back to scanning bookings directly if admission_logs doesn't exist yet.
+ */
+export async function getGateStats(providerId?: string) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  const activeProviderId = providerId || user.id;
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+
+  try {
+    // 1. Try querying admission_logs
+    const { data: logs, error: logsError } = await supabase
+      .from("admission_logs")
+      .select("status, access_type")
+      .eq("provider_id", activeProviderId)
+      .gte("created_at", startOfToday);
+
+    if (logsError) throw logsError;
+
+    let valid = 0;
+    let rejected = 0;
+    let covers = 0;
+    let reservations = 0;
+
+    (logs || []).forEach((log) => {
+      if (log.status === "approved") {
+        valid++;
+        if (log.access_type === "club_cover") {
+          covers++;
+        } else {
+          reservations++;
+        }
+      } else {
+        rejected++;
+      }
+    });
+
+    return {
+      success: true,
+      stats: {
+        valid,
+        rejected,
+        covers,
+        reservations,
+        totalToday: valid
+      }
+    };
+
+  } catch (err) {
+    console.warn("Admission logs query failed, falling back to bookings table:", err);
+
+    // Fallback: Query bookings table for successfully validated tickets today
+    try {
+      const { data: bookings, error: bookingsError } = await supabase
+        .from("bookings")
+        .select("booking_type")
+        .eq("provider_id", activeProviderId)
+        .eq("qr_status", "used")
+        .gte("qr_validated_at", startOfToday);
+
+      if (bookingsError) {
+        return { error: bookingsError.message };
+      }
+
+      let valid = 0;
+      let covers = 0;
+      let reservations = 0;
+
+      (bookings || []).forEach((b) => {
+        valid++;
+        if (b.booking_type === "club_cover") {
+          covers++;
+        } else {
+          reservations++;
+        }
+      });
+
+      return {
+        success: true,
+        stats: {
+          valid,
+          rejected: 0, // Fallback cannot query rejected logs
+          covers,
+          reservations,
+          totalToday: valid
+        }
+      };
+    } catch (fallbackErr: any) {
+      return { error: fallbackErr.message || "Error al calcular estadísticas." };
+    }
+  }
+}
+
+/**
+ * Retrieves the last 5 accesses (attempts) for the operator.
+ * Falls back to bookings if logs table is not yet created.
+ */
+export async function getLastAccesses(providerId?: string, limit: number = 5) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  const activeProviderId = providerId || user.id;
+
+  try {
+    const { data: logs, error: logsError } = await supabase
+      .from("admission_logs")
+      .select("id, buyer_name, access_type, status, created_at, error_reason")
+      .eq("provider_id", activeProviderId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (logsError) throw logsError;
+
+    const formattedLogs = (logs || []).map((log) => ({
+      id: log.id,
+      buyerName: log.buyer_name || "Cliente Hangover",
+      accessType: log.access_type,
+      status: log.status,
+      errorReason: log.error_reason,
+      time: new Date(log.created_at).toLocaleTimeString("es-CO", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      })
+    }));
+
+    return { success: true, accesses: formattedLogs };
+
+  } catch (err) {
+    console.warn("Admission logs query failed for last accesses, falling back to bookings table:", err);
+
+    // Fallback: Query bookings table for successfully validated tickets
+    try {
+      const { data: bookings, error: bookingsError } = await supabase
+        .from("bookings")
+        .select("id, user_id, booking_type, qr_validated_at")
+        .eq("provider_id", activeProviderId)
+        .eq("qr_status", "used")
+        .order("qr_validated_at", { ascending: false })
+        .limit(limit);
+
+      if (bookingsError) {
+        return { error: bookingsError.message };
+      }
+
+      const formattedBookings = [];
+      for (const b of bookings || []) {
+        // Fetch client profile name
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", b.user_id)
+          .single();
+
+        formattedBookings.push({
+          id: b.id,
+          buyerName: profile?.full_name || "Cliente Hangover",
+          accessType: b.booking_type,
+          status: "approved",
+          errorReason: null,
+          time: b.qr_validated_at
+            ? new Date(b.qr_validated_at).toLocaleTimeString("es-CO", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit"
+              })
+            : "—"
+        });
+      }
+
+      return { success: true, accesses: formattedBookings };
+    } catch (fallbackErr: any) {
+      return { error: fallbackErr.message || "Error al consultar accesos." };
+    }
+  }
+}

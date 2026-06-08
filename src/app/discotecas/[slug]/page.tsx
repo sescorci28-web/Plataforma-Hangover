@@ -4,7 +4,6 @@ import { Sparkles, MapPin, Clock, ArrowLeft, Building2, Globe, Calendar, Shoppin
 import Link from "next/link";
 import { ClubTabs } from "@/components/discotecas/ClubTabs";
 import { FeaturedProducts } from "@/components/discotecas/FeaturedProducts";
-import { StoriesGallery } from "@/components/discotecas/StoriesGallery";
 import { ClubHeroActions } from "@/components/discotecas/ClubHeroActions";
 
 function isClubOpen(openingHours: string | null): boolean {
@@ -178,6 +177,18 @@ export default async function ClubDetailPage({ params }: PageProps) {
   const clubTables = clubTablesRes.data || [];
   const clubStories = clubStoriesRes.data || [];
   const clubGalleryItems = clubGalleryRes.data || [];
+
+  // Find featured video / image fallbacks
+  const featuredVideo = 
+    clubGalleryItems.find((item) => item.featured && item.media_type === "video") ||
+    clubStories.find((item) => item.featured && item.media_type === "video");
+
+  const featuredImage =
+    clubGalleryItems.find((item) => item.featured && item.media_type === "image") ||
+    clubStories.find((item) => item.featured && item.media_type === "image");
+
+  const heroVideoUrl = featuredVideo?.url || null;
+  const heroImageUrl = featuredImage?.url || club.banner_image || null;
 
   // ==========================================
   // REAL STATS & METRICS FROM DATABASE
@@ -353,6 +364,54 @@ export default async function ClubDetailPage({ params }: PageProps) {
     upcomingEvents = eventsData || [];
   }
 
+  // ==========================================
+  // HANGOVER CONNECT REALTIME SOCIAL METRICS
+  // ==========================================
+  
+  // 1. Usuarios activos en Connect (con presencia no expirada y última conexión en los últimos 15 min)
+  const { count: activeConnectCount } = await supabase
+    .from("connect_presence")
+    .select("id", { count: "exact", head: true })
+    .eq("club_id", club.id)
+    .gt("expires_at", new Date().toISOString())
+    .gt("last_seen_at", new Date(Date.now() - 15 * 60 * 1000).toISOString());
+
+  // 2. Personas visibles en el local (con visibilidad = 'visible')
+  const { count: visibleConnectCount } = await supabase
+    .from("connect_presence")
+    .select("id", { count: "exact", head: true })
+    .eq("club_id", club.id)
+    .eq("visibility", "visible")
+    .gt("expires_at", new Date().toISOString())
+    .gt("last_seen_at", new Date(Date.now() - 15 * 60 * 1000).toISOString());
+
+  // 3. Nuevas conexiones hoy (chats creados vinculados a este local hoy)
+  const todayStart = new Date();
+  todayStart.setHours(0,0,0,0);
+  const { count: newConnectionsToday } = await supabase
+    .from("connect_chats")
+    .select("id", { count: "exact", head: true })
+    .eq("club_id", club.id)
+    .gte("created_at", todayStart.toISOString());
+
+  // 4. Lista de asistentes visibles (los primeros 12 para mostrar sus fotos y estados en la UI)
+  const { data: rawAttendees } = await supabase
+    .from("connect_presence")
+    .select("id, status, check_in_at, user_id, user:profiles(full_name, avatar_url)")
+    .eq("club_id", club.id)
+    .eq("visibility", "visible")
+    .gt("expires_at", new Date().toISOString())
+    .gt("last_seen_at", new Date(Date.now() - 15 * 60 * 1000).toISOString())
+    .order("check_in_at", { ascending: false })
+    .limit(20);
+
+  const connectAttendees = (rawAttendees as any[]) || [];
+
+  // Verificar si hay evento hoy
+  const nowColombia = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bogota" }));
+  const todayStr = nowColombia.toISOString().split("T")[0]; // YYYY-MM-DD
+  const hasEventToday = upcomingEvents.some((evt: any) => evt.event_date === todayStr);
+
   // Coordinates Google Maps query
   const mapsSearchQuery = encodeURIComponent(`${club.name} ${club.address || ""} ${club.city}`);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsSearchQuery}`;
@@ -376,9 +435,19 @@ export default async function ClubDetailPage({ params }: PageProps) {
           1. HERO PREMIUM
           ========================================== */}
       <section className="relative h-[55vh] md:h-[65vh] w-full bg-zinc-950 overflow-hidden">
-        {club.banner_image ? (
+        {heroVideoUrl ? (
+          <video
+            src={heroVideoUrl}
+            poster={heroImageUrl || undefined}
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="w-full h-full object-cover animate-fade-in"
+          />
+        ) : heroImageUrl ? (
           <img
-            src={club.banner_image}
+            src={heroImageUrl}
             alt={club.name}
             className="w-full h-full object-cover animate-fade-in"
           />
@@ -401,94 +470,71 @@ export default async function ClubDetailPage({ params }: PageProps) {
 
         {/* Hero Info Content Bottom Aligned */}
         <div className="absolute bottom-0 inset-x-0 z-20 pb-8 pt-20 px-4 md:px-8 container mx-auto">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-4 max-w-2fr">
-              {/* Status and Category Badges */}
-              <div className="flex flex-wrap items-center gap-2">
-                {categories.map((cat, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-500/10 border border-primary-500/20 text-[10px] font-bold uppercase tracking-wider text-primary-300 shadow-sm"
-                  >
-                    {cat}
-                  </span>
-                ))}
-
-                {/* Open/Closed Status */}
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm border ${
-                  isOpen 
-                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-                    : "bg-red-500/10 border-red-500/20 text-red-300"
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? "bg-emerald-400" : "bg-red-400"}`} />
-                  <span>{isOpen ? "Abierto" : "Cerrado"}</span>
-                </span>
-
-                {/* Rating Badge */}
-                <div className="flex items-center gap-1 bg-black/45 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-amber-400 text-xs font-black">
-                  <Star className="w-3.5 h-3.5 fill-amber-400" />
-                  <span>{Number(club.rating || 5.0).toFixed(1)}</span>
+          <div className="max-w-4xl mx-auto space-y-5">
+            {/* Title & Info */}
+            <div className="space-y-3">
+              <h1 className="text-5xl md:text-7xl font-black tracking-tight text-white font-outfit drop-shadow-[0_4px_20px_rgba(0,0,0,0.65)]">
+                {club.name}
+              </h1>
+              
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-zinc-350 text-sm font-semibold">
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-4.5 h-4.5 text-accent-400" />
+                  <span>{club.city}</span>
                 </div>
-              </div>
-
-              {/* Title & Info */}
-              <div className="space-y-2">
-                <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white font-outfit drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
-                  {club.name}
-                </h1>
-                <div className="flex items-center gap-2 text-zinc-300 text-sm">
-                  <MapPin className="w-4 h-4 text-accent-400" />
-                  <span className="font-semibold">{club.city}</span>
-                  {club.address && (
-                    <>
-                      <span className="text-zinc-600">•</span>
-                      <span className="text-zinc-400">{club.address}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons Row */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4 pt-2">
-                <ClubHeroActions
-                  clubId={club.id}
-                  clubSlug={club.slug}
-                  clubName={club.name}
-                />
-
-                <div className="flex flex-wrap gap-2">
-                  <a
-                    href={mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/5 text-[11px] font-bold px-3 py-2 transition-all cursor-pointer backdrop-blur"
-                  >
-                    📍 Cómo llegar
-                  </a>
-                  {instagramUrl && (
-                    <a
-                      href={instagramUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/5 text-[11px] font-bold px-3 py-2 transition-all cursor-pointer backdrop-blur"
-                    >
-                      <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
-                      <span>Instagram</span>
-                    </a>
-                  )}
-                </div>
+                {club.address && (
+                  <>
+                    <span className="text-zinc-650">•</span>
+                    <span className="text-zinc-400">{club.address}</span>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Occupancy Indicator Badge */}
-            <div className="shrink-0 flex flex-col items-start md:items-end gap-1.5">
-              <div className={`inline-flex items-center gap-2 border px-3.5 py-2 rounded-2xl text-xs font-black uppercase tracking-wider ${occupancyColorClass} shadow-md`}>
-                <span className={`w-2.5 h-2.5 rounded-full ${occupancyDotClass} animate-pulse`} />
-                <span>{occupancyText}</span>
+            {/* Estado Principal */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 1. Verificado */}
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-black uppercase tracking-widest text-blue-400 shadow-sm">
+                ⭐ Verificado
+              </span>
+
+              {/* 2. Abierto / Cerrado */}
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm border ${
+                isOpen 
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                  : "bg-zinc-800 border-zinc-700 text-zinc-500"
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? "bg-emerald-400 animate-pulse" : "bg-zinc-500"}`} />
+                <span>{isOpen ? "Abierto ahora" : "Cerrado"}</span>
+              </span>
+            </div>
+
+            {/* Datos Secundarios */}
+            <div className="flex items-center flex-wrap gap-x-4 gap-y-2 text-zinc-300 text-sm font-semibold pt-1">
+              {/* Calificación */}
+              <div className="flex items-center gap-1.5">
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <span className="text-white font-bold">{Number(club.rating || 5.0).toFixed(1)}</span>
               </div>
-              <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider text-left md:text-right px-1">
-                🔥 {activeSessionsCount} mesas activas y {activeOrdersCount} comandas
+              
+              <span className="text-zinc-700">•</span>
+
+              {/* Connect Activo */}
+              <div className="flex items-center gap-1.5 text-purple-400">
+                <span>👥</span>
+                <span>Connect activo ({visibleConnectCount || 0})</span>
               </div>
+            </div>
+
+            {/* Action Buttons Row */}
+            <div className="pt-3">
+              <ClubHeroActions
+                clubId={club.id}
+                clubSlug={club.slug}
+                clubName={club.name}
+                instagramUrl={instagramUrl}
+                mapsUrl={mapsUrl}
+              />
             </div>
           </div>
         </div>
@@ -516,73 +562,22 @@ export default async function ClubDetailPage({ params }: PageProps) {
             clubCoverPrice={club.cover_price ?? 0.00}
             upcomingEvents={upcomingEvents}
             clubGalleryItems={clubGalleryItems}
+            clubStories={clubStories}
+            clubLogo={club.logo}
+            clubBannerImage={club.banner_image}
             hasConnectAccess={hasConnectAccess}
             connectBookingId={connectBookingId}
             currentUser={user}
+            connectStats={{
+              activeConnectCount: activeConnectCount || 0,
+              visibleConnectCount: visibleConnectCount || 0,
+              newConnectionsToday: newConnectionsToday || 0,
+              activeSessionsCount: activeSessionsCount || 0,
+              activeOrdersCount: activeOrdersCount || 0
+            }}
+            connectAttendees={connectAttendees}
+            clubAmenities={club.amenities || []}
           />
-
-          {/* ==========================================
-              3. STORIES GALLERY
-              ========================================== */}
-          <div className="border-t border-white/5 pt-10">
-            <StoriesGallery
-              logo={club.logo}
-              bannerImage={club.banner_image}
-              clubName={club.name}
-              stories={clubStories}
-              isProvider={user?.id === club.provider_id}
-            />
-          </div>
-
-          {/* ==========================================
-              4. CARTA DESTACADA (FEATURED PRODUCTS)
-              ========================================== */}
-          <div className="border-t border-white/5 pt-10">
-            <FeaturedProducts clubId={club.id} menuItems={menuItems} />
-          </div>
-
-          {/* ==========================================
-              5. METRICAS DE OPERACION REAL (AT THE BOTTOM)
-              ========================================== */}
-          {(vipReservationsCount || coversSold || reservedTablesCount || totalOrdersCount) ? (
-            <div className="border-t border-white/5 pt-10 pb-10">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-4 font-outfit">Métricas de Operación Real</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* VIP bookings count */}
-                {Boolean(vipReservationsCount) && (
-                  <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
-                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Reservas VIP</span>
-                    <span className="text-3xl font-black text-white mt-2 font-outfit block">{vipReservationsCount}</span>
-                    <span className="text-[10px] text-zinc-400 mt-1 block">Mesa reservada confirmada</span>
-                  </div>
-                )}
-                {/* Covers sold count */}
-                {Boolean(coversSold) && (
-                  <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
-                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Covers vendidos</span>
-                    <span className="text-3xl font-black text-emerald-400 mt-2 font-outfit block">{coversSold}</span>
-                    <span className="text-[10px] text-zinc-400 mt-1 block">Accesos rápidos despachados</span>
-                  </div>
-                )}
-                {/* Mesas reservadas */}
-                {Boolean(reservedTablesCount) && (
-                  <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
-                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Mesas reservadas</span>
-                    <span className="text-3xl font-black text-amber-400 mt-2 font-outfit block">{reservedTablesCount}</span>
-                    <span className="text-[10px] text-zinc-400 mt-1 block">Espacios reservados en vivo</span>
-                  </div>
-                )}
-                {/* Orders count */}
-                {Boolean(totalOrdersCount) && (
-                  <div className="glass-card p-5 border-white/5 bg-zinc-950/40 hover:border-primary-500/15 transition-all">
-                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Pedidos realizados</span>
-                    <span className="text-3xl font-black text-primary-400 mt-2 font-outfit block">{totalOrdersCount}</span>
-                    <span className="text-[10px] text-zinc-400 mt-1 block">Consumos procesados</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
