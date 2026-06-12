@@ -2,9 +2,10 @@
 
 import { useTransition, useState } from "react";
 import { deleteService } from "@/app/services/actions";
-import { Edit2, Trash2, Loader2, AlertTriangle, AlertCircle } from "lucide-react";
+import { Edit2, Trash2, Loader2, AlertTriangle, AlertCircle, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { ServiceProfileManager } from "./ServiceProfileManager";
 
 interface Service {
   id: string;
@@ -14,6 +15,9 @@ interface Service {
   category: string;
   subcategory?: string | null;
   image_url: string | null;
+  spotify_url?: string | null;
+  soundcloud_url?: string | null;
+  youtube_url?: string | null;
 }
 
 interface ProviderServicesListProps {
@@ -25,6 +29,7 @@ export function ProviderServicesList({ services }: ProviderServicesListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showConfirmId, setShowConfirmId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [managedService, setManagedService] = useState<Service | null>(null);
 
   const handleDelete = (id: string) => {
     setError(null);
@@ -123,6 +128,13 @@ export function ProviderServicesList({ services }: ProviderServicesListProps) {
               <div className="pt-3 border-t border-white/5 flex items-center justify-between mt-auto">
                 <span className="text-[10px] text-zinc-500">ID: {service.id.substring(0, 8)}...</span>
                 <div className="flex gap-2">
+                  <button
+                    onClick={() => setManagedService(service)}
+                    className="p-2 bg-primary-650/15 hover:bg-primary-650/25 border border-primary-500/20 hover:border-primary-500/40 text-primary-400 hover:text-white rounded-lg transition-colors flex items-center gap-1 text-xs cursor-pointer font-semibold"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Perfil
+                  </button>
                   <Link
                     href={`/dashboard/provider/edit-service/${service.id}`}
                     className="p-2 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-lg transition-colors flex items-center gap-1 text-xs cursor-pointer"
@@ -143,6 +155,14 @@ export function ProviderServicesList({ services }: ProviderServicesListProps) {
           );
         })}
       </div>
+
+      {managedService && (
+        <ServiceProfileManager
+          service={managedService}
+          isOpen={!!managedService}
+          onClose={() => setManagedService(null)}
+        />
+      )}
     </div>
   );
 }

@@ -60,7 +60,7 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
   try {
     const { data, error } = await supabase
       .from("services")
-      .select("id, title, description, price, category, subcategory, image_url")
+      .select("id, title, description, price, category, subcategory, image_url, spotify_url, soundcloud_url, youtube_url")
       .eq("provider_id", user.id)
       .order("created_at", { ascending: false });
     

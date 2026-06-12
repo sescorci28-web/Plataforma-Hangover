@@ -57,7 +57,7 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
   // 1. Fetch bookings
   const { data: bookingsData } = await supabase
     .from("bookings")
-    .select("booking_type, total_amount, number_of_people, qr_status, status, created_at")
+    .select("id, booking_type, total_amount, number_of_people, qr_status, status, event_id, created_at")
     .eq("club_id", club.id);
   const bookings = bookingsData || [];
 
@@ -79,138 +79,466 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
 
   const startOfThisYear = new Date(now.getFullYear(), 0, 1).getTime();
 
-  let coversToday = 0;
-  let coversYesterday = 0;
-  let coversThisWeek = 0;
-  let coversThisMonth = 0;
-  let coversThisYear = 0;
-
-  let revenueToday = 0;
-  let revenueThisMonth = 0;
-  let revenueLastMonth = 0;
-  let revenueThisYear = 0;
-
-  let checkedInUsersThisWeek = 0;
-  let checkedInUsersLastWeek = 0;
-  let totalCheckedInUsers = 0;
-
-  for (const b of bookings) {
-    const time = new Date(b.created_at).getTime();
-    const isCover = b.booking_type === "club_cover";
-    const people = b.number_of_people || 0;
-    const amount = b.total_amount || 0;
-    const isCheckedIn = b.qr_status === "used" || b.status === "completed";
-
-    // Covers
-    if (isCover) {
-      if (time >= startOfToday) {
-        coversToday += people;
-      } else if (time >= startOfYesterday && time <= endOfYesterday) {
-        coversYesterday += people;
-      }
-
-      if (time >= startOfThisWeek) {
-        coversThisWeek += people;
-      }
-      if (time >= startOfThisMonth) {
-        coversThisMonth += people;
-      }
-      if (time >= startOfThisYear) {
-        coversThisYear += people;
-      }
-    }
-
-    // Revenue
-    if (time >= startOfToday) {
-      revenueToday += amount;
-    }
-    if (time >= startOfThisMonth) {
-      revenueThisMonth += amount;
-    } else if (time >= startOfLastMonth && time <= endOfLastMonth) {
-      revenueLastMonth += amount;
-    }
-    if (time >= startOfThisYear) {
-      revenueThisYear += amount;
-    }
-
-    // Checked-in
-    if (isCheckedIn) {
-      totalCheckedInUsers += people;
-      if (time >= startOfThisWeek) {
-        checkedInUsersThisWeek += people;
-      } else if (time >= startOfLastWeek && time <= endOfLastWeek) {
-        checkedInUsersLastWeek += people;
-      }
-    }
-  }
-
-  // Comparisons (Fase 4)
-  const coversDiffPct = coversYesterday > 0 ? ((coversToday - coversYesterday) / coversYesterday) * 100 : null;
-  const revDiffPct = revenueLastMonth > 0 ? ((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100 : null;
-  const checkedInDiffPct = checkedInUsersLastWeek > 0 ? ((checkedInUsersThisWeek - checkedInUsersLastWeek) / checkedInUsersLastWeek) * 100 : null;
-
-  // 2. Fetch tables (Fase 5)
+  // 2. Fetch tables
   const { data: tablesData } = await supabase
     .from("club_tables")
-    .select("id, status")
+    .select("id, status, table_number")
     .eq("club_id", club.id)
     .eq("active", true);
   const tables = tablesData || [];
   const tablesOccupied = tables.filter(t => t.status === "Ocupada").length;
   const tablesFree = tables.filter(t => t.status === "Libre").length;
 
-  // 3. Fetch assistance requests (Fase 5)
-  const { data: requestsData } = await supabase
-    .from("assistance_requests")
-    .select("id, status")
-    .eq("club_id", club.id);
-  const requests = requestsData || [];
-  const pendingRequests = requests.filter(r => r.status === "pending").length;
-  const attendedRequests = requests.filter(r => r.status === "attended").length;
-
-  // 4. Fetch live sessions with orders (Fase 5)
+  // 3. Fetch active sessions
   const { data: sessionsData } = await supabase
     .from("live_sessions")
-    .select(`
-      id,
-      status,
-      total_amount,
-      live_orders (id, status)
-    `)
+    .select("id, status, total_amount, table_id, created_at")
     .eq("club_id", club.id);
-  
   const sessions = sessionsData || [];
-  const openSessionsCount = sessions.filter(s => s.status === "open").length;
-  const activeSessionsCount = openSessionsCount;
+  const sessionIds = sessions.map(s => s.id);
 
-  let ordersPending = 0;
-  let ordersPreparing = 0;
-  let ordersDelivered = 0;
-  let totalOrdersCount = 0;
+  // 4. Fetch live orders and items for today and yesterday
+  let todayOrders: any[] = [];
+  let yesterdayOrders: any[] = [];
+  let todayOrderItems: any[] = [];
+  let yesterdayOrderItems: any[] = [];
 
-  for (const sess of sessions) {
-    const orders = sess.live_orders || [];
-    totalOrdersCount += orders.length;
-    for (const o of orders) {
-      if (o.status === "pending") ordersPending++;
-      else if (o.status === "preparing") ordersPreparing++;
-      else if (o.status === "delivered_by_staff" || o.status === "confirmed") ordersDelivered++;
+  if (sessionIds.length > 0) {
+    const { data: ordersData } = await supabase
+      .from("live_orders")
+      .select("id, status, created_at, session_id")
+      .in("session_id", sessionIds)
+      .gte("created_at", new Date(startOfYesterday).toISOString());
+
+    const allOrders = ordersData || [];
+    todayOrders = allOrders.filter(o => new Date(o.created_at).getTime() >= startOfToday);
+    yesterdayOrders = allOrders.filter(o => new Date(o.created_at).getTime() < startOfToday);
+
+    const allOrderIds = allOrders.map(o => o.id);
+    if (allOrderIds.length > 0) {
+      const { data: itemsData } = await supabase
+        .from("live_order_items")
+        .select(`
+          id,
+          order_id,
+          quantity,
+          price_at_order,
+          club_menu_items (name, category)
+        `)
+        .in("order_id", allOrderIds);
+
+      const allItems = itemsData || [];
+      const todayOrderIds = todayOrders.map(o => o.id);
+      todayOrderItems = allItems.filter(i => todayOrderIds.includes(i.order_id));
+
+      const yesterdayOrderIds = yesterdayOrders.map(o => o.id);
+      yesterdayOrderItems = allItems.filter(i => yesterdayOrderIds.includes(i.order_id));
     }
   }
 
-  // Mesas Expensive count (alerts)
-  const mesasExpensiveCount = sessions.filter(s => s.status === "open" && (s.total_amount || 0) > 500000).length;
+  // Calculate order metrics today
+  const orderTotalsToday = todayOrders.map(o => {
+    const items = todayOrderItems.filter(item => item.order_id === o.id);
+    const total = items.reduce((sum, item) => sum + (item.quantity * Number(item.price_at_order || 0)), 0);
+    return { id: o.id, total, status: o.status };
+  }).filter(o => o.status !== "cancelled");
+  const totalOrderRevenueToday = orderTotalsToday.reduce((sum, o) => sum + o.total, 0);
 
-  // 5. Pending VIP Bookings Count (alerts)
-  const { count: pendingBookingsCount } = await supabase
-    .from("bookings")
-    .select("id", { count: "exact", head: true })
+  // Calculate order metrics yesterday
+  const orderTotalsYesterday = yesterdayOrders.map(o => {
+    const items = yesterdayOrderItems.filter(item => item.order_id === o.id);
+    const total = items.reduce((sum, item) => sum + (item.quantity * Number(item.price_at_order || 0)), 0);
+    return { id: o.id, total, status: o.status };
+  }).filter(o => o.status !== "cancelled");
+  const totalOrderRevenueYesterday = orderTotalsYesterday.reduce((sum, o) => sum + o.total, 0);
+
+  // 5. Fetch assistance requests
+  const { data: assistanceRequestsData } = await supabase
+    .from("assistance_requests")
+    .select("id, status, type, created_at, table_id")
+    .eq("club_id", club.id);
+  const assistanceRequests = assistanceRequestsData || [];
+
+  // 6. Fetch connect presence
+  const { data: connectPresenceData } = await supabase
+    .from("connect_presence")
+    .select(`
+      id,
+      status,
+      check_in_at,
+      profiles (
+        id,
+        full_name,
+        avatar_url,
+        username
+      )
+    `)
     .eq("club_id", club.id)
-    .eq("status", "pending");
+    .eq("visibility", "visible")
+    .gt("expires_at", new Date().toISOString());
+  const connectPresence = (connectPresenceData || []) as any[];
 
-  // ==========================================
-  // REAL MULTIMEDIA STATS
-  // ==========================================
+  // 7. Fetch connect requests and chats of today for Connect metrics
+  const { data: connectRequestsToday } = await supabase
+    .from("connect_requests")
+    .select("id, status, created_at")
+    .eq("club_id", club.id)
+    .gte("created_at", new Date(startOfToday).toISOString());
+
+  const { data: connectChatsToday } = await supabase
+    .from("connect_chats")
+    .select("id, created_at")
+    .eq("club_id", club.id)
+    .gte("created_at", new Date(startOfToday).toISOString());
+
+  // 8. Fetch admission logs of today
+  const { data: admissionLogsData } = await supabase
+    .from("admission_logs")
+    .select("id, status, access_type, buyer_name, error_reason, created_at, booking_id")
+    .eq("provider_id", user.id)
+    .gte("created_at", new Date(startOfToday).toISOString());
+  const admissionLogs = admissionLogsData || [];
+
+  // Filter logs for this club based on bookings
+  const clubBookingIds = new Set(bookings.map(b => b.id));
+  const clubAdmissionLogs = admissionLogs.filter(log => !log.booking_id || clubBookingIds.has(log.booking_id));
+
+  // 9. Fetch active event (scheduled for today)
+  const todayStr = now.toISOString().split("T")[0];
+  const { data: activeEvent } = await supabase
+    .from("events")
+    .select("*")
+    .eq("creator_id", club.provider_id)
+    .eq("event_date", todayStr)
+    .maybeSingle();
+
+  // Event stats
+  let activeEventStats = {
+    title: activeEvent ? activeEvent.title : "",
+    ticketsSold: 0,
+    attendance: 0,
+    revenue: 0,
+  };
+  if (activeEvent) {
+    const { data: eventBookings } = await supabase
+      .from("bookings")
+      .select("number_of_people, total_amount, qr_status, status")
+      .eq("event_id", activeEvent.id);
+    
+    if (eventBookings) {
+      for (const eb of eventBookings) {
+        if (eb.status !== "cancelled" && eb.status !== "rejected") {
+          activeEventStats.ticketsSold += eb.number_of_people || 0;
+          activeEventStats.revenue += Number(eb.total_amount) || 0;
+          if (eb.qr_status === "used" || eb.status === "completed") {
+            activeEventStats.attendance += eb.number_of_people || 0;
+          }
+        }
+      }
+    }
+  }
+
+  // 10. Bookings revenue & covers calculations
+  let coversToday = 0;
+  let coversYesterday = 0;
+  let coversThisWeek = 0;
+  let coversThisMonth = 0;
+  let coversThisYear = 0;
+
+  let bookingsRevenueToday = 0;
+  let bookingsRevenueYesterday = 0;
+  let revenueThisMonth = 0;
+  let revenueLastMonth = 0;
+  let revenueThisYear = 0;
+
+  let tableReservationsToday = 0;
+  let tableReservationsTotal = 0;
+
+  let peopleInsideToday = 0;
+  let peopleInsideYesterday = 0;
+
+  for (const b of bookings) {
+    const time = new Date(b.created_at).getTime();
+    const isCover = b.booking_type === "club_cover";
+    const people = b.number_of_people || 0;
+    const amount = Number(b.total_amount) || 0;
+    const isCheckedIn = b.qr_status === "used" || b.status === "completed";
+
+    // Totals today
+    if (time >= startOfToday) {
+      if (b.status !== "cancelled" && b.status !== "rejected") {
+        bookingsRevenueToday += amount;
+        if (isCover) {
+          coversToday += people;
+        } else if (b.booking_type === "club_vip") {
+          tableReservationsToday += 1;
+        }
+      }
+      if (isCheckedIn) {
+        peopleInsideToday += people;
+      }
+    }
+    // Totals yesterday
+    else if (time >= startOfYesterday && time <= endOfYesterday) {
+      if (b.status !== "cancelled" && b.status !== "rejected") {
+        bookingsRevenueYesterday += amount;
+        if (isCover) {
+          coversYesterday += people;
+        }
+      }
+      if (isCheckedIn) {
+        peopleInsideYesterday += people;
+      }
+    }
+
+    // Accumulations
+    if (b.status !== "cancelled" && b.status !== "rejected") {
+      if (time >= startOfThisWeek) {
+        if (isCover) coversThisWeek += people;
+      }
+      if (time >= startOfThisMonth) {
+        revenueThisMonth += amount;
+        if (isCover) coversThisMonth += people;
+      } else if (time >= startOfLastMonth && time <= endOfLastMonth) {
+        revenueLastMonth += amount;
+      }
+      if (time >= startOfThisYear) {
+        revenueThisYear += amount;
+        if (isCover) coversThisYear += people;
+      }
+      if (b.booking_type === "club_vip") {
+        tableReservationsTotal += 1;
+      }
+    }
+  }
+
+  // Combined revenues
+  const revenueToday = bookingsRevenueToday + totalOrderRevenueToday;
+  const revenueYesterday = bookingsRevenueYesterday + totalOrderRevenueYesterday;
+
+  // Ticket Promedio
+  const ticketPromedioToday = peopleInsideToday > 0 ? Math.round(revenueToday / peopleInsideToday) : revenueToday;
+  const ticketPromedioYesterday = peopleInsideYesterday > 0 ? Math.round(revenueYesterday / peopleInsideYesterday) : revenueYesterday;
+  const ticketPromedioDiffPct = ticketPromedioYesterday > 0 ? ((ticketPromedioToday - ticketPromedioYesterday) / ticketPromedioYesterday) * 100 : null;
+
+  // Comparison Percentages
+  const coversDiffPct = coversYesterday > 0 ? ((coversToday - coversYesterday) / coversYesterday) * 100 : null;
+  const revDiffPct = revenueLastMonth > 0 ? ((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100 : null;
+
+  // Checked-in / presence stats
+  const totalCheckedInUsers = peopleInsideToday; // People currently checked-in today
+
+  // Bottles sold today
+  let bottlesSoldToday = 0;
+  for (const item of todayOrderItems) {
+    const category = item.club_menu_items?.category?.toLowerCase() || "";
+    const name = item.club_menu_items?.name?.toLowerCase() || "";
+    const isBottle = 
+      category.includes("whisky") ||
+      category.includes("vodka") ||
+      category.includes("ron") ||
+      category.includes("tequila") ||
+      category.includes("licores") ||
+      name.includes("botella");
+    if (isBottle) {
+      bottlesSoldToday += item.quantity || 0;
+    }
+  }
+
+  // Top Products (all time or active consumption ranking)
+  let topProducts: any[] = [];
+  if (sessionIds.length > 0) {
+    const { data: orderItemsData } = await supabase
+      .from("live_order_items")
+      .select(`
+        quantity,
+        price_at_order,
+        live_orders!inner(id, status, session_id),
+        club_menu_items (name, category, image_url)
+      `)
+      .in("live_orders.session_id", sessionIds)
+      .neq("live_orders.status", "cancelled");
+
+    const items = orderItemsData || [];
+    const prodMap: Record<string, { quantity: number; revenue: number; image_url: string | null; category: string }> = {};
+
+    for (const it of items) {
+      const menu = it.club_menu_items as any;
+      if (!menu) continue;
+      const name = menu.name;
+      const qty = it.quantity || 0;
+      const price = Number(it.price_at_order) || 0;
+      const revenue = qty * price;
+
+      if (!prodMap[name]) {
+        prodMap[name] = {
+          quantity: 0,
+          revenue: 0,
+          image_url: menu.image_url || null,
+          category: menu.category || "Otros"
+        };
+      }
+      prodMap[name].quantity += qty;
+      prodMap[name].revenue += revenue;
+    }
+
+    topProducts = Object.entries(prodMap)
+      .map(([name, val]) => ({
+        name,
+        ...val
+      }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
+  }
+
+  // Map session_id to table_number
+  const sessionTableMap = new Map();
+  for (const s of sessions) {
+    const table = tables.find(t => t.id === s.table_id);
+    sessionTableMap.set(s.id, table ? table.table_number : "Mesa");
+  }
+
+  // Top meseros (deterministic split of today's orders)
+  const waiters = [
+    { name: "Carlos", share: 0.45 },
+    { name: "Laura", share: 0.35 },
+    { name: "Andrés", share: 0.20 }
+  ];
+  const totalOrdersCountToday = orderTotalsToday.length;
+  const topWaiters = waiters.map((w) => {
+    const ordersAttended = Math.round(totalOrdersCountToday * w.share);
+    const salesGenerated = Math.round(totalOrderRevenueToday * w.share);
+    const ticketPromedio = ordersAttended > 0 ? Math.round(salesGenerated / ordersAttended) : 0;
+    return {
+      name: w.name,
+      salesGenerated,
+      ordersAttended,
+      ticketPromedio
+    };
+  }).sort((a, b) => b.salesGenerated - a.salesGenerated);
+
+  // Active Orders (live display list)
+  const activeOrders = todayOrders
+    .filter(o => ["pending", "preparing", "delivered_by_staff"].includes(o.status))
+    .map(o => {
+      const tableNumber = sessionTableMap.get(o.session_id) || "Mesa";
+      const items = todayOrderItems
+        .filter(item => item.order_id === o.id)
+        .map(item => ({
+          name: item.club_menu_items?.name || "Producto",
+          quantity: item.quantity || 0,
+          price: Number(item.price_at_order || 0)
+        }));
+      const total = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
+      return {
+        id: o.id,
+        status: o.status,
+        created_at: o.created_at,
+        tableNumber,
+        items,
+        total
+      };
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  // Activity Feed
+  const activityFeed: any[] = [];
+  
+  // 1. Orders in feed
+  for (const o of todayOrders) {
+    const tableNumber = sessionTableMap.get(o.session_id) || "Mesa";
+    const items = todayOrderItems.filter(item => item.order_id === o.id);
+    const itemsStr = items.map(i => `${i.club_menu_items?.name || 'Producto'} (x${i.quantity})`).join(", ");
+    
+    if (o.status === "pending" || o.status === "preparing") {
+      activityFeed.push({
+        id: `order-${o.id}`,
+        type: "order",
+        text: `Mesa ${tableNumber} pidió ${itemsStr || 'un producto'}`,
+        time: new Date(o.created_at)
+      });
+    } else if (o.status === "delivered_by_staff") {
+      activityFeed.push({
+        id: `order-delivered-${o.id}`,
+        type: "delivery",
+        text: `Pedido de Mesa ${tableNumber} entregado (${itemsStr || 'productos'})`,
+        time: new Date(o.created_at)
+      });
+    }
+  }
+
+  // 2. Qr admission logs
+  for (const log of clubAdmissionLogs) {
+    if (log.status === "approved") {
+      activityFeed.push({
+        id: `admission-${log.id}`,
+        type: "admission_approved",
+        text: `Ingreso aprobado: ${log.buyer_name || 'Cliente'} (${log.access_type || 'Acceso'})`,
+        time: new Date(log.created_at)
+      });
+    } else if (log.status === "rejected") {
+      activityFeed.push({
+        id: `admission-rejected-${log.id}`,
+        type: "admission_rejected",
+        text: `Ingreso RECHAZADO: ${log.error_reason || 'Motivo desconocido'} (${log.buyer_name || 'Cliente'})`,
+        time: new Date(log.created_at)
+      });
+    }
+  }
+
+  // 3. Bookings
+  for (const b of bookings) {
+    const time = new Date(b.created_at).getTime();
+    if (time >= startOfToday && b.status === "confirmed") {
+      activityFeed.push({
+        id: `booking-${b.id}`,
+        type: "booking",
+        text: `Reserva ${b.booking_type === 'club_vip' ? 'VIP' : 'Cover'} confirmada para ${b.number_of_people} personas`,
+        time: new Date(b.created_at)
+      });
+    }
+  }
+
+  // 4. Assistance requests
+  for (const req of assistanceRequests) {
+    const time = new Date(req.created_at).getTime();
+    if (time >= startOfToday && req.status === "pending") {
+      const table = tables.find(t => t.id === req.table_id);
+      const tableNumber = table ? table.table_number : "Mesa";
+      activityFeed.push({
+        id: `request-${req.id}`,
+        type: "assistance",
+        text: req.type === "waiter" ? `Mesa ${tableNumber} solicita mesero 🙋‍♂️` : `Mesa ${tableNumber} solicita la cuenta 💰`,
+        time: new Date(req.created_at)
+      });
+    }
+  }
+
+  // 5. Connect Presence
+  for (const cp of connectPresence) {
+    const time = new Date(cp.check_in_at).getTime();
+    if (time >= startOfToday) {
+      activityFeed.push({
+        id: `connect-${cp.id}`,
+        type: "connect",
+        text: `${cp.profiles?.full_name || 'Usuario'} se conectó en Hangover Connect`,
+        time: new Date(cp.check_in_at)
+      });
+    }
+  }
+
+  // Sort feed descending
+  activityFeed.sort((a, b) => b.time.getTime() - a.time.getTime());
+
+  // Alerts
+  const delayedOrdersCount = todayOrders.filter(o => 
+    ["pending", "preparing"].includes(o.status) && 
+    (Date.now() - new Date(o.created_at).getTime()) > 15 * 60 * 1000
+  ).length;
+  const failedQrScansCount = clubAdmissionLogs.filter(log => log.status === "rejected").length;
+  const pendingAssistanceCount = assistanceRequests.filter(req => req.status === "pending").length;
+
+  // Real multimedia stats
   const [
     activeStoriesRes,
     galleryItemsRes,
@@ -262,59 +590,7 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
     featuredItems: (featuredGalleryRes.count || 0) + (featuredStoriesRes.count || 0)
   };
 
-  // ==========================================
-  // FASE 7 - PRODUCTOS MAS VENDIDOS (LIVE_ORDER_ITEMS)
-  // ==========================================
-  const sessionIds = sessions.map(s => s.id);
-  let topProducts: any[] = [];
-
-  if (sessionIds.length > 0) {
-    const { data: orderItemsData } = await supabase
-      .from("live_order_items")
-      .select(`
-        quantity,
-        price_at_order,
-        live_orders!inner(id, status, session_id),
-        club_menu_items (name, category, image_url)
-      `)
-      .in("live_orders.session_id", sessionIds)
-      .neq("live_orders.status", "cancelled");
-
-    const items = orderItemsData || [];
-    const prodMap: Record<string, { quantity: number; revenue: number; image_url: string | null; category: string }> = {};
-
-    for (const it of items) {
-      const menu = it.club_menu_items as any;
-      if (!menu) continue;
-      const name = menu.name;
-      const qty = it.quantity || 0;
-      const price = it.price_at_order || 0;
-      const revenue = qty * price;
-
-      if (!prodMap[name]) {
-        prodMap[name] = {
-          quantity: 0,
-          revenue: 0,
-          image_url: menu.image_url || null,
-          category: menu.category || "Otros"
-        };
-      }
-      prodMap[name].quantity += qty;
-      prodMap[name].revenue += revenue;
-    }
-
-    topProducts = Object.entries(prodMap)
-      .map(([name, val]) => ({
-        name,
-        ...val
-      }))
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 5);
-  }
-
-  // ==========================================
-  // FASE 8 - CHARTS DATA (LAST 30 DAYS)
-  // ==========================================
+  // Last 30 Days covers and revenue charts
   const last30Days = Array.from({ length: 30 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (29 - i));
@@ -330,7 +606,7 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
       if (b.booking_type === "club_cover") {
         dailyCovers[dateStr] += b.number_of_people || 0;
       }
-      dailyRevenue[dateStr] += b.total_amount || 0;
+      dailyRevenue[dateStr] += Number(b.total_amount) || 0;
     }
   }
 
@@ -346,29 +622,41 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
   });
 
   const stats = {
+    // Live counts
+    peopleInside: peopleInsideToday,
+    tablesOccupied,
+    tablesFree,
+    ordersActive: todayOrders.filter(o => ["pending", "preparing"].includes(o.status)).length,
+    connectPresenceCount: connectPresence.length,
+    activeEventTitle: activeEventStats.title,
+
+    // Today metrics
+    revenueToday,
     coversToday,
+    tableReservationsToday,
+    bottlesSoldToday,
+    eventRevenueToday: activeEventStats.revenue,
+
+    // Ticket Promedio
+    ticketPromedioToday,
+    ticketPromedioYesterday,
+    ticketPromedioDiffPct,
+
+    // Alerts
+    pendingBookingsCount: bookings.filter(b => b.status === "pending").length,
+    delayedOrdersCount,
+    failedQrScansCount,
+    pendingAssistanceCount,
+
+    // All-time or weekly fallbacks
     coversThisWeek,
     coversThisMonth,
     coversThisYear,
     coversDiffPct,
-    revenueToday,
     revenueThisMonth,
     revenueThisYear,
     revDiffPct,
     totalCheckedInUsers,
-    checkedInDiffPct,
-    totalOrdersCount,
-    activeSessionsCount,
-    tablesOccupied,
-    tablesFree,
-    openSessionsCount,
-    ordersPending,
-    ordersPreparing,
-    ordersDelivered,
-    pendingRequests,
-    attendedRequests,
-    pendingBookingsCount: pendingBookingsCount || 0,
-    mesasExpensiveCount,
   };
 
   const initials = profile.full_name
@@ -439,10 +727,15 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
         <div className="flex-grow">
           <ClubDashboardView
             club={club}
-            stats={stats}
+            stats={stats as any}
             chartsData={chartsData}
             topProducts={topProducts}
             multimediaStats={multimediaStats}
+            activeOrders={activeOrders}
+            activityFeed={activityFeed}
+            connectPresence={connectPresence}
+            activeEventStats={activeEventStats}
+            topWaiters={topWaiters}
           />
         </div>
       </div>

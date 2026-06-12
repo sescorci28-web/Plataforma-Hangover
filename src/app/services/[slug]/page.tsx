@@ -3,32 +3,17 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { 
   Calendar, MapPin, Sparkles, ArrowLeft, ShieldCheck, Clock, MessageSquare, 
-  CheckCircle2, AlertTriangle, Users, Award, Star, Zap, Image, ChevronRight, Check, X,
-  PhoneCall, Video as VideoIcon
+  CheckCircle2, AlertTriangle, Users, Award, Star, Zap, Image as ImageIcon, ChevronRight, Check, X,
+  PhoneCall, Video as VideoIcon, Music, Disc
 } from "lucide-react";
 
-const YoutubeIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
-    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
-  </svg>
-);
-
-const InstagramIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-  </svg>
-);
-
-const FacebookIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
-  </svg>
-);
 import { ServiceGallery } from "@/components/services/ServiceGallery";
 import { ServiceBookingWidget } from "@/components/services/ServiceBookingWidget";
+import { ServiceStoriesViewer } from "@/components/services/ServiceStoriesViewer";
+import { ServiceCalendar } from "@/components/services/ServiceCalendar";
+import { ServiceReviewsSection } from "@/components/services/ServiceReviewsSection";
+import { ServiceProfileActions } from "@/components/services/ServiceProfileActions";
+import { ServicePortfolio } from "@/components/services/ServicePortfolio";
 import { slugify } from "@/lib/slugify";
 
 export const revalidate = 0; // Dynamic route
@@ -58,6 +43,23 @@ function getEmbedUrl(url: string) {
   }
   
   return null;
+}
+
+// Convert standard spotify share link to embed link
+function getSpotifyEmbedUrl(url: string) {
+  if (!url) return null;
+  const regex = /open\.spotify\.com\/(playlist|track|album|artist)\/([a-zA-Z0-9]+)/i;
+  const match = url.match(regex);
+  if (match) {
+    return `https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0`;
+  }
+  return null;
+}
+
+// SoundCloud embed builder
+function getSoundCloudEmbedUrl(url: string) {
+  if (!url) return null;
+  return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`;
 }
 
 export default async function ServiceDetailPage({ params }: ServiceDetailPageProps) {
@@ -131,6 +133,119 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
     notFound();
   }
 
+  // ----------------------------------------------------------------
+  // Fetch Professional Profile details (Graceful Try/Catches)
+  // ----------------------------------------------------------------
+  let stories: any[] = [];
+  let dbGallery: any[] = [];
+  let pastEvents: any[] = [];
+  let reviews: any[] = [];
+  let manualAvailability: any[] = [];
+  let bookedDates: string[] = [];
+  let eligibleBookingId: string | null = null;
+
+  try {
+    const { data } = await supabase
+      .from("service_stories")
+      .select("*")
+      .eq("service_id", service.id)
+      .eq("active", true)
+      .order("display_order", { ascending: true });
+    stories = data || [];
+  } catch (e) {
+    console.warn("Table service_stories not found/ready:", e);
+  }
+
+  try {
+    const { data } = await supabase
+      .from("service_gallery_items")
+      .select("*")
+      .eq("service_id", service.id)
+      .eq("active", true)
+      .order("display_order", { ascending: true });
+    dbGallery = data || [];
+  } catch (e) {
+    console.warn("Table service_gallery_items not found/ready:", e);
+  }
+
+  try {
+    const { data } = await supabase
+      .from("service_past_events")
+      .select("*")
+      .eq("service_id", service.id)
+      .order("event_date", { ascending: false });
+    pastEvents = data || [];
+  } catch (e) {
+    console.warn("Table service_past_events not found/ready:", e);
+  }
+
+  try {
+    const { data } = await supabase
+      .from("service_reviews")
+      .select(`
+        *,
+        user:profiles!service_reviews_user_id_fkey (
+          full_name,
+          avatar_url
+        )
+      `)
+      .eq("service_id", service.id)
+      .order("created_at", { ascending: false });
+    reviews = data || [];
+  } catch (e) {
+    console.warn("Table service_reviews not found/ready:", e);
+  }
+
+  try {
+    const { data } = await supabase
+      .from("service_availability")
+      .select("date, status, notes")
+      .eq("service_id", service.id);
+    manualAvailability = data || [];
+  } catch (e) {
+    console.warn("Table service_availability not found/ready:", e);
+  }
+
+  try {
+    const { data } = await supabase
+      .from("bookings")
+      .select("event_date")
+      .eq("service_id", service.id)
+      .in("status", ["confirmed", "completed"]);
+    bookedDates = (data || []).map((b: any) => b.event_date);
+  } catch (e) {
+    console.warn("Error querying booked dates from bookings:", e);
+  }
+
+  // Check review eligibility
+  if (user) {
+    try {
+      const { data: userBookings } = await supabase
+        .from("bookings")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("service_id", service.id)
+        .in("status", ["confirmed", "completed"]);
+
+      if (userBookings && userBookings.length > 0) {
+        const bookingIds = userBookings.map((b) => b.id);
+        const { data: userReviews } = await supabase
+          .from("service_reviews")
+          .select("booking_id")
+          .in("booking_id", bookingIds);
+
+        const reviewedIds = (userReviews || []).map((r) => r.booking_id);
+        const unreviewed = userBookings.find((b) => !reviewedIds.includes(b.id));
+
+        if (unreviewed) {
+          eligibleBookingId = unreviewed.id;
+        }
+      }
+    } catch (e) {
+      console.warn("Error verifying review eligibility:", e);
+    }
+  }
+
   // Query bookings count for this service
   const { count: bookingsCount } = await supabase
     .from("bookings")
@@ -143,6 +258,7 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
   const provider = service.provider;
   const providerName = (Array.isArray(provider) ? provider[0]?.full_name : (provider as any)?.full_name) || "Proveedor Hangover";
   const providerCity = service.base_city || (Array.isArray(provider) ? provider[0]?.city : (provider as any)?.city) || "Barranquilla";
+  const providerAvatar = (Array.isArray(provider) ? provider[0]?.avatar_url : (provider as any)?.avatar_url) || null;
   const providerCreatedAt = (Array.isArray(provider) ? provider[0]?.created_at : (provider as any)?.created_at) || service.created_at;
   
   const memberSinceDate = new Date(providerCreatedAt);
@@ -211,35 +327,9 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
   else if (service.category === "social") categoryLabel = "💍 Bodas y Eventos Sociales";
   else if (service.category === "premium") categoryLabel = "⭐ Experiencias Premium";
 
-  // Override with exact subcategory if saved
   const finalCategoryLabel = service.subcategory || categoryLabel;
 
-  // Mock Trabajos Realizados based on category for maximum premium aesthetics
-  const completedWorksMock = [
-    {
-      title: "Pool Party VIP - Hotel del Prado",
-      location: "Barranquilla, Atlántico",
-      date: "Hace 2 semanas",
-      description: "Servicio completo para 150 personas con ambientación musical personalizada y equipamiento de alta fidelidad.",
-      image: "https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?auto=format&fit=crop&w=600&q=80"
-    },
-    {
-      title: "Matrimonio Campestre - Cabaña Las Palmas",
-      location: "Puerto Colombia",
-      date: "Hace 1 mes",
-      description: "Coordinación y ejecución técnica impecable durante más de 6 horas continuas de servicio premium.",
-      image: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=600&q=80"
-    },
-    {
-      title: "Lanzamiento Corporativo - Discoteca Black Box",
-      location: "Zona Norte, Barranquilla",
-      date: "Hace 2 meses",
-      description: "Montaje audiovisual, sonido inmersivo y logística de staff coordinados para evento de marca privada.",
-      image: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80"
-    }
-  ];
-
-  // Query related services (max 4, excluding current service, matching category or city)
+  // Query related services
   const { data: relatedServicesData } = await supabase
     .from("services")
     .select(`
@@ -256,11 +346,20 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
   const relatedServices = relatedServicesData || [];
 
   const videoEmbedUrl = getEmbedUrl(service.video_url || "");
+  const youtubeEmbedUrl = getEmbedUrl(service.youtube_url || "");
+  const spotifyEmbedUrl = getSpotifyEmbedUrl(service.spotify_url || "");
+  const soundcloudEmbedUrl = getSoundCloudEmbedUrl(service.soundcloud_url || "");
+
   const whatsappUrl = service.whatsapp_number
-    ? `https://wa.me/${service.whatsapp_number}?text=${encodeURIComponent(`Hola, estoy interesado en tu servicio "${service.title}" publicado en Hangover.`)}`
+    ? `https://wa.me/${service.whatsapp_number}?text=${encodeURIComponent(`Hola, estoy interesado en tu perfil profesional "${service.title}" en Hangover.`)}`
     : null;
 
   const socialMedia = (service.social_media as any) || {};
+
+  // Custom average rating
+  const avgStars = reviews.length > 0
+    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length)
+    : (Number(service.average_rating) || 5.0);
 
   return (
     <div className="relative min-h-screen w-full bg-[#05050a] text-zinc-100 pb-28 md:pb-20 overflow-hidden">
@@ -283,8 +382,9 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
       )}
 
       <div className={`container mx-auto px-4 sm:px-6 md:px-8 py-6 relative z-10 space-y-6 ${service.cover_url ? "-mt-24 md:-mt-36" : ""}`}>
+        
         {/* Back Button */}
-        <div>
+        <div className="flex justify-between items-center flex-wrap gap-3">
           <Link
             href="/services"
             className="inline-flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white transition-colors group bg-black/60 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10"
@@ -293,6 +393,19 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
             Volver al Marketplace
           </Link>
         </div>
+
+        {/* Stories Section (Horizontal Bubble List) */}
+        {stories.length > 0 && (
+          <div className="bg-zinc-950/30 border border-white/5 p-4 rounded-3xl backdrop-blur-md">
+            <ServiceStoriesViewer
+              serviceName={service.title}
+              providerName={providerName}
+              avatarUrl={providerAvatar}
+              coverUrl={service.image_url}
+              stories={stories}
+            />
+          </div>
+        )}
 
         {/* Hero title & badges */}
         <div className="space-y-4 bg-black/45 backdrop-blur-md p-6 rounded-3xl border border-white/5 shadow-2xl">
@@ -316,21 +429,45 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
             )}
           </div>
 
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div className="space-y-2">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white font-outfit leading-none">
-                {service.title}
-              </h1>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400">
-                <span className="font-semibold text-zinc-300">Ofrecido por {providerName}</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-700 hidden sm:inline" />
-                <span className="flex items-center gap-1">📍 {providerCity}</span>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2 flex items-start gap-4">
+              {providerAvatar ? (
+                <img src={providerAvatar} alt={providerName} className="w-16 h-16 rounded-full object-cover border-2 border-primary-500/40 shrink-0" />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-primary-650 flex items-center justify-center text-white text-xl font-bold font-outfit shrink-0 border-2 border-primary-500/40">
+                  {providerName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white font-outfit leading-none">
+                  {service.title}
+                </h1>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400 mt-2">
+                  <span className="font-bold text-zinc-300">Ofrecido por {providerName}</span>
+                  <span className="w-1 h-1 rounded-full bg-zinc-700 hidden sm:inline" />
+                  <span className="flex items-center gap-0.5">📍 {providerCity}</span>
+                  <span className="w-1 h-1 rounded-full bg-zinc-700 hidden sm:inline" />
+                  <span className="flex items-center gap-1 text-amber-400 font-bold">
+                    ★ {avgStars.toFixed(1)} ({reviews.length})
+                  </span>
+                </div>
               </div>
+            </div>
+
+            {/* Public Action Buttons */}
+            <div className="shrink-0">
+              <ServiceProfileActions
+                serviceId={service.id}
+                providerId={service.provider_id}
+                serviceTitle={service.title}
+                price={service.price}
+                user={user}
+              />
             </div>
           </div>
         </div>
 
-        {/* Dynamic Image Gallery */}
+        {/* Dynamic Image Gallery Banner (Airbnb format) */}
         <section>
           <ServiceGallery 
             mainImageUrl={service.image_url} 
@@ -340,13 +477,15 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
         </section>
 
         {/* Main Content Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 items-start pt-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 items-start pt-4">
+          
           {/* Left Details Grid */}
-          <div className="space-y-10">
+          <div className="space-y-8">
+            
             {/* Description Card */}
             <div className="bg-zinc-950/40 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-6">
-              <h2 className="text-lg font-bold text-white font-outfit uppercase tracking-widest text-primary-400">Descripción del Servicio</h2>
-              <p className="text-zinc-300 text-sm sm:text-base leading-relaxed whitespace-pre-line">
+              <h2 className="text-lg font-bold text-white font-outfit uppercase tracking-widest text-primary-400">Descripción Profesional</h2>
+              <p className="text-zinc-350 text-sm sm:text-base leading-relaxed whitespace-pre-line">
                 {service.description || "Este proveedor no ha especificado una descripción detallada de su servicio. Contáctalo directamente para ajustar detalles del show."}
               </p>
 
@@ -360,7 +499,7 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                   </h3>
                   <ul className="space-y-2">
                     {includesArr.map((item: string, index: number) => (
-                      <li key={index} className="text-xs text-zinc-400 flex items-start gap-2">
+                      <li key={index} className="text-xs text-zinc-450 flex items-start gap-2">
                         <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                         <span>{item}</span>
                       </li>
@@ -376,7 +515,7 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                   </h3>
                   <ul className="space-y-2">
                     {excludesArr.map((item: string, index: number) => (
-                      <li key={index} className="text-xs text-zinc-400 flex items-start gap-2">
+                      <li key={index} className="text-xs text-zinc-455 flex items-start gap-2">
                         <X className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
                         <span>{item}</span>
                       </li>
@@ -406,14 +545,83 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
             {service.experience && (
               <div className="bg-zinc-950/40 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-4">
                 <h2 className="text-lg font-bold text-white font-outfit uppercase tracking-widest text-primary-400">Experiencia Profesional</h2>
-                <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-line">
+                <p className="text-zinc-350 text-sm leading-relaxed whitespace-pre-line">
                   {service.experience}
                 </p>
               </div>
             )}
 
-            {/* VIDEO SECTION */}
-            {videoEmbedUrl ? (
+            {/* PORTFOLIO MULTIMEDIA (Videos first, then photos) */}
+            {dbGallery.length > 0 && (
+              <section className="bg-zinc-950/40 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md">
+                <ServicePortfolio
+                  galleryItems={dbGallery}
+                  serviceTitle={service.title}
+                />
+              </section>
+            )}
+
+            {/* PRODUCTIONS & MUSIC (Spotify / SoundCloud / YouTube Embeds) */}
+            {(spotifyEmbedUrl || soundcloudEmbedUrl || youtubeEmbedUrl) && (
+              <div className="bg-zinc-950/40 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-6">
+                <div>
+                  <h2 className="text-lg font-bold text-white font-outfit uppercase tracking-widest text-primary-400 flex items-center gap-2">
+                    <Music className="w-5 h-5 text-primary-450" />
+                    Producciones y Sets
+                  </h2>
+                  <p className="text-zinc-450 text-xs mt-1">Oye y evalúa muestras del setlist del proveedor.</p>
+                </div>
+
+                <div className="space-y-4">
+                  {spotifyEmbedUrl && (
+                    <div className="rounded-2xl overflow-hidden border border-white/10 shadow-lg">
+                      <iframe 
+                        src={spotifyEmbedUrl}
+                        width="100%" 
+                        height="152" 
+                        frameBorder="0" 
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                        loading="lazy"
+                        className="bg-transparent"
+                      />
+                    </div>
+                  )}
+
+                  {soundcloudEmbedUrl && (
+                    <div className="rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-zinc-900">
+                      <iframe 
+                        width="100%" 
+                        height="166" 
+                        scrolling="no" 
+                        frameBorder="no" 
+                        allow="autoplay" 
+                        src={soundcloudEmbedUrl} 
+                      />
+                    </div>
+                  )}
+
+                  {youtubeEmbedUrl && (
+                    <div className="space-y-2">
+                      <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider flex items-center gap-1.5">
+                        <VideoIcon className="w-3.5 h-3.5 text-red-500" /> Grabación de YouTube / Video Demo
+                      </span>
+                      <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-white/10 shadow-lg">
+                        <iframe
+                          src={youtubeEmbedUrl}
+                          title="Demostración de Producción"
+                          className="absolute inset-0 w-full h-full border-none"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* VIDEO DEMO SECTION (LEGACY COVERAGE SUPPORT) */}
+            {videoEmbedUrl && !youtubeEmbedUrl && (
               <div className="bg-zinc-950/40 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-4">
                 <h2 className="text-lg font-bold text-white font-outfit uppercase tracking-widest text-primary-400 flex items-center gap-2">
                   <VideoIcon className="w-4 h-4 text-rose-500" />
@@ -429,23 +637,7 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                   />
                 </div>
               </div>
-            ) : service.video_url ? (
-              <div className="bg-zinc-950/40 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-4">
-                <h2 className="text-lg font-bold text-white font-outfit uppercase tracking-widest text-primary-400 flex items-center gap-2">
-                  <VideoIcon className="w-4 h-4 text-rose-500" />
-                  Video de Demostración
-                </h2>
-                <Link
-                  href={service.video_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 p-4 rounded-xl bg-white/5 border border-white/10 text-primary-400 hover:text-white transition-colors"
-                >
-                  <YoutubeIcon className="w-6 h-6 text-red-500" />
-                  <span className="text-sm font-semibold">Ver Video de Demostración (Enlace Externo)</span>
-                </Link>
-              </div>
-            ) : null}
+            )}
 
             {/* GEOGRAPHIC COVERAGE */}
             <div className="bg-zinc-950/40 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-4">
@@ -488,49 +680,69 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                 <div className="p-4 bg-white/3 border border-white/5 rounded-2xl text-center space-y-1">
                   <Star className="w-5 h-5 text-amber-400 mx-auto" />
                   <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Calificación Promedio</p>
-                  <p className="text-xl font-extrabold text-white font-outfit">{(Number(service.average_rating) || 5.0).toFixed(1)}</p>
+                  <p className="text-xl font-extrabold text-white font-outfit">{avgStars.toFixed(1)}</p>
                 </div>
               </div>
             </div>
 
-            {/* SECCIÓN TRABAJOS REALIZADOS */}
-            <div className="bg-zinc-950/40 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-white font-outfit uppercase tracking-widest text-primary-400">Trabajos Realizados</h2>
-                <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Historial Reciente</span>
-              </div>
-              <p className="text-zinc-400 text-xs sm:text-sm">
-                Proyectos y contrataciones completadas de manera exitosa a través de la plataforma Hangover.
-              </p>
+            {/* SECCIÓN DISPONIBILIDAD (Calendario Interactivo) */}
+            <div id="disponibilidad-calendario">
+              <ServiceCalendar
+                serviceId={service.id}
+                manualAvailability={manualAvailability}
+                bookings={bookedDates}
+              />
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                {completedWorksMock.map((work, index) => (
-                  <div key={index} className="glass-card overflow-hidden bg-[#0a0a14]/60 border border-white/5 flex flex-col h-full group">
-                    <div className="relative h-36 w-full overflow-hidden bg-zinc-900 shrink-0">
-                      <img
-                        src={work.image}
-                        alt={work.title}
-                        className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
-                      />
-                      <span className="absolute bottom-2.5 left-2.5 bg-black/70 border border-white/10 px-2 py-0.5 rounded-md text-[9px] font-bold text-zinc-300">
-                        {work.date}
-                      </span>
-                    </div>
-                    <div className="p-4 flex-grow flex flex-col justify-between space-y-3">
-                      <div className="space-y-1">
-                        <h4 className="font-bold text-sm text-white line-clamp-1 group-hover:text-primary-400 transition-colors font-outfit">
-                          {work.title}
-                        </h4>
-                        <p className="text-[10px] text-zinc-500 flex items-center gap-1">📍 {work.location}</p>
-                        <p className="text-[11px] text-zinc-400 line-clamp-3 leading-relaxed mt-1">
-                          {work.description}
-                        </p>
+            {/* SECCIÓN TRABAJOS REALIZADOS (Historial de Eventos Pasados) */}
+            {pastEvents.length > 0 && (
+              <div className="bg-zinc-950/40 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-6">
+                <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                  <h2 className="text-lg font-bold text-white font-outfit uppercase tracking-widest text-primary-400">Historial de Eventos</h2>
+                  <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Trabajos realizados</span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {pastEvents.map((work) => (
+                    <div key={work.id} className="glass-card overflow-hidden bg-[#0a0a14]/60 border border-white/5 flex flex-col h-full group">
+                      {work.media_urls && work.media_urls.length > 0 && (
+                        <div className="relative h-44 w-full overflow-hidden bg-zinc-900 shrink-0">
+                          <img
+                            src={work.media_urls[0]}
+                            alt={work.title}
+                            className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
+                          />
+                        </div>
+                      )}
+                      <div className="p-4 flex-grow flex flex-col justify-between space-y-3">
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-start gap-1 flex-wrap">
+                            <h4 className="font-bold text-sm text-white font-outfit truncate">{work.title}</h4>
+                            <span className="bg-white/5 border border-white/10 px-2 py-0.5 rounded text-[8.5px] font-bold text-zinc-450 uppercase">
+                              {new Date(work.event_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+                          {work.description && (
+                            <p className="text-[11px] text-zinc-400 leading-relaxed pt-1.5">
+                              {work.description}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* SECCIÓN RESEÑAS VERIFICADAS */}
+            <ServiceReviewsSection
+              serviceId={service.id}
+              reviews={reviews}
+              user={user}
+              eligibleBookingId={eligibleBookingId}
+            />
+
           </div>
 
           {/* Right Sticky Sidebar Widget */}
@@ -570,7 +782,7 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
               {(socialMedia.instagram || socialMedia.facebook) && (
                 <div className="pt-2.5 border-t border-white/5 space-y-2">
                   <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider block">Redes Sociales</span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {socialMedia.instagram && (
                       <Link
                         href={`https://instagram.com/${socialMedia.instagram.replace("@", "")}`}
@@ -578,8 +790,8 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 text-zinc-350 hover:text-white transition-all text-xs"
                       >
-                        <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
-                        <span>@{socialMedia.instagram}</span>
+                        <span className="text-pink-400 font-bold">@</span>
+                        <span>{socialMedia.instagram}</span>
                       </Link>
                     )}
                     {socialMedia.facebook && (
@@ -589,7 +801,7 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 text-zinc-350 hover:text-white transition-all text-xs"
                       >
-                        <FacebookIcon className="w-3.5 h-3.5 text-blue-400" />
+                        <span className="text-blue-400 font-bold">f</span>
                         <span>Facebook</span>
                       </Link>
                     )}
@@ -619,8 +831,6 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                 if (item.category === "staff") cardGradient = "from-sky-600 to-teal-600";
                 if (item.category === "security") cardGradient = "from-slate-600 to-zinc-700";
                 if (item.category === "catering") cardGradient = "from-emerald-600 to-lime-600";
-
-                const subLabel = item.subcategory || item.category;
 
                 return (
                   <div key={item.id} className="glass-card overflow-hidden hover:border-white/20 transition-all duration-300 flex flex-col h-full bg-[#07070c]/90 group">

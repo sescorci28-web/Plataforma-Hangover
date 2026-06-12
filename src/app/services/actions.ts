@@ -13,7 +13,13 @@ export async function createServiceBooking(
   providerId: string,
   eventDate: string,
   totalAmount: number,
-  notes?: string
+  notes?: string,
+  quoteDetails?: {
+    eventType?: string;
+    bookingCity?: string;
+    budget?: number;
+    guestsCount?: number;
+  }
 ) {
   const supabase = await createClient();
 
@@ -65,7 +71,12 @@ export async function createServiceBooking(
         status: "pending",
         notes: notes || null,
         qr_code: 'QR-' + randomUUID(),
-        qr_status: 'active'
+        qr_status: 'active',
+        // Quotation details support
+        event_type: quoteDetails?.eventType || null,
+        booking_city: quoteDetails?.bookingCity || null,
+        budget: quoteDetails?.budget || null,
+        number_of_people: quoteDetails?.guestsCount || 1
       });
 
     if (insertError) {
@@ -1339,5 +1350,352 @@ export async function getLastAccesses(providerId?: string, limit: number = 5) {
     } catch (fallbackErr: any) {
       return { error: fallbackErr.message || "Error al consultar accesos." };
     }
+  }
+}
+
+/**
+ * Creates a review for a completed service booking.
+ */
+export async function createServiceReview(
+  bookingId: string,
+  serviceId: string,
+  rating: number,
+  comment: string
+) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  try {
+    // 1. Verify booking exists, is completed/confirmed, belongs to user, and matches the service
+    const { data: booking, error: bookingCheckErr } = await supabase
+      .from("bookings")
+      .select("id, status")
+      .eq("id", bookingId)
+      .eq("user_id", user.id)
+      .eq("service_id", serviceId)
+      .single();
+
+    if (bookingCheckErr || !booking) {
+      return { error: "No se encontró una reserva válida o no pertenece a tu usuario." };
+    }
+
+    if (booking.status !== "confirmed" && booking.status !== "completed") {
+      return { error: "Solo puedes calificar servicios que hayan sido confirmados o completados." };
+    }
+
+    // 2. Insert review
+    const { error: insertErr } = await supabase
+      .from("service_reviews")
+      .insert({
+        booking_id: bookingId,
+        user_id: user.id,
+        service_id: serviceId,
+        rating,
+        comment: comment || null
+      });
+
+    if (insertErr) {
+      return { error: `Error al publicar la reseña: ${insertErr.message}` };
+    }
+
+    // 3. Recalculate average_rating in services table
+    const { data: reviews } = await supabase
+      .from("service_reviews")
+      .select("rating")
+      .eq("service_id", serviceId);
+
+    if (reviews && reviews.length > 0) {
+      const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+      await supabase
+        .from("services")
+        .update({ average_rating: Number(avg.toFixed(2)) })
+        .eq("id", serviceId);
+    }
+
+    revalidatePath(`/services`);
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error al publicar la reseña." };
+  }
+}
+
+/**
+ * Gets reviews for a service.
+ */
+export async function getServiceReviews(serviceId: string) {
+  const supabase = await createClient();
+  try {
+    const { data: reviews, error } = await supabase
+      .from("service_reviews")
+      .select(`
+        *,
+        user:profiles!service_reviews_user_id_fkey (
+          full_name,
+          avatar_url
+        )
+      `)
+      .eq("service_id", serviceId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return { success: true, reviews: reviews || [] };
+  } catch (err: any) {
+    return { error: err.message || "Error al obtener las reseñas." };
+  }
+}
+
+/**
+ * Gets availability and bookings status for a service.
+ */
+export async function getServiceAvailability(serviceId: string) {
+  const supabase = await createClient();
+  try {
+    // 1. Fetch manual overrides
+    const { data: manual, error: manualErr } = await supabase
+      .from("service_availability")
+      .select("date, status, notes")
+      .eq("service_id", serviceId);
+
+    if (manualErr) throw manualErr;
+
+    // 2. Fetch confirmed/completed bookings to automatically block dates
+    const { data: bookings, error: bookingsErr } = await supabase
+      .from("bookings")
+      .select("event_date")
+      .eq("service_id", serviceId)
+      .in("status", ["confirmed", "completed"]);
+
+    if (bookingsErr) throw bookingsErr;
+
+    return { 
+      success: true, 
+      manual: manual || [], 
+      bookings: (bookings || []).map(b => b.event_date) 
+    };
+  } catch (err: any) {
+    return { error: err.message || "Error al obtener la disponibilidad." };
+  }
+}
+
+/**
+ * Block/Unblock a date in availability.
+ */
+export async function toggleServiceAvailabilityDate(
+  serviceId: string,
+  dateStr: string,
+  status: 'available' | 'blocked'
+) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  try {
+    // Verify provider owns the service
+    const { data: service, error: serviceCheckErr } = await supabase
+      .from("services")
+      .select("id")
+      .eq("id", serviceId)
+      .eq("provider_id", user.id)
+      .single();
+
+    if (serviceCheckErr || !service) {
+      return { error: "No autorizado o el servicio no existe." };
+    }
+
+    if (status === 'available') {
+      // Delete manual block
+      const { error: delErr } = await supabase
+        .from("service_availability")
+        .delete()
+        .eq("service_id", serviceId)
+        .eq("date", dateStr);
+      if (delErr) throw delErr;
+    } else {
+      // Insert or update block
+      const { error: upsertErr } = await supabase
+        .from("service_availability")
+        .upsert({
+          service_id: serviceId,
+          date: dateStr,
+          status: 'blocked'
+        }, { onConflict: 'service_id,date' });
+      if (upsertErr) throw upsertErr;
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error al actualizar la disponibilidad." };
+  }
+}
+
+/**
+ * Gets media (stories and gallery items) for a service.
+ */
+export async function getServiceMedia(serviceId: string) {
+  const supabase = await createClient();
+  try {
+    const { data: stories, error: storiesErr } = await supabase
+      .from("service_stories")
+      .select("*")
+      .eq("service_id", serviceId)
+      .order("display_order", { ascending: true });
+
+    if (storiesErr) throw storiesErr;
+
+    const { data: gallery, error: galleryErr } = await supabase
+      .from("service_gallery_items")
+      .select("*")
+      .eq("service_id", serviceId)
+      .order("display_order", { ascending: true });
+
+    if (galleryErr) throw galleryErr;
+
+    return { success: true, stories: stories || [], gallery: gallery || [] };
+  } catch (err: any) {
+    return { error: err.message || "Error al obtener multimedia." };
+  }
+}
+
+/**
+ * Gets past events (historial) for a service.
+ */
+export async function getServicePastEvents(serviceId: string) {
+  const supabase = await createClient();
+  try {
+    const { data: events, error } = await supabase
+      .from("service_past_events")
+      .select("*")
+      .eq("service_id", serviceId)
+      .order("event_date", { ascending: false });
+
+    if (error) throw error;
+    return { success: true, events: events || [] };
+  } catch (err: any) {
+    return { error: err.message || "Error al obtener eventos realizados." };
+  }
+}
+
+/**
+ * Creates a past event entry.
+ */
+export async function createServicePastEvent(
+  serviceId: string,
+  title: string,
+  eventDate: string,
+  description: string,
+  mediaUrls: string[]
+) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  try {
+    // Verify provider owns the service
+    const { data: service, error: serviceCheckErr } = await supabase
+      .from("services")
+      .select("id")
+      .eq("id", serviceId)
+      .eq("provider_id", user.id)
+      .single();
+
+    if (serviceCheckErr || !service) {
+      return { error: "No autorizado." };
+    }
+
+    const { error: insertErr } = await supabase
+      .from("service_past_events")
+      .insert({
+        service_id: serviceId,
+        title,
+        event_date: eventDate,
+        description: description || null,
+        media_urls: mediaUrls || []
+      });
+
+    if (insertErr) throw insertErr;
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error al guardar el evento realizado." };
+  }
+}
+
+/**
+ * Deletes a past event.
+ */
+export async function deleteServicePastEvent(eventId: string) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  try {
+    // Check ownership
+    const { data: event, error: eventErr } = await supabase
+      .from("service_past_events")
+      .select("*, service:services(provider_id)")
+      .eq("id", eventId)
+      .single();
+
+    if (eventErr || !event) {
+      return { error: "No se encontró el evento." };
+    }
+
+    const providerId = (event.service as any)?.provider_id;
+    if (providerId !== user.id) {
+      return { error: "No autorizado para eliminar este evento." };
+    }
+
+    const { error: delErr } = await supabase
+      .from("service_past_events")
+      .delete()
+      .eq("id", eventId);
+
+    if (delErr) throw delErr;
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error al eliminar el evento." };
+  }
+}
+
+/**
+ * Updates productions URLs (Spotify, SoundCloud, YouTube).
+ */
+export async function updateServiceProductions(
+  serviceId: string,
+  spotifyUrl: string,
+  soundcloudUrl: string,
+  youtubeUrl: string
+) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  try {
+    const { error: updateErr } = await supabase
+      .from("services")
+      .update({
+        spotify_url: spotifyUrl || null,
+        soundcloud_url: soundcloudUrl || null,
+        youtube_url: youtubeUrl || null
+      })
+      .eq("id", serviceId)
+      .eq("provider_id", user.id);
+
+    if (updateErr) throw updateErr;
+    
+    revalidatePath(`/services`);
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error al actualizar producciones." };
   }
 }
