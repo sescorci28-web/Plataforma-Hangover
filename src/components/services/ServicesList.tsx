@@ -477,19 +477,27 @@ export function ServicesList({ initialServices, user }: ServicesListProps) {
 
       {/* Services Grid */}
       {filteredServices.length === 0 ? (
-        <div className="glass-card p-12 text-center max-w-xl mx-auto space-y-4">
-          <BookOpen className="w-12 h-12 text-zinc-500 mx-auto" />
-          <h3 className="text-xl font-bold text-white font-outfit">No se encontraron servicios</h3>
-          <p className="text-zinc-400 text-sm">
-            Prueba ajustando los filtros avanzados o busca en otra categoría para encontrar profesionales disponibles.
-          </p>
-          <div className="pt-2">
+        <div className="glass-card p-12 text-center max-w-xl mx-auto space-y-6 bg-[#07070c]/80 border border-white/5 shadow-2xl rounded-3xl">
+          <BookOpen className="w-14 h-14 text-primary-400 mx-auto animate-pulse" />
+          <div className="space-y-2">
+            <h3 className="text-2xl font-bold text-white font-outfit">Sé el primero en ofrecer tu servicio</h3>
+            <p className="text-zinc-400 text-sm leading-relaxed max-w-md mx-auto">
+              Aún no hay proveedores en esta categoría. ¿Eres DJ, fotógrafo, bartender o tienes algún servicio para eventos?
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center pt-2">
             <Link 
-              href="/dashboard/provider" 
-              className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all"
+              href="/register?type=provider" 
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-500 text-white text-xs font-black uppercase tracking-wider px-6 py-3.5 rounded-2xl transition-all duration-300 shadow-lg shadow-primary-550/15"
             >
-              Ir a mi panel de Proveedor
+              Publicar mi servicio gratis
             </Link>
+            <button 
+              onClick={clearFilters}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-black uppercase tracking-wider px-6 py-3.5 rounded-2xl transition-all duration-300"
+            >
+              Ver otras categorías
+            </button>
           </div>
         </div>
       ) : (

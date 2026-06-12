@@ -479,7 +479,7 @@ export function ServiceProfileManager({ service, isOpen, onClose }: ServiceProfi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="glass-card w-full max-w-3xl my-8 overflow-hidden relative border-white/10 bg-zinc-950 shadow-[0_0_60px_rgba(217,70,239,0.15)] rounded-[28px] flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-3xl my-8 overflow-hidden relative border border-white/10 bg-zinc-950/98 backdrop-blur-xl shadow-[0_0_60px_rgba(217,70,239,0.15)] rounded-[28px] flex flex-col max-h-[90vh]">
         
         {/* Header */}
         <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
@@ -524,7 +524,7 @@ export function ServiceProfileManager({ service, isOpen, onClose }: ServiceProfi
         </div>
 
         {/* Tab content wrapper scrollable */}
-        <div className="flex-grow overflow-y-auto p-6 scrollbar-none">
+        <div className="flex-grow overflow-y-auto p-6 scrollbar-none max-h-[calc(90vh-160px)]">
 
           {/* ============================================== */}
           {/* TAB 1: MEDIA (STORIES & GALLERY) */}
