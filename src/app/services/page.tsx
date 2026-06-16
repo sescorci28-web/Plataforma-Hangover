@@ -64,7 +64,7 @@ export default async function ServicesPage() {
   }));
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-12 space-y-10">
+    <div className="max-w-6xl mx-auto px-4 md:px-6 py-12 space-y-12">
       <header className="text-center max-w-2xl mx-auto space-y-4">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary-500/10 border border-primary-500/20 text-xs font-semibold text-primary-400">
           <Sparkles className="w-3.5 h-3.5" />
@@ -79,7 +79,7 @@ export default async function ServicesPage() {
       </header>
 
       {/* Banner de Hangover Planner */}
-      <div className="glass-card p-6 md:p-8 bg-gradient-to-r from-primary-950/20 via-indigo-950/20 to-transparent border border-primary-500/20 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-6 max-w-5xl mx-auto">
+      <div className="glass-card p-6 md:p-8 bg-gradient-to-r from-primary-950/20 via-indigo-950/20 to-transparent border border-primary-500/20 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-6 w-full">
         <div className="space-y-2 text-center md:text-left">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-500/10 border border-primary-500/25 text-[10px] font-bold uppercase tracking-wider text-primary-400">
             🎉 Nuevo

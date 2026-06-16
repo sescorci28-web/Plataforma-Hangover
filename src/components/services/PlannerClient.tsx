@@ -10,6 +10,35 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { requestPlannerPackage } from "@/app/services/planner/actions";
 
+function normalizeCategory(cat: string): string {
+  const c = (cat || "").toLowerCase().trim();
+  if (c === "music" || c === "dj" || c.startsWith("dj-") || c.includes("vallenato") || c.includes("mariachi") || c.includes("saxo") || c.includes("violin") || c.includes("banda") || c.includes("show")) {
+    return "music";
+  }
+  if (c === "sound" || c === "luces" || c === "iluminacion" || c === "iluminación") {
+    return "sound";
+  }
+  if (c === "bar" || c === "coctel" || c === "cóctel" || c === "bartender") {
+    return "bar";
+  }
+  if (c === "media" || c === "foto" || c === "video" || c === "fotógrafo" || c === "videógrafo" || c === "drone") {
+    return "media";
+  }
+  if (c === "staff" || c === "security" || c === "seguridad" || c === "mesero" || c === "anfitriona" || c === "hostess") {
+    return "staff";
+  }
+  if (c === "decor" || c === "flores" || c === "globos") {
+    return "decor";
+  }
+  if (c === "premium" || c === "vip") {
+    return "premium";
+  }
+  if (c === "catering" || c === "logistics" || c === "transport" || c === "social" || c === "others" || c === "comida" || c === "transporte" || c === "mobiliario" || c === "bodas") {
+    return "others";
+  }
+  return c;
+}
+
 // Types
 interface ServiceProviderProfile {
   id: string;
@@ -345,7 +374,7 @@ export function PlannerClient({ initialServices, user }: PlannerClientProps) {
 
     sortedCategories.forEach((cat) => {
       // Find all services in this category
-      const catServices = pool.filter((s) => s.category === cat.id);
+      const catServices = pool.filter((s) => normalizeCategory(s.category) === cat.id);
       if (catServices.length === 0) return;
 
       let selectedService: PlannerService | null = null;
@@ -451,7 +480,7 @@ export function PlannerClient({ initialServices, user }: PlannerClientProps) {
   // Get other available services in the same category & city
   const getAlternativeServices = (categoryId: string, currentServiceId: string) => {
     const pool = cityServices.length > 0 ? cityServices : initialServices;
-    return pool.filter((s) => s.category === categoryId && s.id !== currentServiceId);
+    return pool.filter((s) => normalizeCategory(s.category) === categoryId && s.id !== currentServiceId);
   };
 
   // Save Proposal
@@ -912,8 +941,9 @@ export function PlannerClient({ initialServices, user }: PlannerClientProps) {
                     <div className="space-y-2.5">
                       {prop.services.map((service) => {
                         const cost = getServiceCost(service);
-                        const categoryObj = CATEGORIES.find((c) => c.id === service.category);
-                        const alts = getAlternativeServices(service.category, service.id);
+                        const normCat = normalizeCategory(service.category);
+                        const categoryObj = CATEGORIES.find((c) => c.id === normCat);
+                        const alts = getAlternativeServices(normCat, service.id);
 
                         return (
                           <div 

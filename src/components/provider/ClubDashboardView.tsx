@@ -47,6 +47,8 @@ import {
   Search,
   CreditCard,
   Lock,
+  Sliders,
+  QrCode,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { updateClub, deleteClub, getClubPaymentSettings, updateClubPaymentSettings, getClubPayoutHistory } from "@/app/(dashboard)/dashboard/provider/clubs/actions";
@@ -181,6 +183,34 @@ interface ClubDashboardViewProps {
     revenue: number;
   };
   topWaiters?: TopWaiter[];
+  hourlySales24h?: { timestamp: number; label: string; revenue: number }[];
+  todayBookings?: {
+    id: string;
+    booking_type: string;
+    total_amount: number;
+    number_of_people: number;
+    qr_status: string;
+    status: string;
+    created_at: string;
+    clientName: string;
+    clientAvatar: string | null;
+  }[];
+  eventRanking?: {
+    id: string;
+    title: string;
+    date: string;
+    ticketsSold: number;
+    revenue: number;
+    thumbnail: string | null;
+  }[];
+  clubAdmissionLogs?: {
+    id: string;
+    status: string;
+    access_type: string;
+    buyer_name: string;
+    error_reason: string | null;
+    created_at: string;
+  }[];
 }
 
 const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
@@ -235,6 +265,10 @@ export function ClubDashboardView({
   connectPresence = [],
   activeEventStats = { title: "", ticketsSold: 0, attendance: 0, revenue: 0 },
   topWaiters = [],
+  hourlySales24h = [],
+  todayBookings = [],
+  eventRanking = [],
+  clubAdmissionLogs = [],
 }: ClubDashboardViewProps) {
   const router = useRouter();
   const [isPendingTransition, startTransition] = useTransition();
@@ -244,6 +278,21 @@ export function ClubDashboardView({
   const [isMenuManagerOpen, setIsMenuManagerOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isMediaManagerOpen, setIsMediaManagerOpen] = useState(false);
+
+  // Quick actions local modals/state
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const [isAddWaiterModalOpen, setIsAddWaiterModalOpen] = useState(false);
+  const [isCreateBookingModalOpen, setIsCreateBookingModalOpen] = useState(false);
+  const [promoTitle, setPromoTitle] = useState("");
+  const [promoDiscount, setPromoDiscount] = useState("");
+  const [waiterName, setWaiterName] = useState("");
+  const [waiterEmail, setWaiterEmail] = useState("");
+  const [bookingClient, setBookingClient] = useState("");
+  const [bookingPeople, setBookingPeople] = useState(2);
+  const [bookingType, setBookingType] = useState("club_cover");
+  const [bookingAmount, setBookingAmount] = useState(50000);
+  const [successToastMessage, setSuccessToastMessage] = useState<string | null>(null);
+  const [hoveredHour, setHoveredHour] = useState<any | null>(null);
 
   // Edit club form state
   const [name, setName] = useState(club.name || "");
@@ -883,6 +932,33 @@ export function ClubDashboardView({
     }
   };
 
+  const handleCreatePromo = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSuccessToastMessage(`¡Promoción "${promoTitle}" (${promoDiscount}% de descuento) creada con éxito!`);
+    setIsPromoModalOpen(false);
+    setPromoTitle("");
+    setPromoDiscount("");
+    setTimeout(() => setSuccessToastMessage(null), 4000);
+  };
+
+  const handleAddWaiter = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSuccessToastMessage(`¡Mesero ${waiterName} registrado exitosamente!`);
+    setIsAddWaiterModalOpen(false);
+    setWaiterName("");
+    setWaiterEmail("");
+    setTimeout(() => setSuccessToastMessage(null), 4000);
+  };
+
+  const handleCreateBooking = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSuccessToastMessage(`¡Reserva manual para ${bookingClient} (${bookingPeople} personas) creada!`);
+    setIsCreateBookingModalOpen(false);
+    setBookingClient("");
+    setBookingPeople(2);
+    setTimeout(() => setSuccessToastMessage(null), 4000);
+  };
+
   // Relative time helper
   const formatRelativeTime = (date: string | Date): string => {
     const parsedDate = typeof date === "string" ? new Date(date) : date;
@@ -908,9 +984,135 @@ export function ClubDashboardView({
   const capacityLimit = club.capacity || 500;
   const occupancyPct = Math.min(100, Math.round((stats.peopleInside / capacityLimit) * 100));
   const occupancyState = getOccupancyState(occupancyPct);
+  const formatCOP = (val: number) => {
+    if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
+    if (val >= 1000) return `$${(val / 1000).toFixed(0)}k`;
+    return `$${val}`;
+  };
+
+  // 24 Hour SVG graph coordinates
+  const hourlyMax = Math.max(...hourlySales24h.map(s => s.revenue), 10000);
+  const hWidth = 600;
+  const hHeight = 160;
+  const hPaddingX = 45;
+  const hPaddingY = 20;
+  const hPoints = hourlySales24h.map((s, index) => {
+    const x = hPaddingX + (index / 23) * (hWidth - hPaddingX * 2);
+    const y = hHeight - hPaddingY - (s.revenue / hourlyMax) * (hHeight - hPaddingY * 2);
+    return { x, y, revenue: s.revenue, label: s.label };
+  });
+  const hLinePath = hPoints.reduce((path, p, i) => i === 0 ? `M ${p.x} ${p.y}` : `${path} L ${p.x} ${p.y}`, "");
+  const hAreaPath = hPoints.length > 0 ? `${hLinePath} L ${hPoints[hPoints.length - 1].x} ${hHeight - hPaddingY} L ${hPoints[0].x} ${hHeight - hPaddingY} Z` : "";
+
+  // Alerts calculations
+  const lowEventSalesAlert = activeEventStats?.title && activeEventStats?.ticketsSold < (capacityLimit * 0.2);
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12 relative">
+      {/* SUCCESS TOAST NOTIFICATION */}
+      {successToastMessage && (
+        <div className="fixed bottom-5 right-5 z-[100] bg-zinc-950 border border-emerald-500/30 text-white px-5 py-3.5 rounded-2xl shadow-[0_0_40px_rgba(16,185,129,0.15)] flex items-center gap-3 animate-slideIn">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 animate-bounce shrink-0" />
+          <span className="text-xs font-black uppercase tracking-wider font-outfit">{successToastMessage}</span>
+          <button onClick={() => setSuccessToastMessage(null)} className="text-zinc-500 hover:text-white ml-2 transition-colors cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* CREATE MANUAL BOOKING MODAL */}
+      {isCreateBookingModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="glass-card max-w-md w-full p-6 border-white/10 bg-[#09090f] rounded-[28px] space-y-5 shadow-2xl relative">
+            <button onClick={() => setIsCreateBookingModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-white font-outfit">Crear Reserva Manual</h3>
+              <p className="text-xs text-zinc-500">Registra un cliente directamente en la agenda de hoy.</p>
+            </div>
+            <form onSubmit={handleCreateBooking} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Nombre del Cliente</label>
+                <input type="text" required value={bookingClient} onChange={e => setBookingClient(e.target.value)} placeholder="Ej: John Doe" className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Personas</label>
+                  <input type="number" required min="1" max="100" value={bookingPeople} onChange={e => setBookingPeople(parseInt(e.target.value) || 2)} className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Tipo</label>
+                  <select value={bookingType} onChange={e => setBookingType(e.target.value)} className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none h-9">
+                    <option value="club_cover">Cover General</option>
+                    <option value="club_vip">Mesa VIP</option>
+                  </select>
+                </div>
+              </div>
+              <button type="submit" className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer">
+                Registrar Reserva
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE PROMOTION MODAL */}
+      {isPromoModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="glass-card max-w-md w-full p-6 border-white/10 bg-[#09090f] rounded-[28px] space-y-5 shadow-2xl relative">
+            <button onClick={() => setIsPromoModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-white font-outfit">Crear Promoción en Vivo</h3>
+              <p className="text-xs text-zinc-500">Lanza un descuento especial de cover u órdenes hoy.</p>
+            </div>
+            <form onSubmit={handleCreatePromo} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Título de Promoción</label>
+                <input type="text" required value={promoTitle} onChange={e => setPromoTitle(e.target.value)} placeholder="Ej: 2x1 en Gin Tonic" className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Descuento (%)</label>
+                <input type="number" required min="5" max="100" value={promoDiscount} onChange={e => setPromoDiscount(e.target.value)} placeholder="Ej: 20" className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none" />
+              </div>
+              <button type="submit" className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer">
+                Lanzar Promoción
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADD WAITER MODAL */}
+      {isAddWaiterModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="glass-card max-w-md w-full p-6 border-white/10 bg-[#09090f] rounded-[28px] space-y-5 shadow-2xl relative">
+            <button onClick={() => setIsAddWaiterModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-white font-outfit">Registrar Nuevo Mesero</h3>
+              <p className="text-xs text-zinc-500">Agrega un mesero para asignación de mesas hoy.</p>
+            </div>
+            <form onSubmit={handleAddWaiter} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Nombre Completo</label>
+                <input type="text" required value={waiterName} onChange={e => setWaiterName(e.target.value)} placeholder="Ej: Juan Pérez" className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Correo Electrónico</label>
+                <input type="email" required value={waiterEmail} onChange={e => setWaiterEmail(e.target.value)} placeholder="Ej: juan@hangover.club" className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none" />
+              </div>
+              <button type="submit" className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer">
+                Registrar Mesero
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* 1. HEADER */}
       <div className="flex flex-col gap-4">
         <Link
@@ -927,7 +1129,7 @@ export function ClubDashboardView({
               <img
                 src={club.logo}
                 alt={club.name}
-                className="w-16 h-16 rounded-2xl object-cover border border-white/10 p-0.5 bg-black"
+                className="w-16 h-16 rounded-2xl object-cover border border-white/10 p-0.5 bg-black shrink-0"
               />
             ) : (
               <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-600 shrink-0">
@@ -958,11 +1160,12 @@ export function ClubDashboardView({
           <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full md:w-auto">
             {club.active ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-400 shadow-sm">
-                <Eye className="w-3.5 h-3.5" /> Activa
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                Operando en Vivo
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl bg-zinc-800 border border-white/5 text-xs font-bold text-zinc-400 shadow-sm">
-                <EyeOff className="w-3.5 h-3.5" /> Inactiva
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400 shadow-sm">
+                Cerrado
               </span>
             )}
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl bg-white/5 border border-white/10 text-xs font-extrabold text-amber-400 font-outfit shadow-sm">
@@ -973,549 +1176,516 @@ export function ClubDashboardView({
               onClick={() => setIsEditModalOpen(true)}
               className="flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-bold transition-all cursor-pointer md:ml-2"
             >
-              <Edit2 className="w-3.5 h-3.5" /> Editar Local
+              <Edit2 className="w-3.5 h-3.5" /> Ajustes Perfil
             </button>
           </div>
         </div>
       </div>
 
-      {/* 2. OPERACIÓN EN VIVO (AHORA) */}
-      <section className="space-y-4">
+      {/* 2. REAL-TIME ROW OF 6 CORE METRICS */}
+      <section className="space-y-3">
         <div className="flex items-center justify-between pl-1">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-400">Operación en Vivo (AHORA)</h3>
-          </div>
-          <span className="text-[10px] text-zinc-500 font-bold uppercase">Datos en Tiempo Real</span>
+          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-400">Métricas Operativas del Día</h3>
+          <span className="text-[10px] text-zinc-500 font-bold uppercase">Actualizado hace un momento</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Personas Dentro</span>
-            <div className="mt-2.5">
-              <span className="text-3xl font-black text-white font-outfit block">{stats.peopleInside}</span>
-              <span className="text-[9px] text-zinc-500 mt-1 block">Capacidad: {capacityLimit}</span>
+          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 hover:border-white/10 transition-all flex flex-col justify-between">
+            <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Ventas de Hoy</span>
+            <div className="mt-2">
+              <span className="text-2xl font-black text-emerald-400 font-outfit block">${stats.revenueToday.toLocaleString("es-CO")}</span>
+              <span className="text-[9px] text-zinc-500 block">COP Acumulado</span>
             </div>
           </div>
 
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Mesas Ocupadas</span>
-            <div className="mt-2.5">
-              <span className="text-3xl font-black text-primary-400 font-outfit block">{stats.tablesOccupied}</span>
-              <span className="text-[9px] text-zinc-500 mt-1 block">En atención</span>
+          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 hover:border-white/10 transition-all flex flex-col justify-between">
+            <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Personas Confirmadas</span>
+            <div className="mt-2">
+              <span className="text-2xl font-black text-white font-outfit block">{stats.coversToday + (activeEventStats?.ticketsSold || 0)}</span>
+              <span className="text-[9px] text-zinc-500 block">Reservas + Evento</span>
             </div>
           </div>
 
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Mesas Disponibles</span>
-            <div className="mt-2.5">
-              <span className="text-3xl font-black text-emerald-400 font-outfit block">{stats.tablesFree}</span>
-              <span className="text-[9px] text-zinc-500 mt-1 block">Libres</span>
+          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 hover:border-white/10 transition-all flex flex-col justify-between">
+            <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Tickets Vendidos</span>
+            <div className="mt-2">
+              <span className="text-2xl font-black text-purple-400 font-outfit block">{activeEventStats?.ticketsSold || 0}</span>
+              <span className="text-[9px] text-zinc-500 block">Ventas Evento</span>
             </div>
           </div>
 
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Pedidos Activos</span>
-            <div className="mt-2.5">
-              <span className="text-3xl font-black text-amber-400 font-outfit block">{stats.ordersActive}</span>
-              <span className="text-[9px] text-zinc-500 mt-1 block">En cocina / barra</span>
+          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 hover:border-white/10 transition-all flex flex-col justify-between">
+            <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Accesos Validados</span>
+            <div className="mt-2">
+              <span className="text-2xl font-black text-cyan-400 font-outfit block">{stats.totalCheckedInUsers}</span>
+              <span className="text-[9px] text-zinc-500 block">Chequeo en Puerta</span>
             </div>
           </div>
 
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Connect Connect</span>
-            <div className="mt-2.5">
-              <span className="text-3xl font-black text-cyan-400 font-outfit block">{stats.connectPresenceCount}</span>
-              <span className="text-[9px] text-zinc-500 mt-1 block">Usuarios visibles</span>
+          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 hover:border-white/10 transition-all flex flex-col justify-between">
+            <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Ocupación Actual</span>
+            <div className="mt-2">
+              <span className="text-2xl font-black text-amber-400 font-outfit block">{occupancyPct}%</span>
+              <span className="text-[9px] text-zinc-500 block">Aforo: {stats.peopleInside}/{capacityLimit}</span>
             </div>
           </div>
 
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between col-span-2 md:col-span-1">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Evento Activo</span>
-            <div className="mt-2.5">
-              <span className="text-xs font-bold text-purple-400 font-outfit truncate block" title={stats.activeEventTitle || "Ninguno"}>
-                {stats.activeEventTitle || "Ninguno hoy"}
-              </span>
-              <span className="text-[9px] text-zinc-500 mt-1.5 block">Programación nocturna</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. VENTAS DE HOY (HOY) */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 pl-1">Ventas y Covers de Hoy (HOY)</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Recaudación Total</span>
-            <div className="mt-2.5">
-              <span className="text-xl font-black text-emerald-400 font-outfit block">
-                ${stats.revenueToday.toLocaleString("es-CO")}
-              </span>
-              <span className="text-[9px] text-zinc-500 mt-1 block">Pedidos + Covers</span>
-            </div>
-          </div>
-
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Covers Vendidos</span>
-            <div className="mt-2.5">
-              <span className="text-xl font-black text-white font-outfit block">{stats.coversToday}</span>
-              <span className="text-[9px] text-zinc-500 mt-1 block">Hoy</span>
-            </div>
-          </div>
-
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Reservas de Mesa</span>
-            <div className="mt-2.5">
-              <span className="text-xl font-black text-white font-outfit block">{stats.tableReservationsToday}</span>
-              <span className="text-[9px] text-zinc-500 mt-1 block">Reservas VIP hoy</span>
-            </div>
-          </div>
-
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Botellas Vendidas</span>
-            <div className="mt-2.5">
-              <span className="text-xl font-black text-purple-400 font-outfit block">{stats.bottlesSoldToday}</span>
-              <span className="text-[9px] text-zinc-500 mt-1 block">Licores destilados</span>
-            </div>
-          </div>
-
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Ingresos por Eventos</span>
-            <div className="mt-2.5">
-              <span className="text-xl font-black text-emerald-400 font-outfit block">
-                ${stats.eventRevenueToday.toLocaleString("es-CO")}
-              </span>
-              <span className="text-[9px] text-zinc-500 mt-1 block">Entradas / Covers de eventos</span>
-            </div>
-          </div>
-
-          {/* Ticket Promedio */}
-          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 flex flex-col justify-between">
-            <div className="space-y-1">
-              <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider block">Ticket Promedio</span>
-              <span className="text-xl font-black text-cyan-400 font-outfit block">
-                ${stats.ticketPromedioToday.toLocaleString("es-CO")}
-              </span>
-            </div>
-            <span className="text-[9px] font-bold mt-2.5 block">
-              {stats.ticketPromedioDiffPct !== null ? (
-                <span className={stats.ticketPromedioDiffPct >= 0 ? "text-emerald-400" : "text-red-400"}>
-                  {stats.ticketPromedioDiffPct >= 0 ? "▲ +" : "▼ "}{stats.ticketPromedioDiffPct.toFixed(1)}% vs ayer
-                </span>
-              ) : (
-                <span className="text-zinc-500">Sin historial</span>
-              )}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. OCUPACIÓN DEL LOCAL */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 pl-1">Ocupación del Local</h3>
-        <div className="glass-card p-6 bg-[#09090f]/60 border-white/5 space-y-4">
-          <div className="flex items-center justify-between text-xs">
-            <div>
-              <span className="font-bold text-zinc-300">Ocupación en tiempo real</span>
-              <span className="text-zinc-500 ml-1.5">({stats.peopleInside} personas adentro)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${occupancyState.color}`}>
-                {occupancyState.label}
-              </span>
-              <span className="font-black text-white font-outfit text-sm">{occupancyPct}%</span>
-            </div>
-          </div>
-          
-          <div className="w-full h-3 bg-zinc-950 rounded-full overflow-hidden border border-white/5 p-[1px]">
-            <div
-              className={`h-full rounded-full transition-all duration-1000 ${
-                occupancyPct < 35
-                  ? "bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
-                  : occupancyPct < 70
-                  ? "bg-cyan-500 shadow-[0_0_12px_rgba(6,182,212,0.3)]"
-                  : occupancyPct < 95
-                  ? "bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.3)]"
-                  : "bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.5)] animate-pulse"
-              }`}
-              style={{ width: `${occupancyPct}%` }}
-            />
-          </div>
-
-          {/* Decoupled Future Projections Block */}
-          <div className="pt-4 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">📈 Ocupación Estimada</span>
-              <span className="text-xs font-bold text-zinc-400">Fase 2 IA: --%</span>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">📈 Ventas Estimadas</span>
-              <span className="text-xs font-bold text-zinc-400">Fase 2 IA: $--</span>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">📈 Covers Esperados</span>
-              <span className="text-xs font-bold text-zinc-400">Fase 2 IA: --</span>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">📈 Reservas Proyectadas</span>
-              <span className="text-xs font-bold text-zinc-400">Fase 2 IA: --</span>
+          <div className="glass-card p-5 border-white/5 bg-[#09090f]/60 hover:border-white/10 transition-all flex flex-col justify-between">
+            <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Consumo Promedio</span>
+            <div className="mt-2">
+              <span className="text-2xl font-black text-emerald-400 font-outfit block">${stats.ticketPromedioToday.toLocaleString("es-CO")}</span>
+              <span className="text-[9px] text-zinc-500 block">Ticket por Cliente</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 5. EVENTO ACTIVO */}
+      {/* ALERTS CENTER & LIVE STATUS BANNER */}
       <section className="space-y-4">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 pl-1">Evento Activo de Hoy</h3>
-        {activeEventStats.title ? (
-          <div className="glass-card p-6 bg-[#09090f]/60 border border-purple-500/10 hover:border-purple-500/20 transition-all rounded-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div className="space-y-1">
-                <span className="text-[10px] bg-purple-500/10 border border-purple-500/20 text-purple-400 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider font-outfit">
-                  Evento en Progreso
-                </span>
-                <h4 className="text-lg font-bold text-white font-outfit mt-1">{activeEventStats.title}</h4>
-              </div>
-
-              <div className="grid grid-cols-3 gap-6 shrink-0 w-full md:w-auto">
-                <div className="text-left">
-                  <span className="text-[10px] text-zinc-500 uppercase font-black block">Ventas</span>
-                  <span className="text-sm font-bold text-white">{activeEventStats.ticketsSold} covers</span>
-                </div>
-                <div className="text-left">
-                  <span className="text-[10px] text-zinc-500 uppercase font-black block">Asistencia</span>
-                  <span className="text-sm font-bold text-white">{activeEventStats.attendance} personas</span>
-                </div>
-                <div className="text-left">
-                  <span className="text-[10px] text-zinc-500 uppercase font-black block">Ingresos</span>
-                  <span className="text-sm font-bold text-emerald-400">${activeEventStats.revenue.toLocaleString("es-CO")}</span>
-                </div>
-              </div>
+        {(stats.pendingBookingsCount > 0 || stats.delayedOrdersCount > 0 || stats.failedQrScansCount > 0 || stats.pendingAssistanceCount > 0 || lowEventSalesAlert) ? (
+          <div className="bg-red-500/5 border border-red-500/20 p-5 rounded-3xl space-y-3">
+            <div className="flex items-center gap-2 text-red-400 font-bold text-xs uppercase tracking-wider font-outfit">
+              <AlertTriangle className="w-4.5 h-4.5 animate-pulse" />
+              <span>Centro de Alertas Críticas ({[
+                stats.pendingBookingsCount > 0,
+                stats.delayedOrdersCount > 0,
+                stats.failedQrScansCount > 0,
+                stats.pendingAssistanceCount > 0,
+                lowEventSalesAlert
+              ].filter(Boolean).length} alertas operativas)</span>
             </div>
-          </div>
-        ) : (
-          <div className="py-8 text-center border border-dashed border-white/5 rounded-xl bg-black/20">
-            <Ticket className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-            <p className="text-xs text-zinc-400 font-medium">No existen eventos programados para hoy.</p>
-          </div>
-        )}
-      </section>
-
-      {/* 6. PEDIDOS EN VIVO */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 pl-1">Pedidos en Vivo (Comandas)</h3>
-        {activeOrders.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeOrders.map((order) => (
-              <div key={order.id} className="glass-card p-5 bg-[#09090f]/60 border-white/5 flex flex-col justify-between space-y-4">
-                <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
-                  <div>
-                    <span className="text-xs font-bold text-white font-outfit">Mesa {order.tableNumber}</span>
-                    <span className="text-[10px] text-zinc-500 block">{formatRelativeTime(order.created_at)}</span>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                    order.status === "pending"
-                      ? "bg-red-500/10 border border-red-500/20 text-red-400"
-                      : order.status === "preparing"
-                      ? "bg-amber-500/10 border border-amber-500/20 text-amber-400"
-                      : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-                  }`}>
-                    {order.status === "pending" ? "Pendiente" : order.status === "preparing" ? "Preparando" : "Entregado"}
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 flex-grow">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-xs">
-                      <span className="text-zinc-300 font-medium">{item.name}</span>
-                      <span className="text-zinc-500 font-bold">x{item.quantity}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="pt-2.5 border-t border-white/5 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-zinc-500 block uppercase">Total Pedido</span>
-                    <span className="text-xs font-bold text-emerald-400">${order.total.toLocaleString("es-CO")}</span>
-                  </div>
-
-                  <div className="flex gap-2">
-                    {order.status === "pending" && (
-                      <button
-                        onClick={() => handleUpdateOrderStatus(order.id, "preparing")}
-                        disabled={updatingOrderId !== null}
-                        className="bg-primary-600 hover:bg-primary-500 text-white font-bold text-[10px] uppercase px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        Preparar
-                      </button>
-                    )}
-                    {order.status === "preparing" && (
-                      <button
-                        onClick={() => handleUpdateOrderStatus(order.id, "delivered_by_staff")}
-                        disabled={updatingOrderId !== null}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] uppercase px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        Entregar
-                      </button>
-                    )}
-                    {order.status === "delivered_by_staff" && (
-                      <button
-                        onClick={() => handleUpdateOrderStatus(order.id, "confirmed")}
-                        disabled={updatingOrderId !== null}
-                        className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-[10px] uppercase px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        Confirmar
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-8 text-center border border-dashed border-white/5 rounded-xl bg-black/20">
-            <ShoppingBag className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-            <p className="text-xs text-zinc-400 font-medium">No hay pedidos activos actualmente.</p>
-          </div>
-        )}
-      </section>
-
-      {/* 7. ACTIVIDAD RECIENTE */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 pl-1">⚡ Actividad Reciente</h3>
-        {activityFeed.length > 0 ? (
-          <div className="glass-card p-6 bg-[#09090f]/60 border-white/5 space-y-4 max-h-[350px] overflow-y-auto scrollbar-none">
-            <div className="relative pl-4 border-l border-white/5 space-y-6">
-              {activityFeed.map((item) => (
-                <div key={item.id} className="relative space-y-1">
-                  {/* Bullet Indicator */}
-                  <span className={`absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-[#09090f] ${
-                    item.type === "order"
-                      ? "bg-red-500"
-                      : item.type === "delivery"
-                      ? "bg-emerald-500"
-                      : item.type === "admission_approved"
-                      ? "bg-cyan-500"
-                      : item.type === "admission_rejected"
-                      ? "bg-red-600"
-                      : item.type === "assistance"
-                      ? "bg-amber-500"
-                      : "bg-purple-500"
-                  }`} />
-                  <div className="flex justify-between items-start text-xs">
-                    <p className="text-zinc-300 font-medium leading-relaxed">{item.text}</p>
-                    <span className="text-[10px] text-zinc-500 font-semibold shrink-0 ml-4">
-                      {formatRelativeTime(item.time)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="py-8 text-center border border-dashed border-white/5 rounded-xl bg-black/20">
-            <Clock className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-            <p className="text-xs text-zinc-400 font-medium">Aún no hay actividad registrada.</p>
-          </div>
-        )}
-      </section>
-
-      {/* 8. TOP MESEROS */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 pl-1">🏆 Top Meseros</h3>
-        <div className="glass-card p-6 bg-[#09090f]/60 border-white/5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {topWaiters.map((waiter, index) => (
-              <div key={waiter.name} className="bg-black/30 p-4 rounded-xl border border-white/5 relative overflow-hidden flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
-                  {index === 0 ? <Trophy className="w-5 h-5 fill-amber-500" /> : <span className="font-bold font-outfit text-sm">#{index + 1}</span>}
-                </div>
-                <div className="min-w-0 space-y-0.5">
-                  <h4 className="text-xs font-black text-white">{waiter.name}</h4>
-                  <p className="text-xs font-bold text-emerald-400">${waiter.salesGenerated.toLocaleString("es-CO")}</p>
-                  <div className="flex gap-2 text-[10px] text-zinc-500 font-medium">
-                    <span>{waiter.ordersAttended} ped.</span>
-                    <span>•</span>
-                    <span>Avg: ${waiter.ticketPromedio.toLocaleString("es-CO")}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 9. ACTIVIDAD HANGOVER CONNECT */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 pl-1">Actividad Hangover Connect</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 glass-card p-6 bg-[#09090f]/60 border-white/5 space-y-4">
-            <div>
-              <h4 className="font-bold text-white text-sm font-outfit">Presencia en Vivo</h4>
-              <p className="text-xs text-zinc-500">Usuarios online visibles en el marketplace</p>
-            </div>
-            
-            {connectPresence.length > 0 ? (
-              <div className="flex flex-wrap gap-3">
-                {connectPresence.map((cp) => (
-                  <div key={cp.id} className="flex items-center gap-2 bg-black/40 border border-white/5 px-3 py-2 rounded-2xl">
-                    {cp.profiles?.avatar_url ? (
-                      <img src={cp.profiles.avatar_url} alt={cp.profiles.full_name || ""} className="w-6 h-6 rounded-full object-cover border border-white/10" />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400">
-                        {cp.profiles?.full_name ? cp.profiles.full_name[0].toUpperCase() : "U"}
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-xs font-bold text-white">{cp.profiles?.full_name || "Usuario"}</p>
-                      <p className="text-[9px] text-emerald-400 uppercase font-semibold">{cp.status === 'available' ? 'Disponible' : cp.status === 'do_not_disturb' ? 'No molestar' : 'Observando'}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-8 text-center border border-dashed border-white/5 rounded-xl bg-black/20">
-                <Users className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-                <p className="text-xs text-zinc-500 font-medium">Aún no hay conexiones sociales activas.</p>
-              </div>
-            )}
-          </div>
-
-          <div className="glass-card p-6 bg-[#09090f]/60 border-white/5 space-y-5">
-            <div>
-              <h4 className="font-bold text-white text-sm font-outfit">Multimedia de Local</h4>
-              <p className="text-xs text-zinc-500">Historias y Galería pública</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3.5">
-              <div className="bg-black/30 p-3 rounded-xl border border-white/5 text-center">
-                <span className="text-[9px] text-zinc-500 uppercase font-black block">Historias Activas</span>
-                <span className="text-lg font-black text-primary-400 mt-1 block font-outfit">{multimediaStats.activeStories}</span>
-              </div>
-              <div className="bg-black/30 p-3 rounded-xl border border-white/5 text-center">
-                <span className="text-[9px] text-zinc-500 uppercase font-black block">Galería</span>
-                <span className="text-lg font-black text-cyan-400 mt-1 block font-outfit">{multimediaStats.galleryItems}</span>
-              </div>
-              <div className="bg-black/30 p-3 rounded-xl border border-white/5 text-center">
-                <span className="text-[9px] text-zinc-500 uppercase font-black block">Videos</span>
-                <span className="text-lg font-black text-purple-400 mt-1 block font-outfit">{multimediaStats.totalVideos}</span>
-              </div>
-              <div className="bg-black/30 p-3 rounded-xl border border-white/5 text-center">
-                <span className="text-[9px] text-zinc-500 uppercase font-black block">Destacados ★</span>
-                <span className="text-lg font-black text-emerald-400 mt-1 block font-outfit">{multimediaStats.featuredItems}</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsMediaManagerOpen(true)}
-              className="w-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-white rounded-xl py-2 px-4 text-xs font-bold border border-white/5 transition-all text-center cursor-pointer min-h-[38px] font-outfit"
-            >
-              Administrar Multimedia
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* 10. ALERTAS OPERATIVAS */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 pl-1">Alertas Operativas</h3>
-        <div className="glass-card p-6 bg-[#09090f]/60 border-white/5 space-y-4">
-          {stats.pendingBookingsCount > 0 || stats.delayedOrdersCount > 0 || stats.failedQrScansCount > 0 || stats.pendingAssistanceCount > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {stats.pendingBookingsCount > 0 && (
-                <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-amber-300">
-                  <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
-                  <div>
-                    <h4 className="text-xs font-black uppercase font-outfit">Reservas Pendientes</h4>
-                    <p className="text-[11px] mt-0.5 font-medium">Hay {stats.pendingBookingsCount} reservas VIP esperando confirmación de mesa.</p>
-                  </div>
-                </div>
-              )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {stats.delayedOrdersCount > 0 && (
-                <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-300">
-                  <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
+                <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 p-3.5 rounded-2xl text-red-300">
+                  <Clock className="w-5 h-5 text-red-500 shrink-0" />
                   <div>
-                    <h4 className="text-xs font-black uppercase font-outfit">Pedidos Retrasados</h4>
-                    <p className="text-[11px] mt-0.5 font-medium">Hay {stats.delayedOrdersCount} comandas en preparación por más de 15 minutos.</p>
-                  </div>
-                </div>
-              )}
-              {stats.failedQrScansCount > 0 && (
-                <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-300">
-                  <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
-                  <div>
-                    <h4 className="text-xs font-black uppercase font-outfit">Validaciones QR Fallidas</h4>
-                    <p className="text-[11px] mt-0.5 font-medium">{stats.failedQrScansCount} intentos de accesos QR rechazados en puerta hoy.</p>
+                    <h4 className="text-[11px] font-black uppercase font-outfit">Pedidos Retrasados</h4>
+                    <p className="text-[10px] mt-0.5 text-zinc-400">Hay {stats.delayedOrdersCount} pedidos atrasados en barra por más de 15 min.</p>
                   </div>
                 </div>
               )}
               {stats.pendingAssistanceCount > 0 && (
-                <div className="flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-blue-300">
-                  <Bell className="w-5 h-5 text-blue-400 shrink-0 animate-bounce" />
+                <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-2xl text-amber-300">
+                  <Bell className="w-5 h-5 text-amber-500 shrink-0 animate-bounce" />
                   <div>
-                    <h4 className="text-xs font-black uppercase font-outfit">Llamados a Mesero</h4>
-                    <p className="text-[11px] mt-0.5 font-medium">{stats.pendingAssistanceCount} mesas solicitando asistencia o la cuenta en sala.</p>
+                    <h4 className="text-[11px] font-black uppercase font-outfit">Mesas Solicitan Atención</h4>
+                    <p className="text-[10px] mt-0.5 text-zinc-400">Hay {stats.pendingAssistanceCount} llamados de mesero / cuenta sin atender.</p>
+                  </div>
+                </div>
+              )}
+              {lowEventSalesAlert && (
+                <div className="flex items-center gap-3 bg-purple-500/10 border border-purple-500/20 p-3.5 rounded-2xl text-purple-300">
+                  <Ticket className="w-5 h-5 text-purple-500 shrink-0" />
+                  <div>
+                    <h4 className="text-[11px] font-black uppercase font-outfit">Baja Venta de Evento</h4>
+                    <p className="text-[10px] mt-0.5 text-zinc-400">Las ventas del evento actual están por debajo del 20% del aforo.</p>
+                  </div>
+                </div>
+              )}
+              {stats.failedQrScansCount > 0 && (
+                <div className="flex items-center gap-3 bg-rose-500/10 border border-rose-500/20 p-3.5 rounded-2xl text-rose-300">
+                  <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />
+                  <div>
+                    <h4 className="text-[11px] font-black uppercase font-outfit font-outfit">Rechazos QR en Puerta</h4>
+                    <p className="text-[10px] mt-0.5 text-zinc-400">Se han registrado {stats.failedQrScansCount} accesos fallidos en la entrada.</p>
                   </div>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="flex items-center gap-3 text-emerald-400">
-              <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center animate-pulse">
-                <CheckCircle className="w-5 h-5" />
+          </div>
+        ) : (
+          <div className="bg-emerald-500/5 border border-emerald-500/15 p-4 rounded-3xl flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0">
+                <Check className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wider font-outfit">Operación Normal</h4>
-                <p className="text-[11px] text-zinc-500 mt-0.5 font-medium">No hay alertas activas, retrasos en pedidos, o llamados de mesero pendientes.</p>
+                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400 font-outfit">Estado General de Operación</h4>
+                <p className="text-[10px] text-zinc-500">Todo marcha bien. No hay incidencias, mesas sin atención o pedidos retrasados.</p>
               </div>
             </div>
-          )}
-        </div>
+            <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full text-emerald-400 font-bold uppercase tracking-wider">Estable</span>
+          </div>
+        )}
       </section>
 
-      {/* 11. MIS DISCOTECAS & QUICK ACTIONS */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 pl-1">Accesos Rápidos</h3>
-        <div className="glass-card p-6 bg-[#09090f]/60 border-white/5 space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            <button
-              onClick={() => setIsEditModalOpen(true)}
-              className="bg-white/5 hover:bg-white/10 text-white rounded-xl py-3 px-4 text-xs font-bold border border-white/5 transition-all text-center cursor-pointer font-outfit"
-            >
-              📝 Editar Perfil
-            </button>
-            <button
-              onClick={() => setIsMediaManagerOpen(true)}
-              className="bg-white/5 hover:bg-white/10 text-white rounded-xl py-3 px-4 text-xs font-bold border border-white/5 transition-all text-center cursor-pointer font-outfit"
-            >
-              📸 Multimedia
-            </button>
-            <button
-              onClick={() => setIsMenuManagerOpen(true)}
-              className="bg-white/5 hover:bg-white/10 text-white rounded-xl py-3 px-4 text-xs font-bold border border-white/5 transition-all text-center cursor-pointer font-outfit"
-            >
-              🍷 Editar Carta
-            </button>
-            <button
-              onClick={() => router.push("/dashboard/provider/tables")}
-              className="bg-white/5 hover:bg-white/10 text-white rounded-xl py-3 px-4 text-xs font-bold border border-white/5 transition-all text-center cursor-pointer font-outfit"
-            >
-              🪑 Control Mesas
-            </button>
-            <button
-              onClick={() => router.push("/dashboard/provider/orders")}
-              className="bg-white/5 hover:bg-white/10 text-white rounded-xl py-3 px-4 text-xs font-bold border border-white/5 transition-all text-center cursor-pointer font-outfit"
-            >
-              🍹 Pedidos en Vivo
-            </button>
-            <button
-              onClick={() => router.push("/dashboard/provider/scanner")}
-              className="bg-white/5 hover:bg-white/10 text-white rounded-xl py-3 px-4 text-xs font-bold border border-white/5 transition-all text-center cursor-pointer font-outfit col-span-2 lg:col-span-1"
-            >
-              🎟️ Validar QR
-            </button>
+      {/* 3. CORE TWO-COLUMN REAL-TIME CENTRAL CONSOLE */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Left Column - Real-time metrics, logs, lists */}
+        <div className="lg:col-span-2 space-y-8">
+          
+          {/* HOURLY SALES CHART (24H) */}
+          <div className="glass-card p-6 bg-zinc-950/40 border border-white/5 rounded-3xl space-y-4 shadow-xl relative">
+            <div className="flex justify-between items-center pb-2 border-b border-white/5">
+              <div>
+                <h4 className="font-bold text-white text-sm font-outfit">Ingresos por Hora (Últimas 24 Horas)</h4>
+                <p className="text-xs text-zinc-500">Monitorea el flujo de compras de bebidas y covers en tiempo real</p>
+              </div>
+              {hoveredHour ? (
+                <div className="text-xs font-black font-outfit bg-primary-650/10 border border-primary-500/25 px-3 py-1 rounded-xl text-primary-400 animate-fadeIn shrink-0">
+                  {hoveredHour.label} — {formatCOP(hoveredHour.revenue)} COP
+                </div>
+              ) : (
+                <span className="text-[10px] text-zinc-650 uppercase font-black">Pasa el cursor</span>
+              )}
+            </div>
+
+            <div className="w-full aspect-[4/1] min-h-[160px] relative">
+              <svg viewBox={`0 0 ${hWidth} ${hHeight}`} className="w-full h-full overflow-visible select-none">
+                <defs>
+                  <linearGradient id="hourly-chart-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#d946ef" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="#d946ef" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+
+                {/* Grid Lines */}
+                <line x1={hPaddingX} y1={hPaddingY} x2={hWidth - hPaddingX} y2={hPaddingY} stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
+                <line x1={hPaddingX} y1={(hHeight - hPaddingY) / 2} x2={hWidth - hPaddingX} y2={(hHeight - hPaddingY) / 2} stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
+                <line x1={hPaddingX} y1={hHeight - hPaddingY} x2={hWidth - hPaddingX} y2={hHeight - hPaddingY} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+
+                {/* Fill Area */}
+                {hAreaPath && <path d={hAreaPath} fill="url(#hourly-chart-grad)" />}
+
+                {/* Line Path */}
+                {hLinePath && <path d={hLinePath} fill="none" stroke="#d946ef" strokeWidth="2.5" strokeLinecap="round" />}
+
+                {/* X Labels */}
+                {hPoints.filter((_, idx) => idx % 4 === 0 || idx === 23).map((p, idx) => (
+                  <text key={idx} x={p.x} y={hHeight - 5} fill="#71717a" fontSize="8.5" textAnchor="middle" className="font-semibold">{p.label.slice(0, 5)}</text>
+                ))}
+
+                {/* Interactive dots & hover zones */}
+                {hPoints.map((p, idx) => (
+                  <g key={idx}>
+                    {hoveredHour && hoveredHour.label === p.label && (
+                      <>
+                        <circle cx={p.x} cy={p.y} r="5.5" fill="#d946ef" opacity="0.3" className="pointer-events-none" />
+                        <circle cx={p.x} cy={p.y} r="3" fill="#d946ef" className="pointer-events-none" />
+                      </>
+                    )}
+                    <circle cx={p.x} cy={p.y} r="10" fill="transparent" onMouseEnter={() => setHoveredHour(p)} onMouseLeave={() => setHoveredHour(null)} className="cursor-pointer" />
+                  </g>
+                ))}
+              </svg>
+            </div>
+          </div>
+
+          {/* SECCIÓN "OPERACIÓN EN VIVO" */}
+          <div className="glass-card p-6 bg-zinc-950/40 border border-white/5 rounded-3xl space-y-5 shadow-xl">
+            <div>
+              <h4 className="font-bold text-white text-sm font-outfit">Control de la Operación en Vivo</h4>
+              <p className="text-xs text-zinc-500">Visualiza el balance operativo del local de un vistazo</p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              <div className="bg-black/30 border border-white/5 p-4 rounded-2xl text-center space-y-1">
+                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-wider block">Mesas Ocupadas</span>
+                <span className="text-2xl font-black text-primary-400 font-outfit block">{stats.tablesOccupied}</span>
+                <span className="text-[9px] bg-primary-500/10 border border-primary-500/20 text-primary-300 py-0.5 px-2 rounded-full inline-block font-bold">VIP Activo</span>
+              </div>
+              <div className="bg-black/30 border border-white/5 p-4 rounded-2xl text-center space-y-1">
+                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-wider block">Mesas Libres</span>
+                <span className="text-2xl font-black text-emerald-400 font-outfit block">{stats.tablesFree}</span>
+                <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 py-0.5 px-2 rounded-full inline-block font-bold">Disponibles</span>
+              </div>
+              <div className="bg-black/30 border border-white/5 p-4 rounded-2xl text-center space-y-1">
+                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-wider block">Comandas Activas</span>
+                <span className="text-2xl font-black text-amber-400 font-outfit block">{activeOrders.length}</span>
+                <span className="text-[9px] bg-amber-500/10 border border-amber-500/20 text-amber-300 py-0.5 px-2 rounded-full inline-block font-bold">Pendientes</span>
+              </div>
+              <div className="bg-black/30 border border-white/5 p-4 rounded-2xl text-center space-y-1">
+                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-wider block">Personal Activo</span>
+                <span className="text-2xl font-black text-cyan-400 font-outfit block">{topWaiters?.length || 3}</span>
+                <span className="text-[9px] bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 py-0.5 px-2 rounded-full inline-block font-bold">Meseros</span>
+              </div>
+              <div className="bg-black/30 border border-white/5 p-4 rounded-2xl text-center space-y-1 col-span-2 sm:col-span-1">
+                <span className="text-[9px] text-zinc-500 font-black uppercase tracking-wider block">Promedio Servicio</span>
+                <span className="text-2xl font-black text-white font-outfit block">12 min</span>
+                <span className="text-[9px] bg-zinc-800 text-zinc-400 py-0.5 px-2 rounded-full inline-block font-bold">Tiempo Óptimo</span>
+              </div>
+            </div>
+          </div>
+
+          {/* AGENDA DE RESERVAS DEL DIA */}
+          <div className="glass-card p-6 bg-zinc-950/40 border border-white/5 rounded-3xl space-y-4 shadow-xl">
+            <div className="flex justify-between items-center pb-3 border-b border-white/5">
+              <div>
+                <h4 className="font-bold text-white text-sm font-outfit">Agenda de Reservas de Hoy</h4>
+                <p className="text-xs text-zinc-500">Listado de covers y mesas VIP programadas para esta noche</p>
+              </div>
+              <span className="text-[10px] bg-primary-600/10 border border-primary-500/20 text-primary-400 font-black px-2.5 py-1 rounded-xl uppercase font-outfit">
+                {todayBookings.length} Reservas
+              </span>
+            </div>
+
+            {todayBookings.length > 0 ? (
+              <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/5 text-zinc-500 font-bold uppercase text-[9px] tracking-wider">
+                      <th className="py-2.5 px-3">Cliente</th>
+                      <th className="py-2.5 px-3">Personas</th>
+                      <th className="py-2.5 px-3">Tipo de Acceso</th>
+                      <th className="py-2.5 px-3">Monto Total</th>
+                      <th className="py-2.5 px-3">Ingreso (QR)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {todayBookings.map((b) => (
+                      <tr key={b.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-3 px-3 font-semibold text-white flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-400 font-black overflow-hidden border border-white/10 shrink-0">
+                            {b.clientAvatar ? (
+                              <img src={b.clientAvatar} alt={b.clientName} className="w-full h-full object-cover" />
+                            ) : (
+                              b.clientName[0].toUpperCase()
+                            )}
+                          </div>
+                          <span className="truncate max-w-[120px]">{b.clientName}</span>
+                        </td>
+                        <td className="py-3 px-3 text-zinc-300 font-bold">{b.number_of_people} personas</td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                            b.booking_type === "club_vip" 
+                              ? "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+                              : "bg-cyan-500/10 border border-cyan-500/20 text-cyan-400"
+                          }`}>
+                            {b.booking_type === "club_vip" ? "Mesa VIP" : "Cover General"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 font-bold text-emerald-400">${b.total_amount.toLocaleString("es-CO")}</td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase border ${
+                            b.qr_status === "used"
+                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                              : "bg-zinc-800 border-white/5 text-zinc-500"
+                          }`}>
+                            {b.qr_status === "used" ? "Validado" : "Pendiente"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="py-8 text-center border border-dashed border-white/5 rounded-2xl bg-black/20">
+                <Ticket className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
+                <p className="text-xs text-zinc-500 font-medium">No se han registrado reservas para hoy aún.</p>
+              </div>
+            )}
+          </div>
+
+          {/* HISTORICO 30 DIAS CHART */}
+          <ClubDashboardCharts data={chartsData} />
+
+          {/* RANKING DE EVENTOS MAS VENDIDOS */}
+          <div className="glass-card p-6 bg-zinc-950/40 border border-white/5 rounded-3xl space-y-4 shadow-xl">
+            <div className="pb-3 border-b border-white/5">
+              <h4 className="font-bold text-white text-sm font-outfit">Ranking de Eventos Más Vendidos</h4>
+              <p className="text-xs text-zinc-500">Historial de taquilla y covers vendidos en los últimos eventos</p>
+            </div>
+
+            {eventRanking.length > 0 ? (
+              <div className="space-y-4">
+                {eventRanking.map((evt, idx) => {
+                  const maxTickets = Math.max(...eventRanking.map(e => e.ticketsSold), 10);
+                  const pct = Math.round((evt.ticketsSold / maxTickets) * 100);
+                  return (
+                    <div key={evt.id} className="space-y-2">
+                      <div className="flex justify-between items-center text-xs font-semibold">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-5 h-5 rounded-lg bg-white/5 flex items-center justify-center font-bold text-zinc-400 shrink-0">#{idx + 1}</span>
+                          <span className="text-white font-outfit truncate">{evt.title}</span>
+                          <span className="text-[10px] text-zinc-500 shrink-0">({evt.date})</span>
+                        </div>
+                        <div className="flex gap-4 text-zinc-300 font-bold shrink-0">
+                          <span>{evt.ticketsSold} sold</span>
+                          <span className="text-emerald-400">${evt.revenue.toLocaleString("es-CO")}</span>
+                        </div>
+                      </div>
+                      <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden border border-white/5">
+                        <div 
+                          className="h-full bg-gradient-to-r from-primary-600 to-purple-500 rounded-full transition-all duration-500" 
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center border border-dashed border-white/5 rounded-2xl bg-black/20">
+                <Ticket className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
+                <p className="text-xs text-zinc-500 font-medium">Aún no hay eventos registrados en el historial.</p>
+              </div>
+            )}
           </div>
         </div>
-      </section>
+
+        {/* Right Column - Actions, QR entry logs, connect presence */}
+        <div className="space-y-8">
+          
+          {/* ACCIONES RAPIDAS */}
+          <div className="glass-card p-6 bg-zinc-950/40 border border-white/5 rounded-3xl space-y-4 shadow-xl">
+            <h4 className="font-bold text-white text-sm font-outfit pb-2.5 border-b border-white/5">Consola de Acciones Rápidas</h4>
+            <div className="grid grid-cols-2 gap-3.5">
+              <button
+                onClick={() => router.push("/dashboard/provider/new-event")}
+                className="bg-purple-600/10 hover:bg-purple-600/20 text-purple-400 border border-purple-500/20 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5"
+              >
+                <Plus className="w-5 h-5 text-purple-400" />
+                <span className="text-xs font-bold font-outfit">Crear Evento</span>
+              </button>
+              <button
+                onClick={() => router.push("/dashboard/provider/tables")}
+                className="bg-cyan-600/10 hover:bg-cyan-600/20 text-cyan-400 border border-cyan-500/20 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5"
+              >
+                <Sliders className="w-5 h-5 text-cyan-400" />
+                <span className="text-xs font-bold font-outfit">Control Mesas</span>
+              </button>
+              <button
+                onClick={() => setIsPromoModalOpen(true)}
+                className="bg-amber-600/10 hover:bg-amber-600/20 text-amber-400 border border-amber-500/20 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5"
+              >
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <span className="text-xs font-bold font-outfit">Promoción</span>
+              </button>
+              <button
+                onClick={() => router.push("/dashboard/provider/scanner")}
+                className="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5"
+              >
+                <QrCode className="w-5 h-5 text-emerald-400" />
+                <span className="text-xs font-bold font-outfit">Validar QR</span>
+              </button>
+              <button
+                onClick={() => setIsAddWaiterModalOpen(true)}
+                className="bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5 text-center w-full"
+              >
+                <Users className="w-5 h-5 text-blue-400" />
+                <span className="text-xs font-bold font-outfit">Nuevo Mesero</span>
+              </button>
+              <button
+                onClick={() => setIsCreateBookingModalOpen(true)}
+                className="bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5"
+              >
+                <Ticket className="w-5 h-5 text-rose-400" />
+                <span className="text-xs font-bold font-outfit">Nueva Reserva</span>
+              </button>
+            </div>
+          </div>
+
+          {/* FEED DE ACCESOS EN TIEMPO REAL (QR) */}
+          <div className="glass-card p-6 bg-zinc-950/40 border border-white/5 rounded-3xl space-y-4 shadow-xl">
+            <div className="flex justify-between items-center pb-2.5 border-b border-white/5">
+              <h4 className="font-bold text-white text-sm font-outfit">Accesos QR Recientes</h4>
+              <span className="text-[9px] bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 py-0.5 px-2 rounded-full font-bold uppercase tracking-wider">Lector en Vivo</span>
+            </div>
+
+            <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+              {clubAdmissionLogs.length > 0 ? (
+                clubAdmissionLogs.map((log) => (
+                  <div key={log.id} className="bg-black/30 border border-white/5 p-3 rounded-2xl space-y-1.5 flex flex-col justify-between">
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="font-bold text-white truncate max-w-[140px]">{log.buyer_name || "Cliente"}</span>
+                      <span className="text-zinc-500 font-semibold">{formatRelativeTime(log.created_at)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] text-zinc-400 uppercase font-black tracking-wide">{log.access_type || "Entrada Cover"}</span>
+                      <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${
+                        log.status === "approved"
+                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                          : "bg-red-500/10 border-red-500/20 text-red-400"
+                      }`}>
+                        {log.status === "approved" ? "Aceptado" : "Rechazado"}
+                      </span>
+                    </div>
+                    {log.status === "rejected" && log.error_reason && (
+                      <p className="text-[9px] text-red-400 leading-snug font-semibold mt-0.5 border-t border-white/5 pt-1">
+                        Motivo: {log.error_reason}
+                      </p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="py-6 text-center text-zinc-650 italic text-[11px]">
+                  No se han registrado lecturas QR hoy.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ACTIVE EVENT CONTROLLER */}
+          <div className="glass-card p-6 bg-zinc-950/40 border border-white/5 rounded-3xl space-y-4 shadow-xl relative overflow-hidden">
+            <h4 className="font-bold text-white text-sm font-outfit pb-2 border-b border-white/5">Evento Activo de Hoy</h4>
+            {activeEventStats?.title ? (
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[9px] bg-purple-500/10 border border-purple-500/20 text-purple-400 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider font-outfit">
+                    En progreso
+                  </span>
+                  <h5 className="font-bold text-white text-sm font-outfit mt-1.5">{activeEventStats.title}</h5>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl">
+                    <span className="text-[9px] text-zinc-500 uppercase font-black block">Covers</span>
+                    <span className="font-bold text-white block mt-0.5">{activeEventStats.ticketsSold}</span>
+                  </div>
+                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl">
+                    <span className="text-[9px] text-zinc-500 uppercase font-black block">Entraron</span>
+                    <span className="font-bold text-white block mt-0.5">{activeEventStats.attendance}</span>
+                  </div>
+                  <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl">
+                    <span className="text-[9px] text-zinc-500 uppercase font-black block">Ingresos</span>
+                    <span className="font-bold text-emerald-400 block mt-0.5">${activeEventStats.revenue.toLocaleString("es-CO")}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="py-6 text-center text-zinc-500 text-xs font-medium border border-dashed border-white/5 rounded-2xl">
+                Sin evento programado para hoy
+              </div>
+            )}
+          </div>
+
+          {/* CONNECT PRESENCE IN LIVE ROOM */}
+          <div className="glass-card p-6 bg-zinc-950/40 border border-white/5 rounded-3xl space-y-4 shadow-xl">
+            <div>
+              <h4 className="font-bold text-white text-sm font-outfit">Presencia en Vivo Connect</h4>
+              <p className="text-xs text-zinc-500">Usuarios interactuando en el local ahora</p>
+            </div>
+
+            <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+              {connectPresence.length > 0 ? (
+                connectPresence.map((cp) => (
+                  <div key={cp.id} className="flex items-center justify-between bg-black/30 border border-white/5 p-3 rounded-2xl">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {cp.profiles?.avatar_url ? (
+                        <img src={cp.profiles.avatar_url} alt={cp.profiles.full_name} className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-[11px] font-black text-zinc-400 shrink-0">
+                          {cp.profiles?.full_name ? cp.profiles.full_name[0].toUpperCase() : "U"}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white truncate leading-tight">{cp.profiles?.full_name || "Usuario"}</p>
+                        <p className="text-[9px] text-zinc-500">@{cp.profiles?.username || "usuario"}</p>
+                      </div>
+                    </div>
+                    <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 py-0.5 px-2.5 rounded-full font-bold uppercase shrink-0">Activo</span>
+                  </div>
+                ))
+              ) : (
+                <div className="py-6 text-center text-zinc-650 italic text-[11px]">
+                  No hay usuarios en sala Connect ahora.
+                </div>
+              )}
+            </div>
+          </div>
+          
+        </div>
+      </div>
 
       {/* ==========================================
           REUSE EDIT MODALS

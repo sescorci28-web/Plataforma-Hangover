@@ -12,7 +12,7 @@ export function MobileNavBar() {
     { label: "Inicio", href: "/", icon: Home },
     { label: "Eventos", href: "/events", icon: Calendar },
     { label: "Discotecas", href: "/discotecas", icon: Building2 },
-    { label: "Connect", href: "/dashboard", icon: Users }, // Links to Connect / Dashboard
+    { label: "Connect", href: "/connect", icon: Users }, // Links to Connect directly
     { label: "Perfil", href: "/dashboard/profile", icon: User },
   ];
 

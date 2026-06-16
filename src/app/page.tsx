@@ -646,9 +646,9 @@ export default async function HomePage() {
             <div className="space-y-3.5 text-left">
               <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block font-outfit">Soporte</span>
               <ul className="space-y-2 text-xs">
-                <li><Link href="#" className="text-zinc-500 hover:text-white transition-colors">Centro de Ayuda</Link></li>
-                <li><Link href="#" className="text-zinc-500 hover:text-white transition-colors">Términos de Uso</Link></li>
-                <li><Link href="#" className="text-zinc-500 hover:text-white transition-colors">Privacidad</Link></li>
+                <li><Link href="/ayuda" className="text-zinc-500 hover:text-white transition-colors">Centro de Ayuda</Link></li>
+                <li><Link href="/terminos" className="text-zinc-500 hover:text-white transition-colors">Términos de Uso</Link></li>
+                <li><Link href="/privacidad" className="text-zinc-500 hover:text-white transition-colors">Privacidad</Link></li>
               </ul>
             </div>
           </div>

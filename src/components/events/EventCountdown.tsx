@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Timer } from "lucide-react";
 
 interface EventCountdownProps {
@@ -17,14 +17,37 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
     isEnded: boolean;
   }>({ days: 0, hours: 0, minutes: 0, seconds: 0, isEnded: false });
   const [mounted, setMounted] = useState(false);
+  
+  // Use a ref to store target time to prevent effect dependency issues
+  const targetTimeRef = useRef<number>(0);
 
   useEffect(() => {
     setMounted(true);
-    const target = new Date(targetDate).getTime();
+    
+    if (!targetDate) {
+      setTimeLeft(prev => ({ ...prev, isEnded: true }));
+      return;
+    }
+
+    // Robust parsing of date string
+    let parsed = Date.parse(targetDate);
+    if (isNaN(parsed)) {
+      // Fallback: replace space with T if database has space format
+      const formatted = targetDate.replace(" ", "T");
+      parsed = Date.parse(formatted);
+    }
+
+    if (isNaN(parsed)) {
+      console.warn("Invalid date format passed to EventCountdown:", targetDate);
+      setTimeLeft(prev => ({ ...prev, isEnded: true }));
+      return;
+    }
+
+    targetTimeRef.current = parsed;
 
     const calculateTime = () => {
-      const now = new Date().getTime();
-      const difference = target - now;
+      const now = Date.now();
+      const difference = targetTimeRef.current - now;
 
       if (difference <= 0) {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isEnded: true });
@@ -44,6 +67,8 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
 
     return () => clearInterval(timer);
   }, [targetDate]);
+
+  const padZero = (n: number) => String(n).padStart(2, "0");
 
   if (!mounted) {
     // Return skeleton or empty view with same bounds to prevent layout shift during SSR hydration
@@ -68,22 +93,27 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
   }
 
   if (timeLeft.isEnded) {
+    if (variant === "compact") {
+      return (
+        <div className="inline-flex items-center gap-1.5 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/20 text-[11px] font-semibold text-rose-400 uppercase tracking-wider select-none shadow-lg">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+          <span>Evento finalizado</span>
+        </div>
+      );
+    }
     return (
-      <div className="inline-flex items-center gap-1.5 bg-rose-500/10 px-3 py-1 rounded-lg border border-rose-500/20 text-[11px] font-semibold text-rose-400 uppercase tracking-wider">
-        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-        Evento en Curso / Finalizado
+      <div className="flex flex-col items-center justify-center p-6 border border-rose-500/20 bg-rose-500/5 rounded-2xl max-w-md mx-auto text-center w-full">
+        <span className="text-sm font-black text-rose-400 uppercase tracking-widest">Evento finalizado</span>
       </div>
     );
   }
-
-  const padZero = (n: number) => String(n).padStart(2, "0");
 
   if (variant === "compact") {
     return (
       <div className="inline-flex items-center gap-1.5 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 text-[11px] font-mono text-white select-none shadow-lg">
         <Timer className="w-3.5 h-3.5 text-primary-400 shrink-0" />
         <span>
-          {timeLeft.days > 0 && `${padZero(timeLeft.days)}d `}
+          {timeLeft.days > 0 ? `${padZero(timeLeft.days)}d ` : ""}
           {padZero(timeLeft.hours)}h : {padZero(timeLeft.minutes)}m : {padZero(timeLeft.seconds)}s
         </span>
       </div>
@@ -94,28 +124,28 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
     <div className="grid grid-cols-4 gap-2.5 sm:gap-4 max-w-md mx-auto text-center select-none font-mono">
       <div className="flex flex-col items-center justify-center bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl px-2 py-3 sm:px-3 sm:py-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300 w-full min-w-0">
         <div className="absolute inset-0 bg-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        <span className="block text-2xl sm:text-3xl font-extrabold text-gradient leading-none tracking-tight text-center select-none w-full">
+        <span className="block text-2xl sm:text-3xl font-extrabold text-white leading-none tracking-tight text-center select-none w-full">
           {padZero(timeLeft.days)}
         </span>
         <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1.5 leading-none">Días</span>
       </div>
       <div className="flex flex-col items-center justify-center bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl px-2 py-3 sm:px-3 sm:py-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300 w-full min-w-0">
         <div className="absolute inset-0 bg-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        <span className="block text-2xl sm:text-3xl font-extrabold text-gradient leading-none tracking-tight text-center select-none w-full">
+        <span className="block text-2xl sm:text-3xl font-extrabold text-white leading-none tracking-tight text-center select-none w-full">
           {padZero(timeLeft.hours)}
         </span>
         <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1.5 leading-none">Horas</span>
       </div>
       <div className="flex flex-col items-center justify-center bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl px-2 py-3 sm:px-3 sm:py-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300 w-full min-w-0">
         <div className="absolute inset-0 bg-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        <span className="block text-2xl sm:text-3xl font-extrabold text-gradient leading-none tracking-tight text-center select-none w-full">
+        <span className="block text-2xl sm:text-3xl font-extrabold text-white leading-none tracking-tight text-center select-none w-full">
           {padZero(timeLeft.minutes)}
         </span>
         <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1.5 leading-none">Mins</span>
       </div>
       <div className="flex flex-col items-center justify-center bg-gradient-to-b from-white/10 to-white/0 border border-white/10 rounded-2xl px-2 py-3 sm:px-3 sm:py-4 backdrop-blur-md relative overflow-hidden group hover:border-primary-500/30 transition-all duration-300 w-full min-w-0">
         <div className="absolute inset-0 bg-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        <span className="block text-2xl sm:text-3xl font-extrabold text-gradient leading-none tracking-tight text-center select-none w-full">
+        <span className="block text-2xl sm:text-3xl font-extrabold text-white leading-none tracking-tight text-center select-none w-full">
           {padZero(timeLeft.seconds)}
         </span>
         <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mt-1.5 leading-none">Segs</span>

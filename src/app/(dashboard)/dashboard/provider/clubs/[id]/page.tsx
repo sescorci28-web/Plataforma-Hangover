@@ -57,7 +57,7 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
   // 1. Fetch bookings
   const { data: bookingsData } = await supabase
     .from("bookings")
-    .select("id, booking_type, total_amount, number_of_people, qr_status, status, event_id, created_at")
+    .select("id, booking_type, total_amount, number_of_people, qr_status, status, event_id, created_at, user_id, profiles(full_name, avatar_url)")
     .eq("club_id", club.id);
   const bookings = bookingsData || [];
 
@@ -621,6 +621,80 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
     };
   });
 
+  // 11. Calculate hourlySales24h (from orders of last 24h)
+  const allOrdersList = todayOrders.concat(yesterdayOrders);
+  const allItemsList = todayOrderItems.concat(yesterdayOrderItems);
+  const orderTotalsAll = allOrdersList.map(o => {
+    const items = allItemsList.filter(item => item.order_id === o.id);
+    const total = items.reduce((sum, item) => sum + (item.quantity * Number(item.price_at_order || 0)), 0);
+    return { id: o.id, total, status: o.status, created_at: o.created_at };
+  }).filter(o => o.status !== "cancelled");
+
+  const hourlySales24h = Array.from({ length: 24 }, (_, i) => {
+    const d = new Date();
+    d.setHours(d.getHours() - (23 - i), 0, 0, 0);
+    return {
+      timestamp: d.getTime(),
+      label: d.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", hour12: false }),
+      revenue: 0,
+    };
+  });
+
+  const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+  for (const o of orderTotalsAll) {
+    const orderTime = new Date(o.created_at).getTime();
+    if (orderTime >= twentyFourHoursAgo) {
+      const slot = hourlySales24h.find((s, idx) => {
+        const nextTimestamp = idx < 23 ? hourlySales24h[idx + 1].timestamp : Infinity;
+        return orderTime >= s.timestamp && orderTime < nextTimestamp;
+      });
+      if (slot) {
+        slot.revenue += o.total;
+      }
+    }
+  }
+
+  // 12. Calculate todayBookings
+  const todayBookings = bookings
+    .filter(b => new Date(b.created_at).getTime() >= startOfToday)
+    .map(b => {
+      const profileInfo = (b as any).profiles;
+      return {
+        id: b.id,
+        booking_type: b.booking_type,
+        total_amount: Number(b.total_amount) || 0,
+        number_of_people: b.number_of_people || 0,
+        qr_status: b.qr_status,
+        status: b.status,
+        created_at: b.created_at,
+        clientName: profileInfo?.full_name || "Cliente",
+        clientAvatar: profileInfo?.avatar_url || null
+      };
+    });
+
+  // 13. Calculate eventRanking (top 5 events based on bookings tickets sold)
+  const { data: eventsData } = await supabase
+    .from("events")
+    .select("id, title, event_date, thumbnail_url")
+    .eq("creator_id", club.provider_id)
+    .order("event_date", { ascending: false })
+    .limit(10);
+  const eventsListForRank = eventsData || [];
+  
+  const eventRanking = eventsListForRank.map(evt => {
+    const eventBookings = bookings.filter(b => b.event_id === evt.id && b.status !== "cancelled" && b.status !== "rejected");
+    const ticketsSold = eventBookings.reduce((sum, b) => sum + (b.number_of_people || 0), 0);
+    const revenue = eventBookings.reduce((sum, b) => sum + Number(b.total_amount || 0), 0);
+    return {
+      id: evt.id,
+      title: evt.title,
+      date: evt.event_date,
+      ticketsSold,
+      revenue,
+      thumbnail: evt.thumbnail_url || null
+    };
+  }).sort((a, b) => b.ticketsSold - a.ticketsSold).slice(0, 5);
+
   const stats = {
     // Live counts
     peopleInside: peopleInsideToday,
@@ -736,6 +810,10 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
             connectPresence={connectPresence}
             activeEventStats={activeEventStats}
             topWaiters={topWaiters}
+            hourlySales24h={hourlySales24h}
+            todayBookings={todayBookings}
+            eventRanking={eventRanking}
+            clubAdmissionLogs={clubAdmissionLogs}
           />
         </div>
       </div>

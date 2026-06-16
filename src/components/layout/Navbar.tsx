@@ -61,6 +61,9 @@ export function Navbar({ user }: NavbarProps) {
             <Link href="/discotecas" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
               Discotecas
             </Link>
+            <Link href="/connect" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
+              Connect
+            </Link>
           </nav>
 
           {/* Desktop Actions */}
@@ -112,40 +115,71 @@ export function Navbar({ user }: NavbarProps) {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
-          className="md:hidden absolute top-full left-0 right-0 glass-nav border-t border-white/10"
+          className="md:hidden absolute top-full left-0 right-0 bg-[#09090f] border-t border-white/10 shadow-2xl"
         >
           <div className="flex flex-col p-4 gap-4">
-            <Link href="/events" className="text-zinc-300 hover:text-white py-2">
+            <Link
+              href="/events"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-zinc-300 hover:text-white py-2"
+            >
               Eventos
             </Link>
-            <Link href="/services" className="text-zinc-300 hover:text-white py-2">
+            <Link
+              href="/services"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-zinc-300 hover:text-white py-2"
+            >
               Servicios
             </Link>
-            <Link href="/discotecas" className="text-zinc-300 hover:text-white py-2">
+            <Link
+              href="/discotecas"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-zinc-300 hover:text-white py-2"
+            >
               Discotecas
+            </Link>
+            <Link
+              href="/connect"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-zinc-300 hover:text-white py-2"
+            >
+              Connect
             </Link>
             <hr className="border-white/10 my-2" />
             {user ? (
               <>
-                <Link href="/dashboard" className="text-zinc-300 hover:text-white py-2">
+                <Link
+                  href="/dashboard"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="text-zinc-300 hover:text-white py-2"
+                >
                   Dashboard
                 </Link>
                 <button
                   type="button"
-                  onClick={logout}
-                  className="w-full text-center bg-zinc-800 text-white px-4 py-3 rounded-xl mt-2 transition-all"
+                  onClick={() => {
+                    logout();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full text-center bg-zinc-800 text-white px-4 py-3 rounded-xl mt-2 transition-all cursor-pointer"
                 >
                   Cerrar Sesión
                 </button>
               </>
             ) : (
               <>
-                <Link href="/login" className="text-zinc-300 hover:text-white py-2">
+                <Link
+                  href="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="text-zinc-300 hover:text-white py-2"
+                >
                   Iniciar Sesión
                 </Link>
                 <Link
                   href="/register"
-                  className="text-center bg-primary-600 text-white px-4 py-3 rounded-xl mt-2 glow"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="text-center bg-primary-600 text-white px-4 py-3 rounded-xl mt-2 glow cursor-pointer"
                 >
                   Regístrate
                 </Link>

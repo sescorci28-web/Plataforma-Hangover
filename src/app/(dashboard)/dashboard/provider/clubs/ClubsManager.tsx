@@ -921,11 +921,12 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                 <div className="absolute top-4 left-4 flex items-center gap-1 bg-black/60 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-full text-xs font-bold">
                   {club.active ? (
                     <span className="flex items-center gap-1 text-emerald-400">
-                      <Eye className="w-3.5 h-3.5" /> Activa
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping mr-0.5" />
+                      Abierto ahora
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 text-zinc-400">
-                      <EyeOff className="w-3.5 h-3.5" /> Inactiva
+                    <span className="flex items-center gap-1 text-red-400">
+                      Cerrado
                     </span>
                   )}
                 </div>
@@ -948,11 +949,23 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                     {club.name}
                   </h3>
                   {club.address && <p className="text-xs text-zinc-500 truncate">{club.address}</p>}
-                  <p className="text-zinc-400 text-xs leading-relaxed line-clamp-3 min-h-[48px]">
+                  <p className="text-zinc-400 text-xs leading-relaxed line-clamp-2 min-h-[32px]">
                     {club.description || "Sin descripción proporcionada."}
                   </p>
 
-                  <div className="flex flex-wrap gap-2 mt-2">
+                  {/* Operational Metrics Grid */}
+                  <div className="grid grid-cols-2 gap-2 mt-3 p-3 bg-white/5 border border-white/5 rounded-xl text-[11px]">
+                    <div>
+                      <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Asistentes Hoy</span>
+                      <span className="font-extrabold text-white">{(club as any).todayAttendees || 0} personas</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block">Ventas Hoy</span>
+                      <span className="font-extrabold text-emerald-400">${((club as any).todaySales || 0).toLocaleString("es-CO")}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-2">
                     {club.opening_hours && (
                       <div className="flex items-center gap-1.5 text-xs text-zinc-400 bg-white/5 py-1.5 px-3 rounded-lg border border-white/5">
                         <Clock className="w-3.5 h-3.5 text-primary-400 shrink-0" />
@@ -1000,7 +1013,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
       )}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto">
-          <div className={`glass-card w-full ${editingClub ? 'max-w-4xl' : 'max-w-6xl'} my-8 overflow-hidden relative border-white/10 bg-zinc-950 shadow-[0_0_80px_rgba(217,70,239,0.15)] flex flex-col md:flex-row h-full max-h-[90vh] rounded-[28px]`}>
+          <div className={`glass-card w-full ${editingClub ? 'max-w-4xl' : 'max-w-6xl'} my-auto overflow-hidden relative border-white/10 bg-zinc-950 shadow-[0_0_80px_rgba(217,70,239,0.15)] flex flex-col md:flex-row h-full max-h-[calc(100vh-2rem)] md:max-h-[85vh] rounded-[28px]`}>
             
             {/* WIZARD OR EDIT HEADER & CONTENT WRAPPER */}
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -1098,7 +1111,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
               )}
 
               {/* CORE FORM WRAPPER */}
-              <div className="flex-grow overflow-y-auto p-6 space-y-6 scrollbar-none min-h-0">
+              <div className="flex-grow overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent min-h-0">
                 {error && (
                   <div className="flex items-center gap-2.5 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs">
                     <AlertTriangle className="w-4.5 h-4.5 shrink-0" />
@@ -2633,7 +2646,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
             </div>
 
             {/* LIVE PREVIEW AND COMPLETENESS SIDEBAR (Right pane - Hidden on Mobile unless Wizard Preview) */}
-            <div className={`w-full md:w-80 border-t md:border-t-0 md:border-l border-white/5 bg-zinc-950/60 p-6 flex flex-col justify-between shrink-0 overflow-y-auto scrollbar-none max-h-[40vh] md:max-h-none ${
+            <div className={`w-full md:w-80 border-t md:border-t-0 md:border-l border-white/5 bg-zinc-950/60 p-6 flex flex-col justify-between shrink-0 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent max-h-[40vh] md:max-h-none ${
               !editingClub || currentWizardStep === 'preview' ? 'flex' : 'hidden md:flex'
             }`}>
               <div className="space-y-5">

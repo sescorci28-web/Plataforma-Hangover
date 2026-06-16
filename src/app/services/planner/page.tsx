@@ -21,20 +21,17 @@ export default async function PlannerPage() {
       slug,
       description,
       price,
-      price_type,
       category,
       image_url,
       cover_url,
       average_rating,
       base_city,
-      is_active,
       provider:profiles!services_provider_id_fkey (
         id,
         full_name,
         city
       )
-    `)
-    .eq("is_active", true);
+    `);
 
   // Fallback to empty array if no services found
   const activeServices = services || [];
