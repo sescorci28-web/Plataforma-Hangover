@@ -10,10 +10,10 @@ export async function getEventGallery(eventId: string) {
   const supabase = await createClient();
   try {
     const { data, error } = await supabase
-      .from("event_gallery")
+      .from("event_gallery_items")
       .select("*")
       .eq("event_id", eventId)
-      .order("sort_order", { ascending: true });
+      .order("display_order", { ascending: true });
 
     if (error) throw error;
     return { success: true, items: data || [] };

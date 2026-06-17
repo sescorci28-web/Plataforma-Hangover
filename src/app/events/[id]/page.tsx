@@ -305,10 +305,10 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
   let galleryItems = [];
   try {
     const { data: galleryData, error: galleryError } = await supabase
-      .from("event_gallery")
+      .from("event_gallery_items")
       .select("*")
       .eq("event_id", event.id)
-      .order("sort_order", { ascending: true });
+      .order("display_order", { ascending: true });
     
     if (galleryError) {
       console.warn("Event gallery table issue (could be missing migration):", galleryError.message);
@@ -316,7 +316,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
       galleryItems = galleryData;
     }
   } catch (err) {
-    console.error("Failed to query event_gallery:", err);
+    console.error("Failed to query event_gallery_items:", err);
   }
 
   return (
