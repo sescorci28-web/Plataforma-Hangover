@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -50,6 +51,11 @@ export function StoriesGallery({
   const [progress, setProgress] = useState(0);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [showDemo, setShowDemo] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const resolvedOwnerType = ownerType;
@@ -290,107 +296,112 @@ export function StoriesGallery({
       </div>
 
       {/* Fullscreen Story Viewer Modal */}
-      <AnimatePresence>
-        {activeStoryIndex !== null && (
-          <div className="fixed inset-0 z-55 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
+      {mounted && activeStoryIndex !== null && createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 cursor-default"
+          onClick={handleCloseStory}
+        >
+          
+          {/* Left and Right navigation desktop triggers */}
+          <button
+            onClick={(e) => { e.stopPropagation(); handlePrevStory(); }}
+            className="absolute left-6 hidden md:flex w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 items-center justify-center text-white border border-white/10 transition-all cursor-pointer z-50"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+
+          <button
+            onClick={(e) => { e.stopPropagation(); handleNextStory(); }}
+            className="absolute right-6 hidden md:flex w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 items-center justify-center text-white border border-white/10 transition-all cursor-pointer z-50"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+
+          {/* Main story container block (forced 9:16 vertical aspect ratio, max height) */}
+          <div 
+            className="relative w-full max-w-[420px] h-[85vh] max-h-[760px] aspect-[9/16] rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col justify-between bg-black"
+            onClick={(e) => e.stopPropagation()}
+          >
             
-            {/* Left and Right navigation desktop triggers */}
-            <button
-              onClick={handlePrevStory}
-              className="absolute left-6 hidden md:flex w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 items-center justify-center text-white border border-white/10 transition-all cursor-pointer z-50"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
-
-            <button
-              onClick={handleNextStory}
-              className="absolute right-6 hidden md:flex w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 items-center justify-center text-white border border-white/10 transition-all cursor-pointer z-50"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
-
-            {/* Main story container block (forced 9:16 vertical aspect ratio) */}
-            <div className="relative w-full max-w-md aspect-[9/16] rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col justify-between bg-[#050508]">
-              
-              {/* Top progress bar lines */}
-              <div className="absolute top-4 inset-x-4 z-20 flex gap-1">
-                {storiesList.map((_, idx) => (
-                  <div key={idx} className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden">
-                    {idx < activeStoryIndex && <div className="h-full bg-white w-full" />}
-                    {idx === activeStoryIndex && (
-                      <div className="h-full bg-white transition-all duration-100" style={{ width: `${progress}%` }} />
-                    )}
-                    {idx > activeStoryIndex && <div className="h-full bg-white w-0" />}
-                  </div>
-                ))}
-              </div>
-
-              {/* Story header info bar */}
-              <div className="absolute top-8 inset-x-4 z-20 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent p-2 rounded-t-xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-zinc-900">
-                    <img src={resolvedAvatar || resolvedCover || ""} alt={resolvedName} className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <h4 className="text-white text-xs font-bold font-outfit leading-none">{resolvedName}</h4>
-                    <p className="text-[9px] text-zinc-400 font-semibold uppercase tracking-wider mt-0.5">
-                      {storiesList[activeStoryIndex].label}
-                    </p>
-                  </div>
+            {/* Top progress bar lines */}
+            <div className="absolute top-4 inset-x-4 z-20 flex gap-1">
+              {storiesList.map((_, idx) => (
+                <div key={idx} className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden">
+                  {idx < activeStoryIndex && <div className="h-full bg-white w-full" />}
+                  {idx === activeStoryIndex && (
+                    <div className="h-full bg-white transition-all duration-100" style={{ width: `${progress}%` }} />
+                  )}
+                  {idx > activeStoryIndex && <div className="h-full bg-white w-0" />}
                 </div>
+              ))}
+            </div>
 
-                <div className="flex items-center gap-3">
-                  {/* Pause / Play */}
-                  <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                  </button>
-
-                  {/* Close */}
-                  <button
-                    onClick={handleCloseStory}
-                    className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+            {/* Story header info bar */}
+            <div className="absolute top-8 inset-x-4 z-20 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent p-2 rounded-t-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-zinc-900">
+                  <img src={resolvedAvatar || resolvedCover || ""} alt={resolvedName} className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <h4 className="text-white text-xs font-bold font-outfit leading-none">{resolvedName}</h4>
+                  <p className="text-[9px] text-zinc-400 font-semibold uppercase tracking-wider mt-0.5">
+                    {storiesList[activeStoryIndex].label}
+                  </p>
                 </div>
               </div>
 
-              {/* Fullscreen story media content */}
-              <div className="flex-grow w-full h-full relative flex items-center justify-center bg-black">
-                {storiesList[activeStoryIndex].media_type === 'video' ? (
-                  <video
-                    ref={videoRef}
-                    src={storiesList[activeStoryIndex].url}
-                    onLoadedMetadata={handleVideoMetadata}
-                    onEnded={handleNextStory}
-                    playsInline
-                    autoPlay
-                    preload="metadata"
-                    className="w-full h-full object-cover aspect-[9/16]"
-                  />
-                ) : (
-                  <img
-                    src={storiesList[activeStoryIndex].url}
-                    alt={storiesList[activeStoryIndex].label}
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 pointer-events-none" />
-              </div>
+              <div className="flex items-center gap-3">
+                {/* Pause / Play */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
+                  className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                </button>
 
-              {/* Bottom tag or footer callout if any */}
-              <div className="absolute bottom-6 inset-x-6 z-20 text-center">
-                <span className="text-[10px] text-primary-300 bg-primary-950/80 border border-primary-500/20 px-3.5 py-1.5 rounded-full font-bold uppercase tracking-wider">
-                  🔥 Toca o desliza para avanzar
-                </span>
+                {/* Close */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleCloseStory(); }}
+                  className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
             </div>
+
+            {/* Fullscreen story media content - scaled with object-contain */}
+            <div className="flex-grow w-full h-full relative flex items-center justify-center bg-zinc-950">
+              {storiesList[activeStoryIndex].media_type === 'video' ? (
+                <video
+                  ref={videoRef}
+                  src={storiesList[activeStoryIndex].url}
+                  onLoadedMetadata={handleVideoMetadata}
+                  onEnded={handleNextStory}
+                  playsInline
+                  autoPlay
+                  preload="metadata"
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <img
+                  src={storiesList[activeStoryIndex].url}
+                  alt={storiesList[activeStoryIndex].label}
+                  className="w-full h-full object-contain"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+            </div>
+
+            {/* Bottom tag or footer callout if any */}
+            <div className="absolute bottom-6 inset-x-6 z-20 text-center">
+              <span className="text-[10px] text-primary-300 bg-primary-950/80 border border-primary-500/20 px-3.5 py-1.5 rounded-full font-bold uppercase tracking-wider">
+                🔥 Toca o desliza para avanzar
+              </span>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>,
+        document.body
+      )}
     </section>
   );
 }

@@ -7,13 +7,10 @@ import {
   PhoneCall, Video as VideoIcon, Music, Disc, TrendingUp, Globe, Badge
 } from "lucide-react";
 
-import { ServiceGallery } from "@/components/services/ServiceGallery";
 import { ServiceBookingWidget } from "@/components/services/ServiceBookingWidget";
 import { ServiceStoriesViewer } from "@/components/services/ServiceStoriesViewer";
-import { ServiceCalendar } from "@/components/services/ServiceCalendar";
-import { ServiceReviewsSection } from "@/components/services/ServiceReviewsSection";
 import { ServiceProfileActions } from "@/components/services/ServiceProfileActions";
-import { ServicePortfolio } from "@/components/services/ServicePortfolio";
+import { ServiceProfileTabs } from "@/components/services/ServiceProfileTabs";
 import { slugify } from "@/lib/slugify";
 
 export const revalidate = 0;
@@ -193,121 +190,123 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
   const relatedServices = relatedServicesData || [];
 
   return (
-    <div className="relative min-h-screen w-full bg-[#05050a] text-zinc-100 overflow-x-hidden">
+    <div className="relative min-h-screen w-full bg-[#05050a] text-zinc-150 overflow-x-hidden font-sans">
       
-      {/* ── HERO SECTION ─────────────────────────────────────────────── */}
-      <div className="relative w-full">
-        {/* Background: cover image OR category gradient */}
+      {/* ── BANNER / PORTADA (Instagram Style Banner) ───────────────── */}
+      <div className="relative w-full h-[240px] md:h-[350px] overflow-hidden">
         {service.cover_url ? (
-          <div className="absolute inset-0 h-[520px]">
+          <>
             <img src={service.cover_url} alt="Portada" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/60 to-[#05050a]" />
-          </div>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-[#05050a]" />
+          </>
         ) : (
-          <div className={`absolute inset-0 h-[480px] bg-gradient-to-br ${cat.gradient} opacity-70`}>
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.04)_0%,transparent_60%)]" />
+          <div className={`w-full h-full bg-gradient-to-br ${cat.gradient} opacity-80`}>
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.05)_0%,transparent_60%)]" />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#05050a]" />
-            {/* Decorative grid */}
             <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:48px_48px]" />
           </div>
         )}
 
-        {/* Hero Content */}
-        <div className="relative z-10 container mx-auto px-4 sm:px-6 md:px-8 pt-8 pb-0">
-          
-          {/* Back Button */}
-          <Link
-            href="/services"
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white transition-colors group bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 hover:border-white/20 mb-8"
-          >
-            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
-            Volver al Marketplace
-          </Link>
+        {/* Back Button floating on cover */}
+        <Link
+          href="/services"
+          className="absolute top-6 left-6 z-20 inline-flex items-center gap-1.5 text-xs font-bold text-zinc-300 hover:text-white transition-all group bg-black/55 backdrop-blur-md px-4.5 py-2.5 rounded-full border border-white/10 hover:border-white/20 active:scale-95"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+          Volver al Marketplace
+        </Link>
+      </div>
 
-          {/* Stories */}
-          {stories.length > 0 && (
-            <div className="mb-6 bg-black/30 backdrop-blur-md border border-white/5 p-4 rounded-3xl">
-              <ServiceStoriesViewer
-                serviceName={service.title}
-                providerName={providerName}
-                avatarUrl={providerAvatar}
-                coverUrl={service.image_url}
-                stories={stories}
-              />
-            </div>
-          )}
+      {/* ── OVERLAPPING PROFILE CARD & BODY CONTAINER ───────────────── */}
+      <div className="max-w-6xl mx-auto px-4 md:px-8 relative -mt-20 md:-mt-28 z-10 pb-32 space-y-8">
+        
+        {/* Stories Viewer Row */}
+        {stories.length > 0 && (
+          <div className="py-2 px-1">
+            <ServiceStoriesViewer
+              serviceName={service.title}
+              providerName={providerName}
+              avatarUrl={providerAvatar}
+              coverUrl={service.image_url}
+              stories={stories}
+            />
+          </div>
+        )}
 
-          {/* Main Hero Card */}
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
-            {/* Category + Badges Row */}
-            <div className="flex flex-wrap gap-2 mb-5">
-              <span className="px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-[10px] font-extrabold uppercase tracking-widest text-white/80">
-                {finalCategoryLabel}
-              </span>
-              {service.verified && (
-                <span className="px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-extrabold uppercase tracking-widest text-emerald-400 flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> Verificado
-                </span>
-              )}
-              {service.badge_status === "top_provider" && (
-                <span className="px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 text-[10px] font-extrabold uppercase tracking-widest text-white">
-                  🏆 Top Proveedor
-                </span>
-              )}
-              {service.badge_status === "most_booked" && (
-                <span className="px-3 py-1.5 rounded-full bg-gradient-to-r from-rose-500 to-orange-500 text-[10px] font-extrabold uppercase tracking-widest text-white">
-                  🔥 Más Reservado
-                </span>
-              )}
-              {service.provider_status && service.provider_status !== "active" && (
-                <span className="px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-extrabold uppercase tracking-widest text-amber-400">
-                  ⚠️ {service.provider_status === "vacation" ? "En Vacaciones" : "Ocupado temporalmente"}
-                </span>
-              )}
-            </div>
-
-            {/* Provider info + Title */}
-            <div className="flex flex-col md:flex-row md:items-start gap-5">
-              {/* Avatar */}
-              <div className="shrink-0">
+        {/* main profile info header */}
+        <div className="bg-zinc-950/65 backdrop-blur-2xl border border-white/8 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            
+            {/* Avatar & Branded Title Block */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 w-full md:w-auto">
+              {/* Profile Avatar Squircle with neon light glow */}
+              <div className="relative shrink-0">
                 {providerAvatar ? (
                   <img
                     src={providerAvatar}
                     alt={providerName}
-                    className="w-20 h-20 rounded-2xl object-cover border-2 border-white/20 shadow-xl"
+                    className="w-24 h-24 sm:w-28 sm:w-28 rounded-3xl object-cover border-2 border-primary-500 shadow-[0_0_20px_rgba(217,70,239,0.3)] bg-zinc-900"
                   />
                 ) : (
-                  <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${cat.gradient} flex items-center justify-center text-3xl border-2 border-white/15 shadow-xl`}>
+                  <div className={`w-24 h-24 sm:w-28 sm:w-28 rounded-3xl bg-gradient-to-br ${cat.gradient} flex items-center justify-center text-4xl border-2 border-primary-500 shadow-[0_0_20px_rgba(217,70,239,0.3)]`}>
                     {cat.icon}
                   </div>
                 )}
+                
+                {/* Active Indicator status */}
+                {service.availability_status === 'available' && (
+                  <span className="absolute -bottom-1 -right-1 w-4.5 h-4.5 bg-emerald-500 border-2 border-zinc-950 rounded-full animate-pulse" title="Disponible ahora" />
+                )}
               </div>
 
-              {/* Title block */}
-              <div className="flex-grow min-w-0">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white font-outfit leading-tight mb-2">
+              {/* Title, Category & Location Badges */}
+              <div className="space-y-2.5 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[9px] font-black uppercase tracking-widest text-zinc-400">
+                    {finalCategoryLabel}
+                  </span>
+                  {service.verified && (
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-0.5">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Verificado
+                    </span>
+                  )}
+                  {service.badge_status === "top_provider" && (
+                    <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[9px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-0.5">
+                      🏆 Top
+                    </span>
+                  )}
+                </div>
+
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white leading-tight font-outfit truncate">
                   {service.title}
                 </h1>
-                <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400">
-                  <span className="font-semibold text-zinc-200">por {providerName}</span>
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-zinc-400 font-medium">
+                  <span className="text-zinc-200">por {providerName}</span>
+                  <span className="w-1 h-1 rounded-full bg-zinc-700" />
                   <span className="flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-primary-400" />
                     {providerCity}
                   </span>
-                  <span className="flex items-center gap-1 text-amber-400 font-bold">
-                    <Star className="w-3.5 h-3.5 fill-amber-400" />
-                    {avgStars.toFixed(1)}
-                    <span className="text-zinc-500 font-normal">({reviews.length} reseñas)</span>
-                  </span>
-                  <span className="flex items-center gap-1 text-zinc-400">
-                    <Calendar className="w-3.5 h-3.5 text-primary-400" />
-                    {service.completed_bookings_count || totalBookings || 0} eventos
-                  </span>
                 </div>
               </div>
+            </div>
 
-              {/* Action buttons */}
-              <div className="shrink-0 md:self-start">
+            {/* Profile Action CTAs Row */}
+            <div className="flex flex-wrap gap-2.5 w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t border-white/5 md:border-t-0">
+              {whatsappUrl && (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-lg shadow-emerald-950/20 border border-emerald-500/25"
+                >
+                  <PhoneCall className="w-3.5 h-3.5" />
+                  WhatsApp
+                </a>
+              )}
+              
+              <div className="flex-1 sm:flex-initial">
                 <ServiceProfileActions
                   serviceId={service.id}
                   providerId={service.provider_id}
@@ -317,248 +316,70 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                 />
               </div>
             </div>
+
           </div>
 
-          {/* Stats strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-            {[
-              { icon: <Award className="w-4 h-4 text-primary-400" />, label: "Eventos", value: String(service.completed_bookings_count || 0) },
-              { icon: <MessageSquare className="w-4 h-4 text-emerald-400" />, label: "Respuesta", value: service.response_time || "< 1 hora" },
-              { icon: <Calendar className="w-4 h-4 text-accent-400" />, label: "Miembro desde", value: memberSince },
-              { icon: <Star className="w-4 h-4 text-amber-400" />, label: "Calificación", value: avgStars.toFixed(1) + " ★" },
-            ].map((stat, i) => (
-              <div key={i} className="bg-black/40 backdrop-blur-md border border-white/8 rounded-2xl p-4 text-center space-y-1">
-                <div className="flex justify-center">{stat.icon}</div>
-                <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">{stat.label}</p>
-                <p className="text-sm font-extrabold text-white font-outfit">{stat.value}</p>
-              </div>
-            ))}
+          {/* Statistics Strip Row (Instagram metric tags style) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-900/25 border border-white/5 rounded-2xl p-4 divide-y md:divide-y-0 md:divide-x divide-white/5">
+            <div className="text-center py-1.5 md:py-0">
+              <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block mb-1">Calificación</span>
+              <span className="text-sm sm:text-base font-extrabold text-amber-400 font-outfit flex items-center justify-center gap-1">
+                <Star className="w-4 h-4 fill-amber-400" />
+                {avgStars.toFixed(1)} <span className="text-[10px] text-zinc-500 font-normal">({reviews.length})</span>
+              </span>
+            </div>
+            <div className="text-center py-1.5 md:py-0">
+              <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block mb-1">Eventos en Hangover</span>
+              <span className="text-sm sm:text-base font-extrabold text-white font-outfit">
+                {service.completed_bookings_count || totalBookings || 0}
+              </span>
+            </div>
+            <div className="text-center py-1.5 md:py-0 pt-3 md:pt-0">
+              <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block mb-1">Tiempo de Respuesta</span>
+              <span className="text-sm sm:text-base font-extrabold text-emerald-400 font-outfit">
+                {service.response_time || "< 1 hora"}
+              </span>
+            </div>
+            <div className="text-center py-1.5 md:py-0 pt-3 md:pt-0">
+              <span className="text-[9px] text-zinc-500 uppercase font-black tracking-wider block mb-1">Miembro Desde</span>
+              <span className="text-sm sm:text-base font-extrabold text-primary-400 font-outfit">
+                {memberSince}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── MAIN CONTENT ─────────────────────────────────────────────── */}
-      <div className="container mx-auto px-4 sm:px-6 md:px-8 pt-8 pb-32 relative z-10">
-        
-        {/* Gallery (only shown if images exist) */}
-        {hasImages && (
-          <section className="mb-8">
-            <ServiceGallery
-              mainImageUrl={service.image_url}
+        {/* ── TWO COLUMN GRID LAYOUT (Main Tab Content & Booking Sticky Widget) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          
+          {/* Main Feed Column (col-span-2) */}
+          <div className="lg:col-span-2 space-y-6">
+            <ServiceProfileTabs
+              service={service}
+              includesArr={includesArr}
+              excludesArr={excludesArr}
+              requirementsArr={requirementsArr}
+              citiesArr={citiesArr}
               galleryUrls={galleryUrls}
-              serviceTitle={service.title}
+              hasImages={hasImages}
+              dbGallery={dbGallery}
+              pastEvents={pastEvents}
+              reviews={reviews}
+              user={user}
+              eligibleBookingId={eligibleBookingId}
+              manualAvailability={manualAvailability}
+              bookedDates={bookedDates}
+              spotifyEmbedUrl={spotifyEmbedUrl}
+              soundcloudEmbedUrl={soundcloudEmbedUrl}
+              youtubeEmbedUrl={youtubeEmbedUrl}
+              videoEmbedUrl={videoEmbedUrl}
             />
-          </section>
-        )}
-
-        {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 items-start">
-
-          {/* ── LEFT COLUMN ───────────────────────── */}
-          <div className="space-y-6">
-
-            {/* Description */}
-            <div className="bg-zinc-900/50 border border-white/6 rounded-3xl p-6 sm:p-8 space-y-6 backdrop-blur-sm">
-              <div className="flex items-center gap-2 border-b border-white/6 pb-4">
-                <div className="w-1 h-5 rounded-full bg-gradient-to-b from-primary-400 to-accent-500" />
-                <h2 className="text-sm font-extrabold text-white uppercase tracking-widest font-outfit">Descripción Profesional</h2>
-              </div>
-              <p className="text-zinc-300 text-sm sm:text-base leading-relaxed whitespace-pre-line">
-                {service.description || "Este proveedor aún no ha escrito una descripción. Contáctalo directamente para conocer más sobre su servicio."}
-              </p>
-
-              {/* Includes / Excludes */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-white/5">
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4" /> ¿Qué incluye?
-                  </h3>
-                  <ul className="space-y-2">
-                    {includesArr.map((item: string, idx: number) => (
-                      <li key={idx} className="text-xs text-zinc-400 flex items-start gap-2">
-                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4" /> No incluye
-                  </h3>
-                  <ul className="space-y-2">
-                    {excludesArr.map((item: string, idx: number) => (
-                      <li key={idx} className="text-xs text-zinc-500 flex items-start gap-2">
-                        <X className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Requirements */}
-              <div className="pt-4 border-t border-white/5 space-y-3">
-                <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Zap className="w-4 h-4" /> Requisitos técnicos
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {requirementsArr.map((item: string, idx: number) => (
-                    <div key={idx} className="flex gap-2.5 p-3 rounded-xl bg-white/3 border border-white/5 text-xs text-zinc-400">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Experience */}
-            {service.experience && (
-              <div className="bg-zinc-900/50 border border-white/6 rounded-3xl p-6 sm:p-8 space-y-4 backdrop-blur-sm">
-                <div className="flex items-center gap-2 border-b border-white/6 pb-4">
-                  <div className="w-1 h-5 rounded-full bg-gradient-to-b from-primary-400 to-accent-500" />
-                  <h2 className="text-sm font-extrabold text-white uppercase tracking-widest font-outfit">Experiencia Profesional</h2>
-                </div>
-                <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-line">{service.experience}</p>
-              </div>
-            )}
-
-            {/* Portfolio */}
-            {dbGallery.length > 0 && (
-              <section className="bg-zinc-900/50 border border-white/6 rounded-3xl p-6 sm:p-8 backdrop-blur-sm">
-                <div className="flex items-center gap-2 border-b border-white/6 pb-4 mb-6">
-                  <div className="w-1 h-5 rounded-full bg-gradient-to-b from-primary-400 to-accent-500" />
-                  <h2 className="text-sm font-extrabold text-white uppercase tracking-widest font-outfit">Portfolio & Trabajos</h2>
-                </div>
-                <ServicePortfolio galleryItems={dbGallery} serviceTitle={service.title} />
-              </section>
-            )}
-
-            {/* Music embeds */}
-            {(spotifyEmbedUrl || soundcloudEmbedUrl || youtubeEmbedUrl) && (
-              <div className="bg-zinc-900/50 border border-white/6 rounded-3xl p-6 sm:p-8 space-y-6 backdrop-blur-sm">
-                <div className="flex items-center gap-2 border-b border-white/6 pb-4">
-                  <div className="w-1 h-5 rounded-full bg-gradient-to-b from-primary-400 to-accent-500" />
-                  <div>
-                    <h2 className="text-sm font-extrabold text-white uppercase tracking-widest font-outfit flex items-center gap-2">
-                      <Music className="w-4 h-4 text-primary-400" /> Producciones y Sets
-                    </h2>
-                    <p className="text-zinc-500 text-xs mt-0.5">Escucha muestras del setlist del proveedor.</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  {spotifyEmbedUrl && (
-                    <div className="rounded-2xl overflow-hidden border border-white/10 shadow-lg">
-                      <iframe src={spotifyEmbedUrl} width="100%" height="152" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" className="bg-transparent" />
-                    </div>
-                  )}
-                  {soundcloudEmbedUrl && (
-                    <div className="rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-zinc-900">
-                      <iframe width="100%" height="166" scrolling="no" frameBorder="no" allow="autoplay" src={soundcloudEmbedUrl} />
-                    </div>
-                  )}
-                  {youtubeEmbedUrl && (
-                    <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-white/10 shadow-lg">
-                      <iframe src={youtubeEmbedUrl} title="Demo" className="absolute inset-0 w-full h-full border-none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Video demo legacy */}
-            {videoEmbedUrl && !youtubeEmbedUrl && (
-              <div className="bg-zinc-900/50 border border-white/6 rounded-3xl p-6 sm:p-8 space-y-4 backdrop-blur-sm">
-                <div className="flex items-center gap-2 border-b border-white/6 pb-4">
-                  <div className="w-1 h-5 rounded-full bg-gradient-to-b from-primary-400 to-accent-500" />
-                  <h2 className="text-sm font-extrabold text-white uppercase tracking-widest font-outfit flex items-center gap-2">
-                    <VideoIcon className="w-4 h-4 text-rose-500" /> Video de Demostración
-                  </h2>
-                </div>
-                <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-                  <iframe src={videoEmbedUrl} title="Demo" className="absolute inset-0 w-full h-full border-none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-                </div>
-              </div>
-            )}
-
-            {/* Geographic Coverage */}
-            <div className="bg-zinc-900/50 border border-white/6 rounded-3xl p-6 sm:p-8 space-y-4 backdrop-blur-sm">
-              <div className="flex items-center gap-2 border-b border-white/6 pb-4">
-                <div className="w-1 h-5 rounded-full bg-gradient-to-b from-primary-400 to-accent-500" />
-                <h2 className="text-sm font-extrabold text-white uppercase tracking-widest font-outfit flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-primary-400" /> Cobertura Geográfica
-                </h2>
-              </div>
-              <p className="text-zinc-400 text-xs sm:text-sm">Ciudades y municipios donde este proveedor presta sus servicios.</p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {citiesArr.map((city: string) => (
-                  <div key={city} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-zinc-300 hover:bg-white/8 transition-colors">
-                    <MapPin className="w-3.5 h-3.5 text-primary-400" />
-                    <span>{city}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Availability Calendar */}
-            <div id="disponibilidad-calendario" className="bg-zinc-900/50 border border-white/6 rounded-3xl overflow-hidden backdrop-blur-sm">
-              <ServiceCalendar
-                serviceId={service.id}
-                manualAvailability={manualAvailability}
-                bookings={bookedDates}
-              />
-            </div>
-
-            {/* Past Events */}
-            {pastEvents.length > 0 && (
-              <div className="bg-zinc-900/50 border border-white/6 rounded-3xl p-6 sm:p-8 space-y-6 backdrop-blur-sm">
-                <div className="flex items-center justify-between border-b border-white/6 pb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-5 rounded-full bg-gradient-to-b from-primary-400 to-accent-500" />
-                    <h2 className="text-sm font-extrabold text-white uppercase tracking-widest font-outfit">Historial de Eventos</h2>
-                  </div>
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{pastEvents.length} trabajos</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {pastEvents.map((work: any) => (
-                    <div key={work.id} className="bg-zinc-950/60 border border-white/5 rounded-2xl overflow-hidden group hover:border-white/15 transition-all">
-                      {work.media_urls && work.media_urls.length > 0 && (
-                        <div className="relative h-40 w-full overflow-hidden bg-zinc-900 shrink-0">
-                          <img src={work.media_urls[0]} alt={work.title} className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500" />
-                        </div>
-                      )}
-                      <div className="p-4 space-y-2">
-                        <div className="flex justify-between items-start gap-2 flex-wrap">
-                          <h4 className="font-bold text-sm text-white font-outfit truncate">{work.title}</h4>
-                          <span className="bg-white/5 border border-white/8 px-2 py-0.5 rounded text-[9px] font-bold text-zinc-500 uppercase shrink-0">
-                            {new Date(work.event_date).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}
-                          </span>
-                        </div>
-                        {work.description && <p className="text-[11px] text-zinc-400 leading-relaxed">{work.description}</p>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Reviews */}
-            <div className="bg-zinc-900/50 border border-white/6 rounded-3xl overflow-hidden backdrop-blur-sm">
-              <ServiceReviewsSection
-                serviceId={service.id}
-                reviews={reviews}
-                user={user}
-                eligibleBookingId={eligibleBookingId}
-              />
-            </div>
-
           </div>
 
-          {/* ── RIGHT SIDEBAR ─────────────────────── */}
-          <aside className="sticky top-24 space-y-4">
+          {/* Marketplace Booking Sidebar Column (col-span-1) */}
+          <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24">
             
-            {/* Booking Widget */}
+            {/* Booking Card */}
             <ServiceBookingWidget
               serviceId={service.id}
               providerId={service.provider_id}
@@ -570,117 +391,125 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
               availabilityStatus={service.availability_status || "available"}
             />
 
-            {/* Direct Contact */}
-            <div className="bg-zinc-900/80 border border-white/8 rounded-3xl p-5 space-y-4 backdrop-blur-sm">
-              <h4 className="text-[10px] uppercase font-extrabold tracking-widest text-zinc-500 flex items-center gap-1.5">
-                <PhoneCall className="w-3.5 h-3.5" /> Contacto Directo
+            {/* Geographic Coverage Quick Summary Box */}
+            <div className="bg-zinc-950/60 border border-white/8 rounded-3xl p-5 space-y-3.5 backdrop-blur-md">
+              <h4 className="text-[10px] uppercase font-black tracking-widest text-zinc-500 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-zinc-400" /> Municipios Soportados
               </h4>
-
-              {whatsappUrl ? (
-                <Link
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  <PhoneCall className="w-4 h-4 shrink-0" />
-                  Escribir por WhatsApp
-                </Link>
-              ) : (
-                <div className="text-center py-3 border border-dashed border-white/8 rounded-2xl text-zinc-600 text-xs">
-                  Sin número de WhatsApp guardado
-                </div>
-              )}
-
-              {(socialMedia.instagram || socialMedia.facebook) && (
-                <div className="pt-3 border-t border-white/5 space-y-2">
-                  <span className="text-[9px] uppercase font-bold text-zinc-600 tracking-wider block">Redes Sociales</span>
-                  <div className="flex flex-wrap gap-2">
-                    {socialMedia.instagram && (
-                      <Link href={`https://instagram.com/${socialMedia.instagram.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/8 text-zinc-300 hover:text-white transition-all text-xs">
-                        <span className="text-pink-400 font-bold">@</span>
-                        <span>{socialMedia.instagram}</span>
-                      </Link>
-                    )}
-                    {socialMedia.facebook && (
-                      <Link href={`https://facebook.com/${socialMedia.facebook}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/8 text-zinc-300 hover:text-white transition-all text-xs">
-                        <span className="text-blue-400 font-bold">f</span>
-                        <span>Facebook</span>
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              )}
+              <div className="flex flex-wrap gap-1.5">
+                {citiesArr.map((city: string) => (
+                  <span
+                    key={city}
+                    className="text-[11px] font-bold text-zinc-350 bg-white/3 border border-white/5 px-2.5 py-1 rounded-xl"
+                  >
+                    {city}
+                  </span>
+                ))}
+              </div>
             </div>
 
-            {/* Provider card */}
-            <div className="bg-zinc-900/80 border border-white/8 rounded-3xl p-5 space-y-4 backdrop-blur-sm">
-              <h4 className="text-[10px] uppercase font-extrabold tracking-widest text-zinc-500">Sobre el Proveedor</h4>
+            {/* Provider mini info card */}
+            <div className="bg-zinc-950/60 border border-white/8 rounded-3xl p-5 space-y-4 backdrop-blur-md">
+              <h4 className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Acerca del Artista</h4>
+              
               <div className="flex items-center gap-3">
                 {providerAvatar ? (
-                  <img src={providerAvatar} alt={providerName} className="w-12 h-12 rounded-xl object-cover border border-white/10" />
+                  <img
+                    src={providerAvatar}
+                    alt={providerName}
+                    className="w-12 h-12 rounded-2xl object-cover border border-white/10"
+                  />
                 ) : (
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${cat.gradient} flex items-center justify-center text-xl border border-white/10`}>
+                  <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${cat.gradient} flex items-center justify-center text-xl border border-white/10`}>
                     {cat.icon}
                   </div>
                 )}
-                <div>
-                  <p className="font-bold text-sm text-white">{providerName}</p>
-                  <p className="text-xs text-zinc-500 flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> {providerCity}
+                <div className="min-w-0">
+                  <p className="font-extrabold text-sm text-white font-outfit truncate">{providerName}</p>
+                  <p className="text-xs text-zinc-550 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-primary-400" /> {providerCity}
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <div className="text-center p-3 bg-white/3 border border-white/5 rounded-xl">
-                  <p className="text-lg font-extrabold text-white font-outfit">{service.completed_bookings_count || 0}</p>
-                  <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-wide">Eventos</p>
+
+              {/* Social profiles linking */}
+              {(socialMedia.instagram || socialMedia.facebook) && (
+                <div className="pt-3.5 border-t border-white/5 space-y-2">
+                  <span className="text-[9px] uppercase font-black text-zinc-550 tracking-wider block">Redes Sociales</span>
+                  <div className="flex flex-wrap gap-2">
+                    {socialMedia.instagram && (
+                      <a
+                        href={`https://instagram.com/${socialMedia.instagram.replace("@", "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/3 hover:bg-white/6 border border-white/8 text-zinc-350 hover:text-white transition-all text-xs font-bold"
+                      >
+                        <span className="text-pink-400 font-extrabold">@</span>
+                        <span>{socialMedia.instagram.replace("@", "")}</span>
+                      </a>
+                    )}
+                    {socialMedia.facebook && (
+                      <a
+                        href={`https://facebook.com/${socialMedia.facebook}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/3 hover:bg-white/6 border border-white/8 text-zinc-350 hover:text-white transition-all text-xs font-bold"
+                      >
+                        <span className="text-blue-500 font-black">f</span>
+                        <span>Facebook</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
-                <div className="text-center p-3 bg-white/3 border border-white/5 rounded-xl">
-                  <p className="text-lg font-extrabold text-amber-400 font-outfit">{avgStars.toFixed(1)}★</p>
-                  <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-wide">Rating</p>
-                </div>
-              </div>
-              <p className="text-[10px] text-zinc-500 text-center">Miembro desde {memberSince}</p>
+              )}
             </div>
-          </aside>
+
+          </div>
+
         </div>
 
-        {/* Related Services */}
+        {/* Related Similar Services Section */}
         {relatedServices.length > 0 && (
           <div className="pt-16 space-y-6">
             <div className="flex items-center gap-4">
-              <h3 className="text-lg font-black text-white uppercase tracking-wider font-outfit whitespace-nowrap">Servicios Similares</h3>
+              <h3 className="text-md font-black text-white uppercase tracking-widest font-outfit whitespace-nowrap">Otros Servicios Similares</h3>
               <div className="h-px bg-gradient-to-r from-white/10 to-transparent flex-grow" />
             </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {relatedServices.map((item: any) => {
                 const iProvName = (Array.isArray(item.provider) ? item.provider[0]?.full_name : (item.provider as any)?.full_name) || "Proveedor Hangover";
                 const iCity = item.base_city || (Array.isArray(item.provider) ? item.provider[0]?.city : (item.provider as any)?.city) || providerCity;
                 const iCat = categoryConfig[item.category] || cat;
                 return (
-                  <Link key={item.id} href={`/services/${item.slug || item.id}`} className="bg-zinc-900/60 border border-white/6 rounded-2xl overflow-hidden hover:border-white/20 transition-all duration-300 flex flex-col group">
-                    <div className="relative h-36 w-full overflow-hidden shrink-0">
+                  <Link
+                    key={item.id}
+                    href={`/services/${item.slug || item.id}`}
+                    className="bg-zinc-950/60 border border-white/6 hover:border-white/15 rounded-3xl overflow-hidden transition-all duration-300 flex flex-col group shadow-lg"
+                  >
+                    <div className="relative h-40 w-full overflow-hidden shrink-0">
                       {item.image_url ? (
-                        <img src={item.image_url} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <img src={item.image_url} alt={item.title} className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-550" />
                       ) : (
-                        <div className={`w-full h-full bg-gradient-to-tr ${iCat.gradient} opacity-70 flex items-center justify-center text-3xl`}>
+                        <div className={`w-full h-full bg-gradient-to-tr ${iCat.gradient} opacity-70 flex items-center justify-center text-4xl`}>
                           {iCat.icon}
                         </div>
                       )}
-                      <span className="absolute top-3 right-3 bg-black/80 border border-white/10 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-emerald-400">
+                      <span className="absolute top-3 right-3 bg-black/80 border border-white/15 px-3 py-1 rounded-full text-[10px] font-black text-emerald-405 font-outfit">
                         ${item.price?.toLocaleString()}
                       </span>
                     </div>
-                    <div className="p-4 flex-grow flex flex-col justify-between gap-3">
-                      <div>
-                        <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-medium block mb-1">por {iProvName}</span>
-                        <h4 className="font-bold text-white text-sm line-clamp-1 group-hover:text-primary-400 transition-colors font-outfit">{item.title}</h4>
-                        <p className="text-zinc-500 text-xs line-clamp-2 mt-1">{item.description || "Servicio premium para tu evento."}</p>
+
+                    <div className="p-5 flex-grow flex flex-col justify-between gap-4">
+                      <div className="space-y-1.5">
+                        <span className="text-[9px] text-zinc-550 uppercase tracking-widest font-black block">por {iProvName}</span>
+                        <h4 className="font-extrabold text-white text-base line-clamp-1 group-hover:text-primary-400 transition-colors font-outfit">{item.title}</h4>
+                        <p className="text-zinc-400 text-xs line-clamp-2 leading-relaxed">{item.description || "Servicio premium para tu evento."}</p>
                       </div>
-                      <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px] text-zinc-500">
-                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-primary-400" />{iCity}</span>
-                        <span className="text-primary-400 font-bold flex items-center gap-0.5">
+
+                      <div className="flex items-center justify-between pt-3 border-t border-white/5 text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                        <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-primary-400" />{iCity}</span>
+                        <span className="text-primary-400 font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                           Ver más <ChevronRight className="w-3.5 h-3.5" />
                         </span>
                       </div>
@@ -691,6 +520,7 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
