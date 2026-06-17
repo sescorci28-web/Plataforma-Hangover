@@ -27,17 +27,9 @@ export function ServiceGallery({ mainImageUrl, galleryUrls, serviceTitle }: Serv
     });
   }
 
-  // Fallback if no images are present
+  // No images — return nothing, let the parent page handle the visual
   if (allImages.length === 0) {
-    return (
-      <div className="relative h-64 sm:h-96 w-full bg-gradient-to-tr from-primary-950/40 via-night-lighter to-accent-950/40 rounded-3xl border border-white/5 flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:30px_30px]" />
-        <div className="text-center space-y-3 relative z-10">
-          <Sparkles className="w-12 h-12 text-primary-400/40 mx-auto animate-pulse" />
-          <p className="text-zinc-500 text-sm font-medium">Galería sin imágenes cargadas</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const handlePrev = (e: React.MouseEvent) => {

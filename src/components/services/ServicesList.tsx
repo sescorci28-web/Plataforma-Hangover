@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect } from "react";
-import { createServiceBooking } from "@/app/services/actions";
+import { useState, useRef, useEffect } from "react";
 import { Service } from "@/types/database.types";
 import { 
-  Calendar, Clock, DollarSign, MapPin, Sparkles, Filter, X, 
-  ArrowRight, Loader2, CheckCircle2, AlertTriangle, BookOpen, 
-  Search, ShieldCheck, ArrowUpDown, Award, Flame, Star, Zap, Eye,
-  ChevronLeft, ChevronRight
+  MapPin, Sparkles, Filter, 
+  BookOpen, 
+  Search, ShieldCheck, ArrowUpDown, Star, Calendar,
+  ChevronLeft, ChevronRight, Info
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -225,15 +224,6 @@ export function ServicesList({ initialServices, user }: ServicesListProps) {
   const [sortBy, setSortBy] = useState("popular");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Booking Modal States
-  const [bookingService, setBookingService] = useState<ExtendedService | null>(null);
-  const [eventDate, setEventDate] = useState("");
-  const [notes, setNotes] = useState("");
-  
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [isPending, startTransition] = useTransition();
-
   const handleCategorySelect = (catId: string) => {
     setSelectedCategory(catId);
     setSelectedSubcategory("all");
@@ -350,57 +340,6 @@ export function ServicesList({ initialServices, user }: ServicesListProps) {
       }
       return 0;
     });
-
-  const handleOpenBooking = (e: React.MouseEvent, service: ExtendedService) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!user) {
-      window.location.href = `/login?redirect=/services`;
-      return;
-    }
-    setBookingService(service);
-    setEventDate("");
-    setNotes("");
-    setError(null);
-    setSuccess(false);
-  };
-
-  const handleCloseBooking = () => {
-    if (isPending) return;
-    setBookingService(null);
-  };
-
-  const handleConfirmBooking = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bookingService) return;
-    setError(null);
-    setSuccess(false);
-
-    if (!eventDate) {
-      setError("La fecha del evento es obligatoria.");
-      return;
-    }
-
-    startTransition(async () => {
-      const result = await createServiceBooking(
-        bookingService.id,
-        bookingService.provider_id,
-        eventDate,
-        bookingService.price,
-        notes
-      );
-
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setSuccess(true);
-        setTimeout(() => {
-          setBookingService(null);
-          setSuccess(false);
-        }, 3000);
-      }
-    });
-  };
 
   const clearFilters = () => {
     setSearchCity("");
@@ -785,13 +724,12 @@ export function ServicesList({ initialServices, user }: ServicesListProps) {
                         </p>
                       </div>
 
-                      <button
-                        onClick={(e) => handleOpenBooking(e, service)}
-                        className="bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-2.5 px-4.5 text-xs font-bold transition-all flex items-center gap-1.5 glow cursor-pointer shrink-0 active:scale-95 shadow-md font-outfit uppercase tracking-widest"
+                      <span
+                        className="bg-primary-600 group-hover:bg-primary-500 text-white rounded-xl py-2.5 px-4 text-xs font-bold transition-all flex items-center gap-1.5 glow shrink-0 shadow-md font-outfit uppercase tracking-widest"
                       >
-                        Reservar
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                        <Info className="w-3.5 h-3.5" />
+                        Más info
+                      </span>
                     </div>
                   </div>
                 </Link>
@@ -801,109 +739,6 @@ export function ServicesList({ initialServices, user }: ServicesListProps) {
         )}
       </div>
 
-      {/* Booking Modal (Preserved original code for backward compatibility) */}
-      <AnimatePresence>
-        {bookingService && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-card w-full max-w-md overflow-hidden relative border-white/10"
-            >
-              {/* Modal Header */}
-              <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-white">Solicitud de Reserva</h3>
-                  <p className="text-xs text-zinc-400">Reserva de servicio profesional</p>
-                </div>
-                <button
-                  onClick={handleCloseBooking}
-                  disabled={isPending}
-                  className="text-zinc-400 hover:text-white disabled:opacity-50 transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Form Content */}
-              <form onSubmit={handleConfirmBooking} className="p-6 space-y-4">
-                {error && (
-                  <div className="flex items-center gap-2.5 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                {success && (
-                  <div className="flex items-center gap-2.5 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>¡Reserva enviada! Esperando respuesta del proveedor.</span>
-                  </div>
-                )}
-
-                {/* Service Details Card */}
-                <div className="p-4 bg-white/5 border border-white/5 rounded-xl space-y-1">
-                  <span className="text-[10px] text-primary-400 font-bold uppercase tracking-wider">Servicio Seleccionado</span>
-                  <h4 className="font-semibold text-white truncate">{bookingService.title}</h4>
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="text-xs text-zinc-400">Precio Total (Base)</span>
-                    <span className="text-md font-extrabold text-emerald-400">${bookingService.price}</span>
-                  </div>
-                </div>
-
-                {/* Date Input */}
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-zinc-300 ml-1">Fecha de la Fiesta / Evento</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Calendar className="h-4 w-4 text-zinc-500" />
-                    </div>
-                    <input
-                      type="date"
-                      value={eventDate}
-                      onChange={(e) => setEventDate(e.target.value)}
-                      required
-                      disabled={isPending || success}
-                      className="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary-500/50"
-                    />
-                  </div>
-                </div>
-
-                {/* Notes Input */}
-                <div className="space-y-1.5 text-left">
-                  <label className="text-xs font-semibold text-zinc-300 ml-1">Notas / Requerimientos Especiales</label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Describe los detalles de tu evento (horario, tipo de música, espacio, etc.)"
-                    disabled={isPending || success}
-                    className="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white placeholder:text-zinc-655 focus:outline-none focus:ring-1 focus:ring-primary-500/50 min-h-[80px] resize-none"
-                  />
-                </div>
-
-                {/* Confirm Button */}
-                {!success && (
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-3 px-4 font-semibold text-sm transition-all flex items-center justify-center gap-2 glow disabled:opacity-50 disabled:cursor-not-allowed mt-2 cursor-pointer font-outfit uppercase tracking-wider"
-                  >
-                    {isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Procesando Reserva...
-                      </>
-                    ) : (
-                      "Confirmar y Enviar Solicitud"
-                    )}
-                  </button>
-                )}
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
