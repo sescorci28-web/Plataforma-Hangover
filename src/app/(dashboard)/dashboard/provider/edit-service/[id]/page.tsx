@@ -68,30 +68,29 @@ export default async function EditServicePage({ params }: EditServicePageProps) 
   }
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-12 max-w-3xl">
-      <div className="space-y-6">
-        <header className="space-y-2">
-          <Link 
-            href="/dashboard/provider"
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Panel de Proveedor
-          </Link>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-3xl font-bold font-outfit text-white">Editar Servicio</h1>
-            <span className="bg-primary-600/20 text-primary-400 border border-primary-500/20 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-              {profile.role}
-            </span>
-          </div>
-          <p className="text-zinc-400 text-sm">
-            Modifica los detalles de tu servicio. Los cambios se reflejarán inmediatamente en el marketplace de Hangover.
-          </p>
-        </header>
+    <div className="min-h-screen bg-[#06060e]">
+      <div className="container mx-auto px-4 md:px-6 py-10 max-w-2xl">
+        <Link
+          href="/dashboard/provider"
+          className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-white transition-colors mb-8"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Volver al Panel
+        </Link>
 
-        <div className="glass-card p-6 md:p-8">
-          <NewServiceForm initialService={service as any} categories={dbCategories} subcategories={dbSubcategories} />
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-2xl bg-amber-600/20 border border-amber-500/20 flex items-center justify-center">
+              <ArrowLeft className="w-5 h-5 text-amber-400 rotate-[135deg]" />
+            </div>
+            <h1 className="text-2xl font-black font-outfit text-white">Editar Servicio</h1>
+          </div>
+          <p className="text-sm text-zinc-500">
+            Los cambios se reflejan inmediatamente en el marketplace.
+          </p>
         </div>
+
+        <NewServiceForm initialService={service as any} categories={dbCategories} subcategories={dbSubcategories} />
       </div>
     </div>
   );

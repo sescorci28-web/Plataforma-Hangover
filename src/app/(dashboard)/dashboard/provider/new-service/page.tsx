@@ -47,30 +47,31 @@ export default async function NewServicePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-12 max-w-3xl">
-      <div className="space-y-6">
-        <header className="space-y-2">
-          <Link 
-            href="/dashboard/provider"
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Panel de Proveedor
-          </Link>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-3xl font-bold font-outfit text-white">Publicar Nuevo Servicio</h1>
-            <span className="bg-primary-600/20 text-primary-400 border border-primary-500/20 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-              {profile.role}
-            </span>
-          </div>
-          <p className="text-zinc-400 text-sm">
-            Crea una oferta de servicio profesional en el marketplace de Hangover. Recuerda que estará disponible para su contratación inmediata por los clientes.
-          </p>
-        </header>
+    <div className="min-h-screen bg-[#06060e]">
+      <div className="container mx-auto px-4 md:px-6 py-10 max-w-2xl">
+        {/* Back link */}
+        <Link
+          href="/dashboard/provider"
+          className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-white transition-colors mb-8"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Volver al Panel
+        </Link>
 
-        <div className="glass-card p-6 md:p-8">
-          <NewServiceForm categories={dbCategories} subcategories={dbSubcategories} />
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-2xl bg-primary-600/20 border border-primary-500/20 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-primary-400" />
+            </div>
+            <h1 className="text-2xl font-black font-outfit text-white">Publicar Servicio</h1>
+          </div>
+          <p className="text-sm text-zinc-500">
+            Ponlo en el marketplace de Hangover en menos de 2 minutos.
+          </p>
         </div>
+
+        <NewServiceForm categories={dbCategories} subcategories={dbSubcategories} />
       </div>
     </div>
   );
