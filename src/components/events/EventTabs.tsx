@@ -4,9 +4,10 @@ import { useState, useEffect, useTransition } from "react";
 import { 
   Info, Users, Clock, Shirt, ShieldAlert, MapPin, Navigation, 
   Image as ImageIcon, HelpCircle, Calendar, Plus, Music, Radio,
-  MessageSquare, Sparkles, Volume2, UserCheck, ChevronDown, ChevronUp, Loader2, Trash2, Camera, Lock
+  MessageSquare, Sparkles, Volume2, UserCheck, ChevronDown, ChevronUp, Loader2, Trash2, Camera, Lock, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
 import { CommunityTab } from "@/components/connect/CommunityTab";
 import { EventGallery } from "@/components/events/EventGallery";
 import { EventGalleryManager } from "@/components/events/EventGalleryManager";
@@ -89,7 +90,8 @@ export function EventTabs({
   const [updateSubmitting, setUpdateSubmitting] = useState(false);
 
   // Memories guest uploads form
-  const [memoryUrl, setMemoryUrl] = useState("");
+  const [selectedMemoryFile, setSelectedMemoryFile] = useState<File | null>(null);
+  const [memoryFilePreview, setMemoryFilePreview] = useState<string | null>(null);
   const [memoryTitle, setMemoryTitle] = useState("");
   const [memorySubmitting, setMemorySubmitting] = useState(false);
 
@@ -163,15 +165,43 @@ export function EventTabs({
 
   const handleAddMemorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!memoryUrl) return;
+    if (!selectedMemoryFile) {
+      alert("Por favor selecciona una foto para subir.");
+      return;
+    }
     setMemorySubmitting(true);
-    const res = await addEventMemory(eventId, memoryUrl, 'image', memoryTitle);
-    setMemorySubmitting(false);
-    if (res.error) {
-      alert(res.error);
-    } else {
-      setMemoryUrl(""); setMemoryTitle("");
-      fetchMemories();
+    const supabase = createClient();
+    const bucketName = "event-memories";
+
+    try {
+      const fileExt = selectedMemoryFile.name.split(".").pop() || "jpg";
+      const filePath = `${eventId}/${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, selectedMemoryFile, { cacheControl: "3600", upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(filePath);
+
+      const res = await addEventMemory(eventId, publicUrl, 'image', memoryTitle);
+      
+      if (res.error) {
+        alert(res.error);
+      } else {
+        setSelectedMemoryFile(null);
+        setMemoryFilePreview(null);
+        setMemoryTitle("");
+        fetchMemories();
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Error al subir la imagen del recuerdo.");
+    } finally {
+      setMemorySubmitting(false);
     }
   };
 
@@ -503,19 +533,61 @@ export function EventTabs({
                         <Camera className="w-4 h-4 text-primary-450" />
                         <span className="text-[10px] font-black uppercase tracking-wider text-zinc-300">¡Comparte tus fotos del evento!</span>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <input
-                          type="text" required value={memoryUrl} onChange={(e) => setMemoryUrl(e.target.value)}
-                          placeholder="URL de tu imagen"
-                          className="w-full bg-black/40 border border-white/8 rounded-xl px-4 py-2.5 text-xs text-white"
-                        />
-                        <input
-                          type="text" value={memoryTitle} onChange={(e) => setMemoryTitle(e.target.value)}
-                          placeholder="Pie de foto (opcional)"
-                          className="w-full bg-black/40 border border-white/8 rounded-xl px-4 py-2.5 text-xs text-white"
-                        />
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                        {/* Custom File Uploader */}
+                        <div className="relative">
+                          {memoryFilePreview ? (
+                            <div className="relative w-full h-32 rounded-xl overflow-hidden border border-white/10 group">
+                              <img src={memoryFilePreview} alt="Preview" className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedMemoryFile(null);
+                                  setMemoryFilePreview(null);
+                                }}
+                                className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-650 hover:bg-red-500 rounded-full flex items-center justify-center text-white text-xs transition-colors cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border border-dashed border-white/10 hover:border-primary-500/40 bg-black/40 cursor-pointer p-4 transition-all">
+                              <Camera className="w-6 h-6 text-zinc-500 mb-1" />
+                              <span className="text-[10px] font-bold text-zinc-400">Seleccionar Foto</span>
+                              <span className="text-[8px] text-zinc-650 mt-0.5">JPG, PNG (máx. 10MB)</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    setSelectedMemoryFile(file);
+                                    setMemoryFilePreview(URL.createObjectURL(file));
+                                  }
+                                }}
+                                className="hidden"
+                              />
+                            </label>
+                          )}
+                        </div>
+
+                        {/* Title Caption Input */}
+                        <div className="space-y-3">
+                          <label className="block">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">Pie de foto (opcional)</span>
+                            <input
+                              type="text"
+                              value={memoryTitle}
+                              onChange={(e) => setMemoryTitle(e.target.value)}
+                              placeholder="Ej. ¡Qué gran noche! 🎉"
+                              className="w-full bg-black/40 border border-white/8 rounded-xl px-4 py-3 text-xs text-white placeholder:text-zinc-650 focus:outline-none focus:border-primary-500"
+                            />
+                          </label>
+                        </div>
                       </div>
-                      <button type="submit" disabled={memorySubmitting || !memoryUrl} className="w-full py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs uppercase tracking-wider">
+                      
+                      <button type="submit" disabled={memorySubmitting || !selectedMemoryFile} className="w-full py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                         {memorySubmitting ? "Subiendo..." : "Publicar Recuerdo"}
                       </button>
                     </form>
