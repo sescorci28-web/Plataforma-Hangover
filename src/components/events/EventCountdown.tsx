@@ -14,32 +14,29 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
     hours: number;
     minutes: number;
     seconds: number;
-    isEnded: boolean;
-  }>({ days: 0, hours: 0, minutes: 0, seconds: 0, isEnded: false });
+    status: 'waiting' | 'active' | 'ended';
+  }>({ days: 0, hours: 0, minutes: 0, seconds: 0, status: 'waiting' });
   const [mounted, setMounted] = useState(false);
   
-  // Use a ref to store target time to prevent effect dependency issues
   const targetTimeRef = useRef<number>(0);
 
   useEffect(() => {
     setMounted(true);
     
     if (!targetDate) {
-      setTimeLeft(prev => ({ ...prev, isEnded: true }));
+      setTimeLeft(prev => ({ ...prev, status: 'ended' }));
       return;
     }
 
-    // Robust parsing of date string
     let parsed = Date.parse(targetDate);
     if (isNaN(parsed)) {
-      // Fallback: replace space with T if database has space format
       const formatted = targetDate.replace(" ", "T");
       parsed = Date.parse(formatted);
     }
 
     if (isNaN(parsed)) {
       console.warn("Invalid date format passed to EventCountdown:", targetDate);
-      setTimeLeft(prev => ({ ...prev, isEnded: true }));
+      setTimeLeft(prev => ({ ...prev, status: 'ended' }));
       return;
     }
 
@@ -49,8 +46,15 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
       const now = Date.now();
       const difference = targetTimeRef.current - now;
 
+      // Event duration is assumed to be 6 hours
+      const durationMs = 6 * 60 * 60 * 1000;
+
       if (difference <= 0) {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isEnded: true });
+        if (Math.abs(difference) < durationMs) {
+          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, status: 'active' });
+        } else {
+          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, status: 'ended' });
+        }
         return;
       }
 
@@ -59,7 +63,7 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
       const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((difference % (1000 * 60)) / 1000);
 
-      setTimeLeft({ days, hours, minutes, seconds, isEnded: false });
+      setTimeLeft({ days, hours, minutes, seconds, status: 'waiting' });
     };
 
     calculateTime();
@@ -71,7 +75,6 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
   const padZero = (n: number) => String(n).padStart(2, "0");
 
   if (!mounted) {
-    // Return skeleton or empty view with same bounds to prevent layout shift during SSR hydration
     if (variant === "compact") {
       return (
         <div className="inline-flex items-center gap-1 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/5 text-[11px] font-mono text-zinc-400">
@@ -92,18 +95,34 @@ export function EventCountdown({ targetDate, variant = "compact" }: EventCountdo
     );
   }
 
-  if (timeLeft.isEnded) {
+  if (timeLeft.status === 'active') {
+    if (variant === "compact") {
+      return (
+        <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 text-[11px] font-semibold text-emerald-400 uppercase tracking-wider select-none shadow-lg">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span>🔥 Evento en curso</span>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center justify-center p-6 border border-emerald-500/20 bg-emerald-500/5 rounded-2xl max-w-md mx-auto text-center w-full">
+        <span className="text-sm font-black text-emerald-400 uppercase tracking-widest animate-pulse">🔥 Evento en curso</span>
+      </div>
+    );
+  }
+
+  if (timeLeft.status === 'ended') {
     if (variant === "compact") {
       return (
         <div className="inline-flex items-center gap-1.5 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/20 text-[11px] font-semibold text-rose-400 uppercase tracking-wider select-none shadow-lg">
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
-          <span>Evento finalizado</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+          <span>✅ Evento finalizado</span>
         </div>
       );
     }
     return (
       <div className="flex flex-col items-center justify-center p-6 border border-rose-500/20 bg-rose-500/5 rounded-2xl max-w-md mx-auto text-center w-full">
-        <span className="text-sm font-black text-rose-400 uppercase tracking-widest">Evento finalizado</span>
+        <span className="text-sm font-black text-rose-400 uppercase tracking-widest">✅ Evento finalizado</span>
       </div>
     );
   }

@@ -385,28 +385,27 @@ export function CommunityTab({ clubId, eventId, hasAccess, bookingId, currentUse
   }
 
   // Compile Anonymous Community Activity Feed
-  const communityActivities: { id: string; text: string; date: Date; icon: string }[] = [];
+  const communityActivities: { id: string; text: string; date: Date; icon: any }[] = [];
 
   // 1. Current Active Attendees count (Aggregate)
   const visibleAttendeesCount = activePresence.filter(p => p.visibility === 'visible').length;
   if (visibleAttendeesCount > 0) {
     communityActivities.push({
       id: "com-act-active-count",
-      text: `🔥 ${visibleAttendeesCount} usuarios activos esta noche`,
+      text: `${visibleAttendeesCount} usuarios activos esta noche`,
       date: new Date(),
-      icon: "⚡"
+      icon: <Sparkles className="w-4 h-4 text-purple-400" />
     });
   }
 
   // 2. Anonymized check-ins
   activePresence.filter(p => p.visibility === 'visible').slice(0, 5).forEach((p, idx) => {
-    // Alternamos texto para reflejar "Usuario se unió a Connect" y "Nuevo check-in"
     const isEven = idx % 2 === 0;
     communityActivities.push({
       id: `com-act-checkin-${p.id}`,
-      text: isEven ? "👤 Usuario se unió a Connect" : "📍 Nuevo check-in registrado",
+      text: isEven ? "Usuario se unió a Connect" : "Nuevo check-in registrado",
       date: new Date(p.check_in_at),
-      icon: isEven ? "👤" : "📍"
+      icon: isEven ? <Users className="w-4 h-4 text-primary-400" /> : <Shield className="w-4 h-4 text-accent-400" />
     });
   });
 
@@ -414,9 +413,9 @@ export function CommunityTab({ clubId, eventId, hasAccess, bookingId, currentUse
   chats.slice(0, 3).forEach((c) => {
     communityActivities.push({
       id: `com-act-conn-${c.id}`,
-      text: "🤝 Nueva conexión creada",
+      text: "Nueva conexión creada",
       date: new Date(c.created_at || Date.now() - 30 * 60 * 1000),
-      icon: "🤝"
+      icon: <MessageSquare className="w-4 h-4 text-emerald-400" />
     });
   });
 
@@ -453,7 +452,7 @@ export function CommunityTab({ clubId, eventId, hasAccess, bookingId, currentUse
           </div>
 
           <div className="space-y-2 max-w-md mx-auto mb-6">
-            <h3 className="text-2xl font-black text-white font-outfit">🔥 HANGOVER CONNECT</h3>
+            <h3 className="text-2xl font-black text-white font-outfit">HANGOVER CONNECT</h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
               ¡Estás en el local! Activa la red temporal de vida nocturna de esta noche. Encuentra asistentes reales que están en el mismo local, envía solicitudes y chatea.
             </p>
@@ -516,7 +515,7 @@ export function CommunityTab({ clubId, eventId, hasAccess, bookingId, currentUse
                   onClick={() => handleCheckIn('visible', selectedStatus)}
                   className="flex-1 py-3.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-extrabold text-xs transition-all shadow-md shadow-primary-500/10"
                 >
-                  {isPending ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Unirse Visible 🟢"}
+                  {isPending ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Unirse Visible"}
                 </button>
               </div>
             </div>
@@ -618,7 +617,7 @@ export function CommunityTab({ clubId, eventId, hasAccess, bookingId, currentUse
               Estás en Hangover Connect
             </h4>
             <p className="text-[11px] text-zinc-400 font-semibold">
-              Modo: <span className="text-white font-bold">{myPresence.visibility === 'visible' ? 'Visible 👁️' : 'Invisible 🕵️'}</span> • {getStatusText(myPresence.status)}
+              Modo: <span className="text-white font-bold">{myPresence.visibility === 'visible' ? 'Visible' : 'Invisible'}</span> • {getStatusText(myPresence.status)}
             </p>
           </div>
         </div>
@@ -771,8 +770,8 @@ export function CommunityTab({ clubId, eventId, hasAccess, bookingId, currentUse
             Asistentes en el local ({activePresence.filter(p => p.visibility === 'visible').length})
           </h3>
           {myPresence.visibility === 'invisible' && (
-            <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md">
-              🕵️ Estás invisible: No apareces en esta lista
+            <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md flex items-center gap-1">
+              <EyeOff className="w-3.5 h-3.5 text-amber-500" /> Estás invisible: No apareces en esta lista
             </span>
           )}
         </div>

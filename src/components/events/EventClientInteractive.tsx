@@ -101,13 +101,24 @@ export function EventClientInteractive({ eventId, eventTitle, eventDescription }
     }
   };
 
+  const shareTelegram = () => {
+    const text = encodeURIComponent(`¡Mira este evento en Hangover!: ${eventTitle}`);
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${text}`, "_blank");
+  };
+
   const shareWhatsApp = () => {
-    const text = encodeURIComponent(`¡Mira este evento en Hangover!: ${eventTitle}\n${shareUrl}`);
+    const text = encodeURIComponent(`¡Mira este evento en Hangover!: ${eventTitle} - ${shareUrl}`);
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
   };
 
   const shareFacebook = () => {
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, "_blank");
+  };
+
+  const shareInstagram = () => {
+    // Copy link and alert
+    copyToClipboard();
+    alert("¡Enlace copiado al portapapeles! Compártelo en tus historias de Instagram.");
   };
 
   return (
@@ -156,6 +167,13 @@ export function EventClientInteractive({ eventId, eventTitle, eventDescription }
                     WhatsApp
                   </button>
                   <button
+                    onClick={shareTelegram}
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer w-full text-left"
+                  >
+                    <Send className="w-4 h-4 text-sky-400 shrink-0" />
+                    Telegram
+                  </button>
+                  <button
                     onClick={shareFacebook}
                     className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer w-full text-left"
                   >
@@ -188,27 +206,46 @@ export function EventClientInteractive({ eventId, eventTitle, eventDescription }
       {/* Sharing Section Buttons (Section 8) */}
       <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-4">
         <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Comparte con tus amigos</h3>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-5 gap-2">
           <button
             onClick={shareWhatsApp}
-            className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 text-emerald-400 text-xs font-semibold transition-colors cursor-pointer"
+            className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 text-emerald-400 text-[9px] font-semibold transition-colors cursor-pointer"
+            title="Compartir por WhatsApp"
           >
-            <MessageCircle className="w-5 h-5 shrink-0" />
+            <MessageCircle className="w-4 h-4 shrink-0" />
             WhatsApp
           </button>
           <button
-            onClick={shareFacebook}
-            className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-accent-500/10 border border-accent-500/20 hover:bg-accent-500/15 text-accent-400 text-xs font-semibold transition-colors cursor-pointer"
+            onClick={shareTelegram}
+            className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/15 text-sky-400 text-[9px] font-semibold transition-colors cursor-pointer"
+            title="Compartir por Telegram"
           >
-            <FacebookIcon className="w-5 h-5 shrink-0" />
+            <Send className="w-4 h-4 shrink-0" />
+            Telegram
+          </button>
+          <button
+            onClick={shareFacebook}
+            className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-[#1877f2]/10 border border-[#1877f2]/20 hover:bg-[#1877f2]/15 text-[#1877f2] text-[9px] font-semibold transition-colors cursor-pointer"
+            title="Compartir por Facebook"
+          >
+            <FacebookIcon className="w-4 h-4 shrink-0" />
             Facebook
           </button>
           <button
-            onClick={copyToClipboard}
-            className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-primary-500/10 border border-primary-500/20 hover:bg-primary-500/15 text-primary-400 text-xs font-semibold transition-colors cursor-pointer"
+            onClick={shareInstagram}
+            className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-pink-500/10 border border-pink-500/20 hover:bg-pink-500/15 text-pink-400 text-[9px] font-semibold transition-colors cursor-pointer"
+            title="Compartir por Instagram"
           >
-            {copied ? <Check className="w-5 h-5 text-emerald-400 shrink-0 animate-pulse" /> : <Copy className="w-5 h-5 shrink-0" />}
-            {copied ? "¡Copiado!" : "Copiar"}
+            <Share2 className="w-4 h-4 shrink-0" />
+            Instagram
+          </button>
+          <button
+            onClick={copyToClipboard}
+            className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-primary-500/10 border border-primary-500/20 hover:bg-primary-500/15 text-primary-400 text-[9px] font-semibold transition-colors cursor-pointer"
+            title="Copiar Enlace"
+          >
+            {copied ? <Check className="w-4 h-4 text-emerald-400 shrink-0" /> : <Copy className="w-4 h-4 shrink-0" />}
+            {copied ? "Copiado" : "Copiar"}
           </button>
         </div>
       </div>

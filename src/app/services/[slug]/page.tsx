@@ -4,7 +4,8 @@ import Link from "next/link";
 import { 
   Calendar, MapPin, Sparkles, ArrowLeft, ShieldCheck, Clock, MessageSquare, 
   CheckCircle2, AlertTriangle, Users, Award, Star, Zap, ChevronRight, Check, X,
-  PhoneCall, Video as VideoIcon, Music, Disc, TrendingUp, Globe, Badge
+  PhoneCall, Video as VideoIcon, Music, Disc, TrendingUp, Globe, Badge,
+  Volume2, GlassWater, Camera, UserCheck, Palette, Crown, Utensils, Sofa, Car, Heart
 } from "lucide-react";
 
 import { ServiceBookingWidget } from "@/components/services/ServiceBookingWidget";
@@ -43,6 +44,37 @@ function getSpotifyEmbedUrl(url: string) {
 function getSoundCloudEmbedUrl(url: string) {
   if (!url) return null;
   return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`;
+}
+
+function CategoryIcon({ name, className = "w-10 h-10 text-white/80" }: { name: string; className?: string }) {
+  switch (name) {
+    case "music":
+      return <Music className={className} />;
+    case "sound":
+      return <Volume2 className={className} />;
+    case "bar":
+      return <GlassWater className={className} />;
+    case "media":
+      return <Camera className={className} />;
+    case "staff":
+      return <UserCheck className={className} />;
+    case "decor":
+      return <Palette className={className} />;
+    case "premium":
+      return <Crown className={className} />;
+    case "security":
+      return <ShieldCheck className={className} />;
+    case "catering":
+      return <Utensils className={className} />;
+    case "logistics":
+      return <Sofa className={className} />;
+    case "transport":
+      return <Car className={className} />;
+    case "social":
+      return <Heart className={className} />;
+    default:
+      return <Sparkles className={className} />;
+  }
 }
 
 export default async function ServiceDetailPage({ params }: ServiceDetailPageProps) {
@@ -148,21 +180,21 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
 
   // Category config
   const categoryConfig: Record<string, { label: string; gradient: string; accent: string; icon: string }> = {
-    music:   { label: "🎵 Música y Shows",         gradient: "from-violet-900 via-purple-900 to-indigo-950",   accent: "violet",  icon: "🎵" },
-    sound:   { label: "🔊 Sonido e Iluminación",    gradient: "from-sky-900 via-blue-900 to-slate-950",         accent: "sky",     icon: "🔊" },
-    bar:     { label: "🍸 Bar y Coctelería",        gradient: "from-rose-900 via-red-900 to-orange-950",        accent: "rose",    icon: "🍸" },
-    media:   { label: "📸 Foto y Contenido",        gradient: "from-fuchsia-900 via-pink-900 to-purple-950",    accent: "fuchsia", icon: "📸" },
-    staff:   { label: "👥 Staff y Personal",        gradient: "from-teal-900 via-cyan-900 to-slate-950",        accent: "teal",    icon: "👥" },
-    decor:   { label: "🎨 Decoración",              gradient: "from-pink-900 via-fuchsia-900 to-violet-950",    accent: "pink",    icon: "🎨" },
-    premium: { label: "⭐ Experiencias VIP",        gradient: "from-amber-900 via-yellow-900 to-orange-950",    accent: "amber",   icon: "⭐" },
-    security:{ label: "🛡️ Seguridad",              gradient: "from-slate-800 via-zinc-900 to-neutral-950",     accent: "slate",   icon: "🛡️" },
-    catering:{ label: "🍽️ Catering",               gradient: "from-emerald-900 via-green-900 to-teal-950",     accent: "emerald", icon: "🍽️" },
-    logistics:{ label: "🪑 Mobiliario",             gradient: "from-stone-800 via-neutral-900 to-zinc-950",     accent: "stone",   icon: "🪑" },
-    transport:{ label: "🚗 Transporte",             gradient: "from-blue-900 via-indigo-900 to-slate-950",      accent: "blue",    icon: "🚗" },
-    social:  { label: "💍 Bodas y Eventos",         gradient: "from-rose-900 via-pink-900 to-fuchsia-950",      accent: "rose",    icon: "💍" },
+    music:   { label: "Música y Shows",         gradient: "from-violet-900 via-purple-900 to-indigo-950",   accent: "violet",  icon: "music" },
+    sound:   { label: "Sonido e Iluminación",    gradient: "from-sky-900 via-blue-900 to-slate-950",         accent: "sky",     icon: "sound" },
+    bar:     { label: "Bar y Coctelería",        gradient: "from-rose-900 via-red-900 to-orange-950",        accent: "rose",    icon: "bar" },
+    media:   { label: "Foto y Contenido",        gradient: "from-fuchsia-900 via-pink-900 to-purple-950",    accent: "fuchsia", icon: "media" },
+    staff:   { label: "Staff y Personal",        gradient: "from-teal-900 via-cyan-900 to-slate-950",        accent: "teal",    icon: "staff" },
+    decor:   { label: "Decoración",              gradient: "from-pink-900 via-fuchsia-900 to-violet-950",    accent: "pink",    icon: "decor" },
+    premium: { label: "Experiencias VIP",        gradient: "from-amber-900 via-yellow-900 to-orange-950",    accent: "amber",   icon: "premium" },
+    security:{ label: "Seguridad",              gradient: "from-slate-800 via-zinc-900 to-neutral-950",     accent: "slate",   icon: "security" },
+    catering:{ label: "Catering",               gradient: "from-emerald-900 via-green-900 to-teal-950",     accent: "emerald", icon: "catering" },
+    logistics:{ label: "Mobiliario",             gradient: "from-stone-800 via-neutral-900 to-zinc-950",     accent: "stone",   icon: "logistics" },
+    transport:{ label: "Transporte",             gradient: "from-blue-900 via-indigo-900 to-slate-950",      accent: "blue",    icon: "transport" },
+    social:  { label: "Bodas y Eventos",         gradient: "from-rose-900 via-pink-900 to-fuchsia-950",      accent: "rose",    icon: "social" },
   };
 
-  const cat = categoryConfig[service.category] || { label: service.subcategory || "Servicio Especializado", gradient: "from-primary-950 via-violet-950 to-indigo-950", accent: "primary", icon: "✨" };
+  const cat = categoryConfig[service.category] || { label: service.subcategory || "Servicio Especializado", gradient: "from-primary-950 via-violet-950 to-indigo-950", accent: "primary", icon: "sparkles" };
   const finalCategoryLabel = service.subcategory || cat.label;
 
   const avgStars = reviews.length > 0
@@ -248,8 +280,8 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                     className="w-24 h-24 sm:w-28 sm:w-28 rounded-3xl object-cover border-2 border-primary-500 shadow-[0_0_20px_rgba(217,70,239,0.3)] bg-zinc-900"
                   />
                 ) : (
-                  <div className={`w-24 h-24 sm:w-28 sm:w-28 rounded-3xl bg-gradient-to-br ${cat.gradient} flex items-center justify-center text-4xl border-2 border-primary-500 shadow-[0_0_20px_rgba(217,70,239,0.3)]`}>
-                    {cat.icon}
+                  <div className={`w-24 h-24 sm:w-28 sm:w-28 rounded-3xl bg-gradient-to-br ${cat.gradient} flex items-center justify-center border-2 border-primary-500 shadow-[0_0_20px_rgba(217,70,239,0.3)]`}>
+                    <CategoryIcon name={cat.icon} className="w-10 h-10 text-white/90 animate-pulse" />
                   </div>
                 )}
                 
@@ -271,8 +303,8 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                     </span>
                   )}
                   {service.badge_status === "top_provider" && (
-                    <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[9px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-0.5">
-                      🏆 Top
+                    <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[9px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-1">
+                      <Award className="w-3.5 h-3.5 text-amber-400" /> Top
                     </span>
                   )}
                 </div>
@@ -420,8 +452,8 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                     className="w-12 h-12 rounded-2xl object-cover border border-white/10"
                   />
                 ) : (
-                  <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${cat.gradient} flex items-center justify-center text-xl border border-white/10`}>
-                    {cat.icon}
+                  <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${cat.gradient} flex items-center justify-center border border-white/10`}>
+                    <CategoryIcon name={cat.icon} className="w-5 h-5 text-white/90" />
                   </div>
                 )}
                 <div className="min-w-0">
@@ -491,8 +523,8 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                       {item.image_url ? (
                         <img src={item.image_url} alt={item.title} className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-550" />
                       ) : (
-                        <div className={`w-full h-full bg-gradient-to-tr ${iCat.gradient} opacity-70 flex items-center justify-center text-4xl`}>
-                          {iCat.icon}
+                        <div className={`w-full h-full bg-gradient-to-tr ${iCat.gradient} opacity-70 flex items-center justify-center`}>
+                          <CategoryIcon name={iCat.icon} className="w-10 h-10 text-white/80" />
                         </div>
                       )}
                       <span className="absolute top-3 right-3 bg-black/80 border border-white/15 px-3 py-1 rounded-full text-[10px] font-black text-emerald-405 font-outfit">

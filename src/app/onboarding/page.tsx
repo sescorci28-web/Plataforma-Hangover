@@ -160,7 +160,7 @@ export default function OnboardingPage() {
               <Building2 className="w-5 h-5" />
             </div>
             <div className="space-y-1 relative z-10 mt-6">
-              <h3 className="font-bold text-white text-base font-outfit uppercase">🍾 Administrar Discotecas</h3>
+              <h3 className="font-bold text-white text-base font-outfit uppercase">Administrar Discotecas</h3>
               <p className="text-zinc-500 text-[10px] sm:text-xs leading-relaxed max-w-[200px]">
                 Registra locales, vende reservas de mesa VIP y gestiona pedidos.
               </p>
@@ -182,7 +182,7 @@ export default function OnboardingPage() {
               <Calendar className="w-5 h-5" />
             </div>
             <div className="space-y-1 relative z-10 mt-6">
-              <h3 className="font-bold text-white text-base font-outfit uppercase">🎉 Organizar Eventos</h3>
+              <h3 className="font-bold text-white text-base font-outfit uppercase">Organizar Eventos</h3>
               <p className="text-zinc-500 text-[10px] sm:text-xs leading-relaxed max-w-[200px]">
                 Monta eventos, vende entradas oficiales con QR y valida accesos.
               </p>
@@ -204,7 +204,7 @@ export default function OnboardingPage() {
               <Sparkles className="w-5 h-5" />
             </div>
             <div className="space-y-1 relative z-10 mt-6">
-              <h3 className="font-bold text-white text-base font-outfit uppercase">🎧 Ofrecer Servicios</h3>
+              <h3 className="font-bold text-white text-base font-outfit uppercase">Ofrecer Servicios</h3>
               <p className="text-zinc-500 text-[10px] sm:text-xs leading-relaxed max-w-[200px]">
                 Ofrece DJs, iluminación, sonido o catering y recibe reservas.
               </p>
@@ -226,7 +226,7 @@ export default function OnboardingPage() {
               <User className="w-5 h-5" />
             </div>
             <div className="space-y-1 relative z-10 mt-6">
-              <h3 className="font-bold text-white text-base font-outfit uppercase">👤 Solo disfrutar</h3>
+              <h3 className="font-bold text-white text-base font-outfit uppercase">Solo disfrutar</h3>
               <p className="text-zinc-500 text-[10px] sm:text-xs leading-relaxed max-w-[200px]">
                 Encuentra planes, compra tickets y conecta con la comunidad Hangover.
               </p>

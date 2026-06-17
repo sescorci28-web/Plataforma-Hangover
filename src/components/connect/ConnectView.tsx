@@ -27,6 +27,7 @@ import {
   UserX,
   Bookmark,
   Share2,
+  Music,
 } from "lucide-react";
 import { ConnectProfile } from "./ConnectProfile";
 import { ConnectChat } from "./ConnectChat";
@@ -125,9 +126,9 @@ export function ConnectView({
   const [posts, setPosts] = useState<Post[]>([
     {
       id: "post-1",
-      user: { id: "user-2", full_name: "Carlos DJ", avatar_url: null, isProfessional: true, profTitle: "🎧 Guest DJ" },
+      user: { id: "user-2", full_name: "Carlos DJ", avatar_url: null, isProfessional: true, profTitle: "Guest DJ" },
       media_url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=600",
-      caption: "¡Qué noche la de ayer en el opening set! Gracias a todos los que bailaron. 🎶🔋 #nightlife #techno",
+      caption: "¡Qué noche la de ayer en el opening set! Gracias a todos los que bailaron. #nightlife #techno",
       venue: "Hangover Club",
       reactions: { brutal: 42, me_apunto: 12, vamos: 34, me_gusta: 56 },
       userReaction: null as string | null,
@@ -142,7 +143,7 @@ export function ConnectView({
       id: "post-2",
       user: { id: "user-3", full_name: "Mariana Rojas", avatar_url: null, isProfessional: false },
       media_url: "https://images.unsplash.com/photo-1506157786151-b8491531f063?q=80&w=600",
-      caption: "Celebrando mi cumple en la mesa VIP del mejor club de la ciudad. ¡Brutal el servicio! 🍾✨",
+      caption: "Celebrando mi cumple en la mesa VIP del mejor club de la ciudad. ¡Brutal el servicio!",
       venue: "Dulcinea Medellín",
       reactions: { brutal: 89, me_apunto: 4, vamos: 57, me_gusta: 104 },
       userReaction: null as string | null,
@@ -275,7 +276,7 @@ export function ConnectView({
 
     setIsAiLoading(true);
     setTimeout(() => {
-      setAiResponse(`🤖 Basado en tu presupuesto y gustos, te sugiero asistir hoy a "Fiesta del año" en Dulcinea Medellín. 3 miembros de tu Crew asistirán. También podrías conectar con @carlos_dj, quien subirá fotos de su set en vivo.`);
+      setAiResponse(`Basado en tu presupuesto y gustos, te sugiero asistir hoy a "Fiesta del año" en Dulcinea Medellín. 3 miembros de tu Crew asistirán. También podrías conectar con @carlos_dj, quien subirá fotos de su set en vivo.`);
       setIsAiLoading(false);
     }, 1500);
   };
@@ -316,10 +317,10 @@ export function ConnectView({
                 onChange={(e) => setCurrentProfileView(e.target.value as any)}
                 className="w-full bg-[#09090f] border border-white/10 text-white py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wide focus:outline-none cursor-pointer appearance-none select-none"
               >
-                <option value="social">🔗 Perfil Social (Connect)</option>
-                <option value="client">👤 Perfil Cliente (Comprar)</option>
-                <option value="provider">🎧 Perfil Proveedor (Gigs)</option>
-                <option value="club">🍾 Perfil Discoteca (Ops)</option>
+                <option value="social">Perfil Social (Connect)</option>
+                <option value="client">Perfil Cliente (Comprar)</option>
+                <option value="provider">Perfil Proveedor (Gigs)</option>
+                <option value="club">Perfil Discoteca (Ops)</option>
               </select>
               <span className="absolute right-3.5 top-3 text-[9px] pointer-events-none">▼</span>
             </div>
@@ -397,10 +398,10 @@ export function ConnectView({
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[9px] text-zinc-500 font-bold uppercase mr-1">Mood Hoy:</span>
             {[
-              { id: "salir", label: "Quiero salir 🍾" },
-              { id: "parche", label: "Busco parche 🤝" },
-              { id: "tomar", label: "Quiero tomar algo 🍸" },
-              { id: "evento", label: "Busco evento 🎫" }
+              { id: "salir", label: "Quiero salir" },
+              { id: "parche", label: "Busco parche" },
+              { id: "tomar", label: "Quiero tomar algo" },
+              { id: "evento", label: "Busco evento" }
             ].map((mood) => {
               const isActive = currentMood === mood.id;
               return (
@@ -429,13 +430,13 @@ export function ConnectView({
               <button
                 type="button"
                 onClick={() => setFeedSubTab("posts")}
-                className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer ${
+                className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
                   feedSubTab === "posts"
                     ? "bg-primary-600 text-white shadow-lg shadow-primary-500/10 border border-primary-500/20"
                     : "text-zinc-400 hover:text-white"
                 }`}
               >
-                🔥 Publicaciones
+                <Flame className="w-3.5 h-3.5" /> Publicaciones
               </button>
               <button
                 type="button"
@@ -446,7 +447,7 @@ export function ConnectView({
                     : "text-zinc-400 hover:text-white"
                 }`}
               >
-                🤝 Planes y Crews
+                <Users className="w-3.5 h-3.5" /> Planes y Crews
               </button>
             </div>
 
@@ -526,11 +527,12 @@ export function ConnectView({
                       <div className="flex items-center justify-between border-b border-white/5 pb-3">
                         <div className="flex gap-2">
                           {[
-                            { type: "brutal", label: "🔥 Brutal", color: "text-orange-400 hover:bg-orange-500/10" },
-                            { type: "me_apunto", label: "🎉 Me apunto", color: "text-cyan-400 hover:bg-cyan-500/10" },
-                            { type: "vamos", label: "🍾 Vamos", color: "text-purple-400 hover:bg-purple-500/10" },
-                            { type: "me_gusta", label: "❤️ Me gusta", color: "text-rose-400 hover:bg-rose-500/10" }
+                            { type: "brutal", label: "Brutal", icon: Flame, color: "text-orange-400 hover:bg-orange-500/10" },
+                            { type: "me_apunto", label: "Me apunto", icon: UserCheck, color: "text-cyan-400 hover:bg-cyan-500/10" },
+                            { type: "vamos", label: "Vamos", icon: Ticket, color: "text-purple-400 hover:bg-purple-500/10" },
+                            { type: "me_gusta", label: "Me gusta", icon: ThumbsUp, color: "text-rose-400 hover:bg-rose-500/10" }
                           ].map((react) => {
+                            const Icon = react.icon;
                             const isUserReact = post.userReaction === react.type;
                             return (
                               <button
@@ -542,6 +544,7 @@ export function ConnectView({
                                     : "bg-black/35 border-white/5 text-zinc-400 " + react.color
                                 }`}
                               >
+                                <Icon className="w-3.5 h-3.5 shrink-0" />
                                 <span>{react.label}</span>
                                 <span className="font-bold text-zinc-500">{(post.reactions as any)[react.type]}</span>
                               </button>
@@ -656,7 +659,9 @@ export function ConnectView({
                       </div>
 
                       <div className="flex justify-between items-center pt-2 border-t border-white/5">
-                        <span className="text-[9px] text-primary-400 font-bold uppercase">📍 {pl.venue}</span>
+                        <span className="text-[9px] text-primary-400 font-bold uppercase flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-primary-400" /> {pl.venue}
+                        </span>
                         <button
                           onClick={() => handleJoinPlan(pl.id)}
                           className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer border ${
@@ -673,20 +678,25 @@ export function ConnectView({
                 </div>
               </div>
 
-              {/* Local trends widget */}
               <div className="glass-card p-5 bg-zinc-950/30 border-white/5 rounded-3xl space-y-3">
                 <h4 className="font-bold text-white text-sm font-outfit pb-2 border-b border-white/5">Tendencias Locales</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-zinc-300">🔥 1. Hangover Club</span>
+                    <span className="font-semibold text-zinc-300 flex items-center gap-1">
+                      <Flame className="w-3.5 h-3.5 text-orange-400" /> 1. Hangover Club
+                    </span>
                     <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">Muy Activo</span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-zinc-300">🎉 2. Fiesta del año</span>
+                    <span className="font-semibold text-zinc-300 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400" /> 2. Fiesta del año
+                    </span>
                     <span className="text-[9px] text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded">124 Comentarios</span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-zinc-300">🎧 3. DJ Carlos Set</span>
+                    <span className="font-semibold text-zinc-300 flex items-center gap-1">
+                      <Music className="w-3.5 h-3.5 text-cyan-400" /> 3. DJ Carlos Set
+                    </span>
                     <span className="text-[9px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded">Top Tendencia</span>
                   </div>
                 </div>
@@ -758,13 +768,13 @@ export function ConnectView({
 
                 {/* Actions overlay side bar */}
                 <div className="absolute right-4 bottom-24 flex flex-col gap-4 text-center z-10">
-                  <button onClick={() => handleReact(post.id, "brutal")} className="w-10 h-10 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-orange-400 hover:scale-110 transition-transform cursor-pointer">
-                    🔥
+                  <button onClick={() => handleReact(post.id, "brutal")} className="w-10 h-10 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-orange-400 hover:scale-110 transition-transform cursor-pointer" title="Brutal">
+                    <Flame className="w-5 h-5 text-orange-450" />
                   </button>
                   <span className="text-[9px] font-bold text-white">{post.reactions.brutal}</span>
                   
-                  <button onClick={() => handleReact(post.id, "vamos")} className="w-10 h-10 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-purple-400 hover:scale-110 transition-transform cursor-pointer">
-                    🍾
+                  <button onClick={() => handleReact(post.id, "vamos")} className="w-10 h-10 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-purple-400 hover:scale-110 transition-transform cursor-pointer" title="Vamos">
+                    <Ticket className="w-5 h-5 text-purple-450" />
                   </button>
                   <span className="text-[9px] font-bold text-white">{post.reactions.vamos}</span>
                   

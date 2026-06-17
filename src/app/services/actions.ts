@@ -457,7 +457,9 @@ export async function createEvent(
   eventDate: string,
   location: string,
   ticketPrice: number,
-  imageUrl?: string
+  imageUrl?: string,
+  batches?: Array<{ name: string; price: number; capacity: number }>,
+  lineup?: Array<{ artist_name: string; performance_time: string; description?: string; image_url?: string }>
 ) {
   const supabase = await createClient();
 
@@ -478,7 +480,7 @@ export async function createEvent(
   }
 
   try {
-    const { error: insertError } = await supabase
+    const { data: newEvent, error: insertError } = await supabase
       .from("events")
       .insert({
         creator_id: user.id,
@@ -488,10 +490,58 @@ export async function createEvent(
         location,
         ticket_price: ticketPrice,
         image_url: imageUrl || null
-      });
+      })
+      .select("id")
+      .single();
 
-    if (insertError) {
-      return { error: `Error al crear el evento: ${insertError.message}` };
+    if (insertError || !newEvent) {
+      return { error: `Error al crear el evento: ${insertError ? insertError.message : 'No se pudo obtener el ID del evento'}` };
+    }
+
+    // 1. Insert ticket batches if provided
+    if (batches && batches.length > 0) {
+      const batchesToInsert = batches.map((batch, idx) => ({
+        event_id: newEvent.id,
+        name: batch.name,
+        price: batch.price,
+        capacity: batch.capacity,
+        status: idx === 0 ? 'active' : 'locked' // first batch is active, others are locked
+      }));
+
+      const { error: batchesError } = await supabase
+        .from("event_ticket_batches")
+        .insert(batchesToInsert);
+      
+      if (batchesError) {
+        console.error("Error inserting ticket batches:", batchesError.message);
+      }
+    }
+
+    // 2. Insert artist lineup if provided
+    if (lineup && lineup.length > 0) {
+      const lineupToInsert = lineup.map((item, idx) => ({
+        event_id: newEvent.id,
+        artist_name: item.artist_name,
+        performance_time: item.performance_time,
+        description: item.description || null,
+        image_url: item.image_url || null,
+        display_order: idx
+      }));
+
+      const { error: lineupError } = await supabase
+        .from("event_lineup")
+        .insert(lineupToInsert);
+      
+      if (lineupError) {
+        console.error("Error inserting lineup:", lineupError.message);
+      }
+    }
+
+    // 3. Create the exclusive chat room automatically
+    try {
+      await supabase.from("event_chat_rooms").insert({ event_id: newEvent.id });
+    } catch (chatRoomErr: any) {
+      console.error("Failed to create event chat room:", chatRoomErr.message);
     }
 
     revalidatePath("/events");
