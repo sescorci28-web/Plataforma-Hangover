@@ -118,16 +118,39 @@ export async function getEventMemories(eventId: string) {
   try {
     const { data, error } = await supabase
       .from("event_memories")
-      .select("*, user:profiles (full_name, avatar_url)")
+      .select(`
+        *,
+        user:profiles (full_name, avatar_url),
+        reactions:event_memory_reactions (user_id),
+        comments:event_memory_comments (
+          id,
+          comment,
+          created_at,
+          user:profiles (full_name, avatar_url)
+        )
+      `)
       .eq("event_id", eventId)
       .eq("active", true)
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
-    return { success: true, memories: data || [] };
+    if (!error && data) {
+      return { success: true, memories: data || [] };
+    }
+    throw error;
   } catch (err: any) {
-    console.error("Error fetching event memories:", err.message);
-    return { success: false, memories: [], error: err.message };
+    try {
+      const { data, error: fbErr } = await supabase
+        .from("event_memories")
+        .select("*, user:profiles (full_name, avatar_url)")
+        .eq("event_id", eventId)
+        .eq("active", true)
+        .order("created_at", { ascending: false });
+      if (fbErr) throw fbErr;
+      return { success: true, memories: data || [] };
+    } catch (fbErr2: any) {
+      console.error("Error fetching event memories:", fbErr2.message);
+      return { success: false, memories: [], error: fbErr2.message };
+    }
   }
 }
 
@@ -411,6 +434,69 @@ export async function addEventMemory(eventId: string, url: string, mediaType: 'i
     if (error) throw error;
     revalidatePath(`/events/${eventId}`);
     return { success: true };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+/**
+ * Toggle user reaction for a memory.
+ */
+export async function toggleMemoryReaction(memoryId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No estás autenticado." };
+
+  try {
+    const { data: existing } = await supabase
+      .from("event_memory_reactions")
+      .select("id")
+      .eq("memory_id", memoryId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabase
+        .from("event_memory_reactions")
+        .delete()
+        .eq("id", existing.id);
+      if (error) throw error;
+      return { success: true, reacted: false };
+    } else {
+      const { error } = await supabase
+        .from("event_memory_reactions")
+        .insert({ memory_id: memoryId, user_id: user.id });
+      if (error) throw error;
+      return { success: true, reacted: true };
+    }
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+/**
+ * Add a comment to a memory.
+ */
+export async function addMemoryComment(memoryId: string, commentText: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No estás autenticado." };
+
+  if (!commentText.trim()) return { error: "El comentario no puede estar vacío." };
+
+  try {
+    const { data, error } = await supabase
+      .from("event_memory_comments")
+      .insert({
+        memory_id: memoryId,
+        user_id: user.id,
+        comment: commentText.trim()
+      })
+      .select("*, user:profiles(full_name, avatar_url)")
+      .single();
+
+    if (error) throw error;
+    return { success: true, comment: data };
   } catch (err: any) {
     return { error: err.message };
   }

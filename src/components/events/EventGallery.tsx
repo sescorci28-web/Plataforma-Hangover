@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Play, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 
 interface GalleryItem {
   id: string;
@@ -20,6 +21,11 @@ interface EventGalleryProps {
 
 export function EventGallery({ items = [] }: EventGalleryProps) {
   const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
@@ -52,6 +58,21 @@ export function EventGallery({ items = [] }: EventGalleryProps) {
       return prev - 1;
     });
   };
+
+  // Close lightbox on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleCloseLightbox();
+      }
+    };
+    if (activeItemIndex !== null) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeItemIndex]);
 
   if (items.length === 0) {
     return (
@@ -115,7 +136,7 @@ export function EventGallery({ items = [] }: EventGalleryProps) {
                   <h5 className="text-white text-xs font-bold font-outfit truncate">{item.title}</h5>
                 )}
                 {item.description && (
-                  <p className="text-zinc-300 text-[10px] line-clamp-2 leading-relaxed mt-0.5">{item.description}</p>
+                  <p className="text-zinc-350 text-[10px] line-clamp-2 leading-relaxed mt-0.5">{item.description}</p>
                 )}
               </div>
 
@@ -132,73 +153,129 @@ export function EventGallery({ items = [] }: EventGalleryProps) {
 
       {/* Lightbox Slider Modal */}
       <AnimatePresence>
-        {activeItemIndex !== null && (
-          <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
-            {/* Desktop arrows */}
-            <button
-              onClick={handlePrevItem}
-              className="absolute left-6 hidden md:flex w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 items-center justify-center text-white border border-white/10 transition-all cursor-pointer z-50"
+        {isMounted && activeItemIndex !== null && (
+          createPortal(
+            <div 
+              className="fixed inset-0 z-[9999] bg-black/92 backdrop-blur-md flex items-center justify-center p-4 md:p-8 cursor-zoom-out"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  handleCloseLightbox();
+                }
+              }}
             >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
+              {/* Close Button: Placed at top-right of the screen */}
+              <button
+                onClick={handleCloseLightbox}
+                className="fixed top-4 right-4 z-[10000] w-10 h-10 rounded-full bg-black/60 border border-white/10 hover:border-white/20 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer hover:scale-105 shadow-xl"
+              >
+                <X className="w-5 h-5" />
+              </button>
 
-            <button
-              onClick={handleNextItem}
-              className="absolute right-6 hidden md:flex w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 items-center justify-center text-white border border-white/10 transition-all cursor-pointer z-50"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
+              {/* Instagram-style Modal Card Container */}
+              <motion.div
+                initial={{ scale: 0.95, y: 15 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 15 }}
+                className="w-full max-w-5xl h-[85vh] max-h-[780px] flex flex-col md:flex-row bg-[#08080d] border border-white/10 rounded-3xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] relative cursor-default"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Left Column: Media Viewer */}
+                <div className="relative flex-grow bg-black flex items-center justify-center min-h-[40vh] md:min-h-0 h-[50vh] md:h-full select-none">
+                  {/* Media Element */}
+                  <div className="max-w-full max-h-full aspect-auto flex items-center justify-center relative select-none">
+                    {sortedItems[activeItemIndex].media_type === "video" ? (
+                      <video
+                        key={sortedItems[activeItemIndex].id}
+                        src={sortedItems[activeItemIndex].url}
+                        controls
+                        autoPlay
+                        loop
+                        className="max-w-full max-h-[48vh] md:max-h-[82vh] object-contain shadow-2xl"
+                      />
+                    ) : (
+                      <img
+                        src={sortedItems[activeItemIndex].url}
+                        alt={sortedItems[activeItemIndex].title || "Detalle multimedia"}
+                        className="max-w-full max-h-[48vh] md:max-h-[82vh] object-contain shadow-2xl pointer-events-none"
+                      />
+                    )}
+                  </div>
 
-            {/* Modal Body Container */}
-            <div className="relative w-full max-w-md aspect-[9/16] rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col justify-between bg-[#050508]">
-              {/* Top Bar controls */}
-              <div className="absolute top-4 inset-x-4 z-20 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent p-2 rounded-t-xl">
-                <div>
-                  {sortedItems[activeItemIndex].title ? (
-                    <h4 className="text-white text-xs font-bold font-outfit truncate">
-                      {sortedItems[activeItemIndex].title}
-                    </h4>
-                  ) : (
-                    <h4 className="text-white text-xs font-bold font-outfit truncate">Multimedia</h4>
-                  )}
-                  {sortedItems[activeItemIndex].description && (
-                    <p className="text-[10px] text-zinc-400 truncate mt-0.5">
-                      {sortedItems[activeItemIndex].description}
-                    </p>
+                  {/* Navigation Chevrons inside the viewer */}
+                  {sortedItems.length > 1 && (
+                    <>
+                      <button
+                        onClick={handlePrevItem}
+                        className="absolute left-4 w-10 h-10 rounded-full bg-black/60 border border-white/10 hover:border-white/20 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer hover:scale-105"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={handleNextItem}
+                        className="absolute right-4 w-10 h-10 rounded-full bg-black/60 border border-white/10 hover:border-white/20 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer hover:scale-105"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </>
                   )}
                 </div>
 
-                <button
-                  onClick={handleCloseLightbox}
-                  className="text-zinc-400 hover:text-white transition-colors cursor-pointer w-8 h-8 rounded-full bg-black/40 border border-white/10 flex items-center justify-center"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+                {/* Right Column: Sidebar (Metadata / Info) */}
+                <div className="w-full md:w-[380px] lg:w-[400px] bg-[#0c0c14] border-t md:border-t-0 md:border-l border-white/5 flex flex-col h-[35vh] md:h-full shrink-0 justify-between p-6">
+                  <div className="space-y-6">
+                    {/* Header */}
+                    <div className="flex items-center gap-3 pb-4 border-b border-white/5">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary-600 to-indigo-650 flex items-center justify-center text-white font-extrabold text-sm uppercase">
+                        📸
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-white text-xs font-outfit uppercase tracking-widest">
+                          Galería Oficial
+                        </h4>
+                        <span className="text-[9px] text-zinc-550 font-bold uppercase tracking-wider">
+                          Contenido del Organizador
+                        </span>
+                      </div>
+                    </div>
 
-              {/* Main Content (Image or Video) */}
-              <div className="flex-grow w-full h-full relative flex items-center justify-center bg-black">
-                {sortedItems[activeItemIndex].media_type === "video" ? (
-                  <video
-                    key={sortedItems[activeItemIndex].id}
-                    src={sortedItems[activeItemIndex].url}
-                    controls
-                    autoPlay
-                    playsInline
-                    preload="metadata"
-                    className="w-full h-full object-contain aspect-[9/16]"
-                  />
-                ) : (
-                  <img
-                    src={sortedItems[activeItemIndex].url}
-                    alt={sortedItems[activeItemIndex].title || "Detalle multimedia"}
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/30 pointer-events-none" />
-              </div>
-            </div>
-          </div>
+                    {/* Metadata Content */}
+                    <div className="space-y-4">
+                      {sortedItems[activeItemIndex].title ? (
+                        <h3 className="text-white text-base font-black font-outfit leading-tight">
+                          {sortedItems[activeItemIndex].title}
+                        </h3>
+                      ) : (
+                        <h3 className="text-zinc-500 text-sm font-bold uppercase italic font-outfit">
+                          Sin título
+                        </h3>
+                      )}
+                      
+                      {sortedItems[activeItemIndex].description ? (
+                        <p className="text-xs text-zinc-400 leading-relaxed bg-white/[0.02] border border-white/5 rounded-2xl p-4">
+                          {sortedItems[activeItemIndex].description}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-zinc-600 italic leading-relaxed bg-white/[0.01] border border-dashed border-white/5 rounded-2xl p-4 text-center">
+                          Sin descripción adicional.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sidebar Footer info */}
+                  <div className="pt-4 border-t border-white/5 text-[10px] text-zinc-500 flex justify-between items-center">
+                    <span>Elemento {activeItemIndex + 1} de {sortedItems.length}</span>
+                    {sortedItems[activeItemIndex].featured && (
+                      <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold uppercase tracking-widest px-2 py-0.5 rounded text-[8px]">
+                        ★ destacado
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </div>,
+            document.body
+          )
         )}
       </AnimatePresence>
     </div>

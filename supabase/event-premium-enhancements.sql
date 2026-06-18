@@ -315,3 +315,45 @@ CREATE POLICY "Authenticated Upload Access for event-memories" ON storage.object
         bucket_id = 'event-memories' 
         AND auth.role() = 'authenticated'
     );
+
+-- 11. Tabla de Reacciones a Recuerdos (event_memory_reactions)
+CREATE TABLE IF NOT EXISTS public.event_memory_reactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    memory_id UUID NOT NULL REFERENCES public.event_memories(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE (memory_id, user_id)
+);
+
+ALTER TABLE public.event_memory_reactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access to event_memory_reactions" ON public.event_memory_reactions;
+CREATE POLICY "Allow public read access to event_memory_reactions" ON public.event_memory_reactions
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow authenticated users to toggle reactions" ON public.event_memory_reactions;
+CREATE POLICY "Allow authenticated users to toggle reactions" ON public.event_memory_reactions
+    FOR ALL USING (auth.uid() = user_id);
+
+-- 12. Tabla de Comentarios de Recuerdos (event_memory_comments)
+CREATE TABLE IF NOT EXISTS public.event_memory_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    memory_id UUID NOT NULL REFERENCES public.event_memories(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    comment TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.event_memory_comments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access to event_memory_comments" ON public.event_memory_comments;
+CREATE POLICY "Allow public read access to event_memory_comments" ON public.event_memory_comments
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow authenticated users to write comments" ON public.event_memory_comments;
+CREATE POLICY "Allow authenticated users to write comments" ON public.event_memory_comments
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Allow users to delete own comments" ON public.event_memory_comments;
+CREATE POLICY "Allow users to delete own comments" ON public.event_memory_comments
+    FOR DELETE USING (auth.uid() = user_id);

@@ -319,6 +319,32 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
     console.error("Failed to query event_gallery_items:", err);
   }
 
+  // Increment page views via RPC in the database safely
+  try {
+    await supabase.rpc("increment_event_views", { event_id: event.id });
+    (event as any).views = ((event as any).views || 0) + 1;
+  } catch (err) {
+    console.warn("Could not increment event views (might need database migration):", err);
+  }
+
+  // Dynamic Popularity & Views calculation
+  const viewsCount = (event as any).views ?? 0;
+  const bookingsCount = attendeeCount || 0;
+  const popularityScore = viewsCount + (bookingsCount * 10);
+  
+  let popularityLabel = "📈 Regular";
+  if (popularityScore >= 150 || percentSold >= 70) {
+    popularityLabel = "🔥 Trending";
+  } else if (popularityScore >= 50 || percentSold >= 30) {
+    popularityLabel = "⚡ Alta";
+  } else if (popularityScore >= 15 || percentSold >= 10) {
+    popularityLabel = "✨ Creciente";
+  }
+
+  const formattedViews = viewsCount >= 1000 
+    ? `${(viewsCount / 1000).toFixed(1)}K Vistas` 
+    : `${viewsCount} Vistas`;
+
   return (
     <div className="relative min-h-screen w-full bg-[#05050a] text-zinc-100 pb-28 md:pb-20 overflow-hidden">
       {/* Background Neon Ambient Glows */}
@@ -411,7 +437,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                 </div>
                 <div className="min-w-0">
                   <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Popularidad</span>
-                  <span className="text-xs sm:text-sm font-black text-white block">🔥 Trending</span>
+                  <span className="text-xs sm:text-sm font-black text-white block">{popularityLabel}</span>
                 </div>
               </div>
 
@@ -441,7 +467,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                 </div>
                 <div className="min-w-0">
                   <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Vistas</span>
-                  <span className="text-xs sm:text-sm font-black text-white block">1.5K Vistas</span>
+                  <span className="text-xs sm:text-sm font-black text-white block">{formattedViews}</span>
                 </div>
               </div>
             </div>
