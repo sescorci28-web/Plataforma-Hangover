@@ -421,7 +421,7 @@ export default async function ClubDetailPage({ params }: PageProps) {
 
   // Badges array for categorized hero
   const categories = ["🔥 Más Popular", "🎵 Reggaetón", "🍾 Premium Club"];
-  const isOpen = club.active !== false && isClubOpen(club.opening_hours);
+  const isOpen = !!club.active;
 
   return (
     <div className="relative min-h-screen w-full bg-[#05050a] text-zinc-100 pb-20 overflow-hidden">
