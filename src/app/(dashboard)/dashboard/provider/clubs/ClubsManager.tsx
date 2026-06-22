@@ -37,7 +37,7 @@ import {
   Map,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { createClub, updateClub, deleteClub, getClubPaymentSettings, updateClubPaymentSettings, getClubPayoutHistory } from "./actions"
+import { createClub, updateClub, deleteClub, getClubPaymentSettings, updateClubPaymentSettings, getClubPayoutHistory, toggleClubActive } from "./actions"
 import { ClubMenuServicesManager } from "./ClubMenuServicesManager"
 import { CLUB_MODULES, WIZARD_STEPS } from "./constants"
 
@@ -772,7 +772,7 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
           logo: logo || null,
           opening_hours: openTime && closeTime ? `${openTime} - ${closeTime}` : openTime || closeTime || null,
           rating: Number(rating) || 5.0,
-          active: status === 'published' || status === 'paused',
+          active,
           cover_price: coverPrice,
           capacity,
           amenities: amenitiesText ? amenitiesText.split(",").map(s => s.trim()).filter(Boolean) : [],
@@ -918,18 +918,33 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                   <span>{Number(club.rating || 0).toFixed(1)}</span>
                 </div>
 
-                <div className="absolute top-4 left-4 flex items-center gap-1 bg-black/60 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-full text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const nextActiveState = !club.active;
+                    const res = await toggleClubActive(club.id, nextActiveState);
+                    if (res.error) {
+                      alert(res.error);
+                    } else {
+                      router.refresh();
+                    }
+                  }}
+                  className={`absolute top-4 left-4 flex items-center gap-1.5 bg-black/75 backdrop-blur-md border border-white/10 hover:border-white/20 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer z-20 ${
+                    club.active ? 'hover:bg-emerald-950/20' : 'hover:bg-red-950/20'
+                  }`}
+                >
                   {club.active ? (
                     <span className="flex items-center gap-1 text-emerald-400">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping mr-0.5" />
-                      Abierto ahora
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping mr-1" />
+                      Abierto (Toca para Cerrar)
                     </span>
                   ) : (
                     <span className="flex items-center gap-1 text-red-400">
-                      Cerrado
+                      Cerrado (Toca para Abrir)
                     </span>
                   )}
-                </div>
+                </button>
               </div>
 
               <div className="p-5 flex-grow flex flex-col justify-between space-y-4">
@@ -2600,19 +2615,33 @@ export function ClubsManager({ clubs }: ClubsManagerProps) {
                           </div>
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-xs font-black uppercase text-zinc-300 ml-1">Estado de Publicación</label>
-                          <select
-                            value={status}
-                            onChange={e => setStatus(e.target.value as any)}
-                            className="w-full bg-black/60 border border-white/10 rounded-2xl py-3 px-4 text-sm text-white focus:outline-none h-12"
-                          >
-                            <option value="draft">Borrador (Oculto)</option>
-                            <option value="pending_review">Pendiente de Revisión</option>
-                            <option value="published">Publicado (Activo)</option>
-                            <option value="paused">Pausado (Solo Lectura)</option>
-                            <option value="archived">Archivado (Eliminado)</option>
-                          </select>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-xs font-black uppercase text-zinc-300 ml-1">Estado de Publicación</label>
+                            <select
+                              value={status}
+                              onChange={e => setStatus(e.target.value as any)}
+                              className="w-full bg-black/60 border border-white/10 rounded-2xl py-3 px-4 text-sm text-white focus:outline-none h-12"
+                            >
+                              <option value="draft">Borrador (Oculto)</option>
+                              <option value="pending_review">Pendiente de Revisión</option>
+                              <option value="published">Publicado (Activo)</option>
+                              <option value="paused">Pausado (Solo Lectura)</option>
+                              <option value="archived">Archivado (Eliminado)</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-xs font-black uppercase text-zinc-300 ml-1">Estado de Operación (Abierto / Cerrado)</label>
+                            <select
+                              value={active ? "open" : "closed"}
+                              onChange={e => setActive(e.target.value === "open")}
+                              className="w-full bg-black/60 border border-white/10 rounded-2xl py-3 px-4 text-sm text-white focus:outline-none h-12"
+                            >
+                              <option value="open">🟢 Abierto (Operando en vivo)</option>
+                              <option value="closed">🔴 Cerrado</option>
+                            </select>
+                          </div>
                         </div>
 
                         <div className="border-t border-white/5 pt-4 flex gap-4">

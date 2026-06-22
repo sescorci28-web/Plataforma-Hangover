@@ -51,7 +51,7 @@ import {
   QrCode,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { updateClub, deleteClub, getClubPaymentSettings, updateClubPaymentSettings, getClubPayoutHistory } from "@/app/(dashboard)/dashboard/provider/clubs/actions";
+import { updateClub, deleteClub, getClubPaymentSettings, updateClubPaymentSettings, getClubPayoutHistory, toggleClubActive } from "@/app/(dashboard)/dashboard/provider/clubs/actions";
 import { ClubMenuServicesManager } from "@/app/(dashboard)/dashboard/provider/clubs/ClubMenuServicesManager";
 import { CLUB_MODULES } from "@/app/(dashboard)/dashboard/provider/clubs/constants";
 import { ClubDashboardCharts } from "./ClubDashboardCharts";
@@ -769,7 +769,7 @@ export function ClubDashboardView({
           logo: logo || null,
           opening_hours: openTime && closeTime ? `${openTime} - ${closeTime}` : openTime || closeTime || null,
           rating: Number(rating) || 5.0,
-          active: status === 'published' || status === 'paused',
+          active,
           cover_price: coverPrice,
           capacity,
           amenities: amenitiesText ? amenitiesText.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
@@ -1158,16 +1158,35 @@ export function ClubDashboardView({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0 w-full md:w-auto">
-            {club.active ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-400 shadow-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                Operando en Vivo
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400 shadow-sm">
-                Cerrado
-              </span>
-            )}
+            <button
+              type="button"
+              onClick={async () => {
+                const nextActiveState = !club.active;
+                const res = await toggleClubActive(club.id, nextActiveState);
+                if (res.error) {
+                  alert(res.error);
+                } else {
+                  router.refresh();
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer ${
+                club.active 
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:border-emerald-500/40 hover:bg-emerald-500/15'
+                  : 'bg-red-500/10 border-red-500/20 text-red-400 hover:border-red-500/40 hover:bg-red-500/15'
+              }`}
+            >
+              {club.active ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping mr-0.5" />
+                  Abierto (Toca para Cerrar)
+                </>
+              ) : (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-0.5" />
+                  Cerrado (Toca para Abrir)
+                </>
+              )}
+            </button>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl bg-white/5 border border-white/10 text-xs font-extrabold text-amber-400 font-outfit shadow-sm">
               <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 mr-0.5" />
               {Number(club.rating || 0).toFixed(1)}
@@ -2614,23 +2633,37 @@ export function ClubDashboardView({
                             <option value="pro">Plan Pro Premium</option>
                             <option value="enterprise">Plan Enterprise</option>
                           </select>
-                        </div>
                       </div>
+                    </div>
 
-                      <div className="space-y-1">
-                        <label className="text-xs font-black uppercase text-zinc-300 ml-1">Estado de Publicación</label>
-                        <select
-                          value={status}
-                          onChange={e => setStatus(e.target.value as any)}
-                          className="w-full bg-black/60 border border-white/10 rounded-2xl py-3 px-4 text-sm text-white focus:outline-none h-12"
-                        >
-                          <option value="draft">Borrador (Oculto)</option>
-                          <option value="pending_review">Pendiente de Revisión</option>
-                          <option value="published">Publicado (Activo)</option>
-                          <option value="paused">Pausado (Solo Lectura)</option>
-                          <option value="archived">Archivado (Eliminado)</option>
-                        </select>
-                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-xs font-black uppercase text-zinc-300 ml-1">Estado de Publicación</label>
+                              <select
+                                value={status}
+                                onChange={e => setStatus(e.target.value as any)}
+                                className="w-full bg-black/60 border border-white/10 rounded-2xl py-3 px-4 text-sm text-white focus:outline-none h-12"
+                              >
+                                <option value="draft">Borrador (Oculto)</option>
+                                <option value="pending_review">Pendiente de Revisión</option>
+                                <option value="published">Publicado (Activo)</option>
+                                <option value="paused">Pausado (Solo Lectura)</option>
+                                <option value="archived">Archivado (Eliminado)</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-xs font-black uppercase text-zinc-300 ml-1">Estado de Operación (Abierto / Cerrado)</label>
+                              <select
+                                value={active ? "open" : "closed"}
+                                onChange={e => setActive(e.target.value === "open")}
+                                className="w-full bg-black/60 border border-white/10 rounded-2xl py-3 px-4 text-sm text-white focus:outline-none h-12"
+                              >
+                                <option value="open">🟢 Abierto (Operando en vivo)</option>
+                                <option value="closed">🔴 Cerrado</option>
+                              </select>
+                            </div>
+                          </div>
 
                       <div className="border-t border-white/5 pt-4 flex gap-4">
                         <button

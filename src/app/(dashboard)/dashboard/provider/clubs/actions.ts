@@ -80,7 +80,7 @@ export async function createClub(data: {
 
   const slug = slugify(data.name);
   const status = data.status || 'draft';
-  const active = status === 'published' || status === 'paused';
+  const active = data.active;
 
   try {
     const { error: insertError } = await supabase
@@ -179,7 +179,7 @@ export async function updateClub(
 
   const slug = slugify(data.name);
   const status = data.status || 'draft';
-  const active = status === 'published' || status === 'paused';
+  const active = data.active;
 
   try {
     const { data: profile } = await supabase
@@ -891,4 +891,46 @@ export async function getClubPayoutHistory(clubId: string) {
     return { error: err.message || "Ocurrió un error al obtener el historial de liquidaciones." };
   }
 }
+
+export async function toggleClubActive(id: string, active: boolean) {
+  const { error: authError, user, supabase } = await validateProvider();
+  if (authError || !user) {
+    return { error: authError };
+  }
+
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    const isAdmin = profile?.role === "admin";
+
+    let query = supabase
+      .from("clubs")
+      .update({ active })
+      .eq("id", id);
+
+    if (!isAdmin) {
+      query = query.eq("provider_id", user.id);
+    }
+
+    const { error: updateError } = await query;
+
+    if (updateError) {
+      console.error("Toggle club active error:", updateError);
+      return { error: `Error al cambiar el estado del local: ${updateError.message}` };
+    }
+
+    revalidatePath("/discotecas");
+    revalidatePath("/discotecas/[slug]");
+    revalidatePath("/dashboard/provider/clubs");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Unexpected toggle club active error:", err);
+    return { error: err.message || "Ocurrió un error inesperado al cambiar el estado." };
+  }
+}
+
 

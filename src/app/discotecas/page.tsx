@@ -10,7 +10,7 @@ export default async function DiscotecasPage() {
   // Query all clubs from the database
   const { data: clubs, error } = await supabase
     .from("clubs")
-    .select("id, name, city, description, rating, banner_image, slug, opening_hours, cover_price, amenities")
+    .select("id, name, city, description, rating, banner_image, slug, opening_hours, cover_price, amenities, active")
     .order("name", { ascending: true });
 
   if (error) {

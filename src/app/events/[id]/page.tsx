@@ -136,33 +136,21 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
     year: "numeric"
   });
 
-  const openTime = eventDateObj.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) + " HS";
-  const closeDateObj = new Date(eventDateObj.getTime() + 6 * 60 * 60 * 1000);
-  const closeTime = closeDateObj.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) + " HS";
-
-  // Dynamic content enhancements
-  const titleLower = event.title.toLowerCase();
+  const openTime = event.opening_time 
+    ? `${event.opening_time} HS` 
+    : eventDateObj.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) + " HS";
   
-  let dressCode = "Casual Premium";
-  if (titleLower.includes("vip") || titleLower.includes("gala") || titleLower.includes("premium")) {
-    dressCode = "Formal / Elegante";
-  } else if (titleLower.includes("electronic") || titleLower.includes("techno") || titleLower.includes("rave") || titleLower.includes("underground")) {
-    dressCode = "All Black / Cyberpunk";
-  } else if (titleLower.includes("neon") || titleLower.includes("fluo") || titleLower.includes("party")) {
-    dressCode = "Neon / Club wear";
-  }
+  const closeTime = event.closing_time 
+    ? `${event.closing_time} HS` 
+    : new Date(eventDateObj.getTime() + 6 * 60 * 60 * 1000).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) + " HS";
 
-  let minAge = "Mayores de 18 años (+18)";
-  if (titleLower.includes("vip lounge") || event.ticket_price > 50000 || titleLower.includes("exclusivo")) {
-    minAge = "Exclusivo +21 años (DNI Requerido)";
-  }
+  const dressCode = event.dress_code || "Casual Premium";
+  
+  const minAge = event.min_age !== undefined && event.min_age !== null
+    ? (event.min_age === 0 ? "Todo Público" : `Exclusivo +${event.min_age} años (DNI Requerido)`)
+    : "Mayores de 18 años (+18)";
 
-  let category = "Fiesta & Clubbing";
-  if (titleLower.includes("concierto") || titleLower.includes("live") || titleLower.includes("festival") || titleLower.includes("banda")) {
-    category = "Festival / En Vivo";
-  } else if (event.ticket_price === 0) {
-    category = "Social / Acceso Libre";
-  }
+  const category = event.category || "Fiesta";
 
   const creator = event.creator;
   const creatorName = (Array.isArray(creator) ? creator[0]?.full_name : (creator as any)?.full_name) || "Organizador Hangover";
@@ -319,6 +307,18 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
     console.error("Failed to query event_gallery_items:", err);
   }
 
+  // Fetch event tables safely (resilient to missing table)
+  let eventTables: any[] = [];
+  try {
+    const { data: tablesData } = await supabase
+      .from("event_tables")
+      .select("*")
+      .eq("event_id", event.id);
+    eventTables = tablesData || [];
+  } catch (err) {
+    console.error("Failed to query event_tables:", err);
+  }
+
   // Increment page views via RPC in the database safely
   try {
     await supabase.rpc("increment_event_views", { event_id: event.id });
@@ -424,52 +424,62 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
           <div className="space-y-10">
             
             {/* SECCIÓN 2: CONTADOR REGRESIVO */}
-            <div className="bg-zinc-950/40 border border-white/5 p-6 rounded-3xl backdrop-blur-md shadow-xl text-center space-y-4">
-              <span className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-extrabold block">La venta de tickets cierra en</span>
-              <EventCountdown targetDate={event.event_date} variant="detailed" />
-            </div>
+            {((event as any).show_countdown ?? true) && (
+              <div className="bg-zinc-950/40 border border-white/5 p-6 rounded-3xl backdrop-blur-md shadow-xl text-center space-y-4">
+                <span className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-extrabold block">La venta de tickets cierra en</span>
+                <EventCountdown targetDate={event.event_date} variant="detailed" />
+              </div>
+            )}
 
             {/* REAL-TIME STATS GRID */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-zinc-950/40 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary-500/10 flex items-center justify-center text-primary-400 shrink-0">
-                  <Flame className="w-5 h-5" />
+              {((event as any).show_statistics ?? true) && (
+                <div className="bg-zinc-950/40 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary-500/10 flex items-center justify-center text-primary-400 shrink-0">
+                    <Flame className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Popularidad</span>
+                    <span className="text-xs sm:text-sm font-black text-white block">{popularityLabel}</span>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Popularidad</span>
-                  <span className="text-xs sm:text-sm font-black text-white block">{popularityLabel}</span>
-                </div>
-              </div>
+              )}
 
-              <div className="bg-zinc-950/40 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
-                  <Users className="w-5 h-5" />
+              {((event as any).show_capacity ?? true) && (
+                <div className="bg-zinc-950/40 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-zinc-550 font-bold uppercase tracking-wider block">Confirmados</span>
+                    <span className="text-xs sm:text-sm font-black text-white block">{attendeeCount} Asistentes</span>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Confirmados</span>
-                  <span className="text-xs sm:text-sm font-black text-white block">{attendeeCount} Asistentes</span>
-                </div>
-              </div>
+              )}
 
-              <div className="bg-zinc-950/40 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 shrink-0">
-                  <Ticket className="w-5 h-5" />
+              {((event as any).show_sales_progress ?? true) && (
+                <div className="bg-zinc-950/40 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 shrink-0">
+                    <Ticket className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Ocupación</span>
+                    <span className="text-xs sm:text-sm font-black text-white block">{percentSold}% Reservado</span>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Ocupación</span>
-                  <span className="text-xs sm:text-sm font-black text-white block">{percentSold}% Reservado</span>
-                </div>
-              </div>
+              )}
 
-              <div className="bg-zinc-950/40 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-400 shrink-0">
-                  <Clock className="w-5 h-5" />
+              {((event as any).show_statistics ?? true) && (
+                <div className="bg-zinc-950/40 border border-white/5 p-4 rounded-2xl backdrop-blur-md flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-400 shrink-0">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Vistas</span>
+                    <span className="text-xs sm:text-sm font-black text-white block">{formattedViews}</span>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Vistas</span>
-                  <span className="text-xs sm:text-sm font-black text-white block">{formattedViews}</span>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* TABS SYSTEM */}
@@ -487,14 +497,23 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
               galleryItems={galleryItems}
               creatorId={event.creator_id}
               eventDate={event.event_date}
+              showChat={(event as any).show_event_chat ?? true}
+              showCommunity={(event as any).show_event_community ?? true}
+              hasParking={event.has_parking}
+              hasVipZone={event.has_vip_zone}
+              hasTablesModule={event.has_tables_module}
+              isAdultsOnly={event.is_adults_only}
+              isFreeEntry={event.is_free_entry}
             />
 
             {/* SECCIÓN 8: COMPARTIR y SECCIÓN 9: FAVORITOS */}
-            <EventClientInteractive
-              eventId={event.id}
-              eventTitle={event.title}
-              eventDescription={event.description || ""}
-            />
+            {((event as any).show_favorites ?? true) && (
+              <EventClientInteractive
+                eventId={event.id}
+                eventTitle={event.title}
+                eventDescription={event.description || ""}
+              />
+            )}
 
           </div>
 
@@ -510,6 +529,18 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
               ticketBatches={ticketBatches}
               attendeeList={attendeeList}
               user={user}
+              eventTables={eventTables}
+              ticketCardTitle={(event as any).ticket_card_title ?? "Adquiere tus accesos"}
+              ticketCardDescription={(event as any).ticket_card_description ?? "Tickets 100% autorizados del organizador directos al cliente."}
+              showSalesProgress={(event as any).show_sales_progress ?? true}
+              showCapacity={(event as any).show_capacity ?? true}
+              showAttendees={(event as any).show_attendees ?? "all"}
+              showTicketBatches={(event as any).show_ticket_batches ?? true}
+              showRemainingTickets={(event as any).show_remaining_tickets ?? true}
+              showWhoIsGoing={(event as any).show_who_is_going ?? true}
+              eventType={(event as any).event_type ?? "tickets"}
+              ticketingEnabled={(event as any).ticketing_enabled ?? true}
+              showFavorites={(event as any).show_favorites ?? true}
             />
 
             {/* PRICE & ACTION CARD */}

@@ -18,6 +18,7 @@ interface Club {
   cover_price: number | null;
   amenities?: string[] | null;
   enabled_modules?: string[];
+  active?: boolean;
 }
 
 interface ClubsCatalogProps {
@@ -143,7 +144,7 @@ export function ClubsCatalog({ initialClubs }: ClubsCatalogProps) {
     // 3. Filter by Status
     if (selectedStatus !== "all") {
       if (selectedStatus === "open") {
-        const isOpen = isClubOpen(club.opening_hours);
+        const isOpen = club.active !== false && isClubOpen(club.opening_hours);
         if (!isOpen) return false;
       } else if (selectedStatus === "reservations") {
         const hasReservations = club.enabled_modules ? club.enabled_modules.includes("reservations") : true;
@@ -249,7 +250,7 @@ export function ClubsCatalog({ initialClubs }: ClubsCatalogProps) {
           /* Grid of Clubs (con tamaño y dimensiones idénticas) */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {filteredClubs.map((club) => {
-              const isOpen = isClubOpen(club.opening_hours);
+              const isOpen = club.active !== false && isClubOpen(club.opening_hours);
               const genres = getClubGenres(club);
               const ratingVal = club.rating || 0;
               const formattedRating = Number(ratingVal).toFixed(1);

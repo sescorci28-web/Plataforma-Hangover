@@ -6,6 +6,7 @@ import { logout } from "@/app/(auth)/actions";
 import { BookingActions } from "@/components/provider/BookingActions";
 import { ProviderServicesList } from "@/components/provider/ProviderServicesList";
 import { UserBookingsTabs } from "@/components/dashboard/UserBookingsTabs";
+import { EventTicketingManager } from "@/components/provider/EventTicketingManager";
 
 export const revalidate = 0; // Always dynamic
 
@@ -333,7 +334,7 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
                     }`}
                   >
                     <Ticket className="w-5 h-5 text-primary-400" />
-                    Entradas
+                    Boletería
                   </Link>
                   <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
                     <QrCode className="w-5 h-5 text-primary-400" />
@@ -836,12 +837,23 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
                 </div>
               )}
 
-              {/* VISTAS ESPECÍFICAS: ENTRADAS / ASISTENTES / VENTAS / SOLICITUDES / RESERVAS */}
-              {["tickets", "sales", "attendees", "requests", "bookings", "calendar"].includes(view) && (
+              {/* VISTA ESPECÍFICA: BOLETERÍA DEL ORGANIZADOR */}
+              {view === "tickets" && (
+                <div className="glass-card p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      🎟️ Control de Boletería y Ventas
+                    </h2>
+                  </div>
+                  <EventTicketingManager events={providerEvents} />
+                </div>
+              )}
+
+              {/* VISTAS ESPECÍFICAS: ASISTENTES / VENTAS / SOLICITUDES / RESERVAS */}
+              {["sales", "attendees", "requests", "bookings", "calendar"].includes(view) && (
                 <div className="glass-card p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-white">
-                      {view === "tickets" && "Control de Entradas Vendidas"}
                       {view === "sales" && "Registro de Ventas e Ingresos"}
                       {view === "attendees" && "Reporte de Asistentes Confirmados"}
                       {view === "requests" && "Solicitudes Pendientes de Confirmación"}

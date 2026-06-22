@@ -34,6 +34,13 @@ interface EventTabsProps {
   galleryItems?: any[];
   creatorId?: string;
   eventDate?: string;
+  showChat?: boolean;
+  showCommunity?: boolean;
+  hasParking?: boolean;
+  hasVipZone?: boolean;
+  hasTablesModule?: boolean;
+  isAdultsOnly?: boolean;
+  isFreeEntry?: boolean;
 }
 
 export function EventTabs({
@@ -49,7 +56,14 @@ export function EventTabs({
   currentUser,
   galleryItems = [],
   creatorId,
-  eventDate = new Date().toISOString()
+  eventDate = new Date().toISOString(),
+  showChat = true,
+  showCommunity = true,
+  hasParking = false,
+  hasVipZone = false,
+  hasTablesModule = false,
+  isAdultsOnly = false,
+  isFreeEntry = false
 }: EventTabsProps) {
   const [activeTab, setActiveTab] = useState<"info" | "gallery" | "community">("info");
   const [isMounted, setIsMounted] = useState(false);
@@ -71,6 +85,14 @@ export function EventTabs({
 
   // Community sub-tab: 'connect' (interactive Connect presence widget) vs 'chat' (exclusive text chat room)
   const [communitySubTab, setCommunitySubTab] = useState<"connect" | "chat">("connect");
+
+  useEffect(() => {
+    if (!showCommunity && showChat) {
+      setCommunitySubTab("chat");
+    } else if (showCommunity && !showChat) {
+      setCommunitySubTab("connect");
+    }
+  }, [showCommunity, showChat]);
 
   // Accordion FAQ states
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
@@ -189,17 +211,19 @@ export function EventTabs({
           <ImageIcon className="w-3.5 h-3.5" />
           Galería
         </button>
-        <button
-          onClick={() => setActiveTab("community")}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
-            activeTab === "community"
-              ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-lg shadow-primary-500/20"
-              : "text-zinc-500 hover:text-zinc-300 hover:bg-white/3"
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          Comunidad
-        </button>
+        {(showCommunity || showChat) && (
+          <button
+            onClick={() => setActiveTab("community")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+              activeTab === "community"
+                ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-lg shadow-primary-500/20"
+                : "text-zinc-500 hover:text-zinc-300 hover:bg-white/3"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            Comunidad
+          </button>
+        )}
       </div>
 
       {/* Tab Contents */}
@@ -259,11 +283,41 @@ export function EventTabs({
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* FESTIVAL LINEUP SECTION */}
-              <div className="bg-zinc-950/40 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-6">
-                <div className="flex items-center justify-between">
+                {(isFreeEntry || isAdultsOnly || hasParking || hasVipZone || hasTablesModule) && (
+                  <div className="pt-6 border-t border-white/5 space-y-3">
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider block">Servicios y Restricciones</p>
+                    <div className="flex flex-wrap gap-2.5">
+                      {isFreeEntry && (
+                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-400 hover:scale-105 transition-all duration-200 cursor-default">
+                          <span>🆓</span> Acceso Gratuito
+                        </div>
+                      )}
+                      {isAdultsOnly && (
+                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs font-semibold text-rose-400 hover:scale-105 transition-all duration-200 cursor-default">
+                          <span>🔞</span> Solo Mayores (+18)
+                        </div>
+                      )}
+                      {hasParking && (
+                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs font-semibold text-blue-400 hover:scale-105 transition-all duration-200 cursor-default">
+                          <span>🚗</span> Parqueadero Disponible
+                        </div>
+                      )}
+                      {hasVipZone && (
+                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs font-semibold text-purple-400 hover:scale-105 transition-all duration-200 cursor-default">
+                          <span>👑</span> Zona VIP
+                        </div>
+                      )}
+                      {hasTablesModule && (
+                        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-400 hover:scale-105 transition-all duration-200 cursor-default">
+                          <span>🛋️</span> Mesas VIP
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-6 border-t border-white/5">
                   <h2 className="text-xs font-black text-primary-400 font-outfit uppercase tracking-widest flex items-center gap-1.5">
                     <Music className="w-4 h-4" /> Line-Up Oficial
                   </h2>
@@ -463,24 +517,26 @@ export function EventTabs({
               className="space-y-6"
             >
               {/* Inner Tab bar for Connect tab type */}
-              <div className="flex border-b border-white/5 p-1 bg-black/20 rounded-2xl gap-1">
-                <button
-                  onClick={() => setCommunitySubTab("connect")}
-                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all ${
-                    communitySubTab === "connect" ? "bg-white/5 text-white" : "text-zinc-500 hover:text-zinc-300"
-                  }`}
-                >
-                  👥 Asistentes y Connect
-                </button>
-                <button
-                  onClick={() => setCommunitySubTab("chat")}
-                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all ${
-                    communitySubTab === "chat" ? "bg-white/5 text-white" : "text-zinc-500 hover:text-zinc-300"
-                  }`}
-                >
-                  💬 Chat del Evento
-                </button>
-              </div>
+              {showCommunity && showChat && (
+                <div className="flex border-b border-white/5 p-1 bg-black/20 rounded-2xl gap-1">
+                  <button
+                    onClick={() => setCommunitySubTab("connect")}
+                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all ${
+                      communitySubTab === "connect" ? "bg-white/5 text-white" : "text-zinc-500 hover:text-zinc-300"
+                    }`}
+                  >
+                    👥 Asistentes y Connect
+                  </button>
+                  <button
+                    onClick={() => setCommunitySubTab("chat")}
+                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all ${
+                      communitySubTab === "chat" ? "bg-white/5 text-white" : "text-zinc-500 hover:text-zinc-300"
+                    }`}
+                  >
+                    💬 Chat del Evento
+                  </button>
+                </div>
+              )}
 
               {communitySubTab === "connect" ? (
                 <div className="space-y-8">

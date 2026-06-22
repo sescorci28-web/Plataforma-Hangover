@@ -459,7 +459,24 @@ export async function createEvent(
   ticketPrice: number,
   imageUrl?: string,
   batches?: Array<{ name: string; price: number; capacity: number }>,
-  lineup?: Array<{ artist_name: string; performance_time: string; description?: string; image_url?: string }>
+  lineup?: Array<{ artist_name: string; performance_time: string; description?: string; image_url?: string }>,
+  extraData?: {
+    category?: string;
+    dress_code?: string;
+    min_age?: number;
+    opening_time?: string;
+    closing_time?: string;
+    has_parking?: boolean;
+    has_vip_zone?: boolean;
+    has_tables_module?: boolean;
+    is_adults_only?: boolean;
+    is_free_entry?: boolean;
+    event_type?: string;
+    ticketing_enabled?: boolean;
+    show_event_chat?: boolean;
+    show_event_community?: boolean;
+    show_attendees?: string;
+  }
 ) {
   const supabase = await createClient();
 
@@ -489,7 +506,22 @@ export async function createEvent(
         event_date: eventDate,
         location,
         ticket_price: ticketPrice,
-        image_url: imageUrl || null
+        image_url: imageUrl || null,
+        category: extraData?.category || 'Fiesta',
+        dress_code: extraData?.dress_code || 'Casual Premium',
+        min_age: extraData?.min_age ?? 18,
+        opening_time: extraData?.opening_time || null,
+        closing_time: extraData?.closing_time || null,
+        has_parking: extraData?.has_parking ?? false,
+        has_vip_zone: extraData?.has_vip_zone ?? false,
+        has_tables_module: extraData?.has_tables_module ?? false,
+        is_adults_only: extraData?.is_adults_only ?? false,
+        is_free_entry: extraData?.is_free_entry ?? false,
+        event_type: extraData?.event_type || 'tickets',
+        ticketing_enabled: extraData?.ticketing_enabled ?? true,
+        show_event_chat: extraData?.show_event_chat ?? true,
+        show_event_community: extraData?.show_event_community ?? true,
+        show_attendees: extraData?.show_attendees || 'all'
       })
       .select("id")
       .single();
@@ -546,7 +578,7 @@ export async function createEvent(
 
     revalidatePath("/events");
     revalidatePath("/dashboard/provider");
-    return { success: true };
+    return { success: true, eventId: newEvent.id };
   } catch (err: any) {
     return { error: err.message || "Error al crear el evento." };
   }
