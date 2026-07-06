@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useTransition } from "react";
 import Link from "next/link";
 import {
   Send,
@@ -18,10 +18,21 @@ import {
   MapPin,
   Star,
   Check,
-  Plus,
+  X,
   Phone,
-  Info
+  Info,
+  DollarSign,
+  Award,
+  Users,
+  CreditCard,
+  ExternalLink,
+  Compass,
+  ArrowRight,
+  ShieldCheck,
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
+import { updateBookingStatus } from "@/app/services/actions";
 
 interface ChatProps {
   currentUser: any;
@@ -60,13 +71,19 @@ export function ConnectChat({
   const [messages, setMessages] = useState<Message[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "user" | "provider" | "club" | "staff">("all");
+  const [showRightPanel, setShowRightPanel] = useState(true);
+  const [isPending, startTransition] = useTransition();
+
+  // Local FSM Booking state for the active chat partner (simulates real-time transitions)
+  const [localBookingStatus, setLocalBookingStatus] = useState<string>("PENDING");
+  const [localBookingPrice, setLocalBookingPrice] = useState<number>(750000);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Find target chat partner
   const chatPartner = allProfiles.find((p) => p.id === selectedChatUserId) || {
     id: "system",
-    full_name: "Chat Soporte",
-    username: "hangover",
+    full_name: "Soporte Hangover",
+    username: "soporte",
     avatar_url: null,
     role: "staff"
   };
@@ -129,7 +146,9 @@ export function ConnectChat({
   useEffect(() => {
     if (!selectedChatUserId) return;
 
-    // Load structured messages including automated system cards and details
+    // Default simulation booking state
+    setLocalBookingStatus("PENDING");
+
     const initialLogs: Message[] = [
       {
         id: "msg-1",
@@ -204,11 +223,25 @@ export function ConnectChat({
     }, 2000);
   };
 
-  // Filter contacts by search query & type filter
+  // Local FSM Booking state transition helper
+  const handleUpdateLocalStatus = (newStatus: string) => {
+    setLocalBookingStatus(newStatus);
+    
+    // Add system notification message inside chat thread
+    const newSysMsg: Message = {
+      id: `msg-sys-${Date.now()}`,
+      sender_id: "system",
+      text: `🔔 CAMBIO DE ESTADO EN RESERVA\n\nEl estado de la reserva ha cambiado a: ${newStatus.toUpperCase()}\nActualizado hace un momento.`,
+      created_at: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, newSysMsg]);
+  };
+
+  // Filter contacts by global search and filters (Global search parses contact metadata too)
   const filteredProfiles = allProfiles.filter((p) => {
     if (p.id === currentUser.id) return false;
     
-    // Role type filters
+    // Filter by type
     if (activeFilter !== "all") {
       const role = (p.role || "").toLowerCase();
       if (activeFilter === "user" && role !== "user" && role !== "") return false;
@@ -219,20 +252,21 @@ export function ConnectChat({
 
     const name = p.full_name?.toLowerCase() || "";
     const username = p.username?.toLowerCase() || "";
+    const meta = getContactMeta(p.id).lastMessage.toLowerCase();
     const query = searchTerm.toLowerCase();
     
-    return name.includes(query) || username.includes(query);
+    return name.includes(query) || username.includes(query) || meta.includes(query);
   });
 
   return (
-    <div className="h-full flex bg-[#050509]/45 relative">
+    <div className="h-full flex bg-[#050509]/45 relative overflow-hidden">
       
-      {/* COLUMNA IZQUIERDA: LISTA DE CHATS */}
+      {/* COLUMNA 1: LISTADO DE CHATS (Estilo Slack/WhatsApp Business) */}
       <div className={`w-full md:w-80 border-r border-white/5 bg-[#050509]/90 flex flex-col shrink-0 ${
         selectedChatUserId ? "hidden md:flex" : "flex"
       }`}>
         
-        {/* Search header */}
+        {/* Search header with metadata */}
         <div className="p-4 border-b border-white/5 space-y-3 shrink-0">
           <div className="flex items-center justify-between">
             <h4 className="font-black text-xs uppercase tracking-wider text-white font-outfit">Mensajería Connect</h4>
@@ -240,13 +274,16 @@ export function ConnectChat({
               {filteredProfiles.length} Activos
             </span>
           </div>
-          <input
-            type="text"
-            placeholder="Buscar chats..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-black/60 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary-500 placeholder:text-zinc-650"
-          />
+          
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar contactos o mensajes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-black/60 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary-500 placeholder:text-zinc-650"
+            />
+          </div>
         </div>
 
         {/* Filters Quick bar */}
@@ -263,7 +300,7 @@ export function ConnectChat({
               onClick={() => setActiveFilter(filter.id)}
               className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all cursor-pointer whitespace-nowrap ${
                 activeFilter === filter.id 
-                  ? "bg-primary-600 border-primary-500 text-white"
+                  ? "bg-primary-600 border-primary-500 text-white shadow-lg shadow-primary-600/15"
                   : "bg-white/5 border-transparent text-zinc-400 hover:text-white"
               }`}
             >
@@ -300,7 +337,7 @@ export function ConnectChat({
                     </div>
                   )}
                   {statusInfo.label === "En línea" && (
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-black" />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-black animate-pulse" />
                   )}
                 </div>
 
@@ -332,14 +369,13 @@ export function ConnectChat({
           {filteredProfiles.length === 0 && (
             <div className="text-center p-8 space-y-1 text-zinc-600">
               <p className="text-xs italic font-medium">No se encontraron contactos</p>
-              <p className="text-[9px] uppercase tracking-wider">Prueba modificando los filtros</p>
             </div>
           )}
         </div>
 
       </div>
 
-      {/* COLUMNA DERECHA: CONVERSACIÓN ACTIVA */}
+      {/* COLUMNA 2: CONVERSACIÓN ACTIVA */}
       <div className={`flex-grow flex flex-col bg-[#050509]/20 relative ${
         selectedChatUserId ? "flex" : "hidden md:flex"
       }`}>
@@ -348,7 +384,7 @@ export function ConnectChat({
           <div className="h-full flex flex-col relative">
             
             {/* CHAT HEADER */}
-            <div className="p-4 border-b border-white/5 bg-[#09090f]/75 flex items-center justify-between sticky top-0 z-10">
+            <div className="p-4 border-b border-white/5 bg-[#09090f]/75 flex items-center justify-between sticky top-0 z-10 shrink-0">
               
               <div className="flex items-center gap-3 min-w-0">
                 <button 
@@ -374,19 +410,24 @@ export function ConnectChat({
                 </div>
               </div>
 
-              {/* Action buttons header */}
+              {/* Action buttons header & Info panel toggler */}
               <div className="flex gap-2">
                 <button
                   onClick={() => alert(`Visualizando Perfil de ${chatPartner.full_name}`)}
-                  className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-wider text-zinc-300 hover:text-white rounded-xl border border-white/5 transition-all cursor-pointer"
+                  className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-[9px] font-black uppercase tracking-wider text-zinc-300 hover:text-white rounded-xl border border-white/5 transition-all cursor-pointer hidden sm:block"
                 >
                   Ver Perfil
                 </button>
                 <button
-                  onClick={() => alert(`Información del contacto: ${chatPartner.full_name}\nRol: ${getUserTypeLabel(chatPartner.role)}`)}
-                  className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-wider text-zinc-300 hover:text-white rounded-xl border border-white/5 transition-all cursor-pointer"
+                  onClick={() => setShowRightPanel(prev => !prev)}
+                  className={`px-2.5 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 border ${
+                    showRightPanel 
+                      ? "bg-primary-600/10 border-primary-500/20 text-primary-400" 
+                      : "bg-white/5 border-white/5 text-zinc-400"
+                  }`}
                 >
-                  Información
+                  <Info className="w-3.5 h-3.5" />
+                  <span>Panel Contextual</span>
                 </button>
               </div>
 
@@ -397,7 +438,7 @@ export function ConnectChat({
               
               {messages.map((msg) => {
                 const isOwn = msg.sender_id === currentUser.id;
-                const isSystemMessage = msg.text.startsWith("🔔") || msg.text.startsWith("[COTIZACIÓN]") || msg.text.includes("Pago procesado");
+                const isSystemMessage = msg.text.startsWith("🔔") || msg.text.startsWith("[COTIZACIÓN]") || msg.text.includes("Cambio de estado");
                 
                 return (
                   <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"} animate-fadeIn`}>
@@ -459,14 +500,20 @@ export function ConnectChat({
                                   <>
                                     <button
                                       type="button"
-                                      onClick={() => alert("¡Cotización aprobada! Estado de la reserva actualizado a ACCEPTED.")}
+                                      onClick={() => {
+                                        handleUpdateLocalStatus("ACCEPTED");
+                                        alert("¡Cotización aprobada! Reserva transicionada a ACCEPTED.");
+                                      }}
                                       className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg py-1.5 text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
                                     >
                                       Aceptar
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => alert("Cotización rechazada.")}
+                                      onClick={() => {
+                                        handleUpdateLocalStatus("REJECTED");
+                                        alert("Cotización rechazada.");
+                                      }}
                                       className="flex-1 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-lg py-1.5 text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
                                     >
                                       Rechazar
@@ -628,6 +675,334 @@ export function ConnectChat({
         )}
 
       </div>
+
+      {/* COLUMNA 3: PANEL CONTEXTUAL INTELIGENTE */}
+      {selectedChatUserId && showRightPanel && (
+        <div className="hidden xl:flex w-80 border-l border-white/5 bg-[#050509]/95 flex-col overflow-y-auto p-5 space-y-6 shrink-0 shrink-0 select-none animate-[slideInRight_0.2s_ease-out]">
+          
+          <div>
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-550">Panel de Control Operativo</h4>
+            <p className="text-xs text-zinc-400 mt-1">Detalles sincronizados con la conversación.</p>
+          </div>
+
+          {/* RENDER CONTEXTUAL SEGÚN EL ROL DEL INTERLOCUTOR */}
+          
+          {/* CASO A: PROVEEDOR / DETALLE DE SERVICIOS */}
+          {(chatPartner.role === "provider" || !chatPartner.role) && (
+            <div className="space-y-6">
+              
+              {/* Status Header */}
+              <div className="p-4 bg-white/[0.015] border border-white/5 rounded-2xl space-y-2">
+                <p className="text-[8px] font-black uppercase text-zinc-550 tracking-wider">Estado de Contratación</p>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${
+                    localBookingStatus === "PENDING" ? "bg-amber-500 animate-pulse" :
+                    localBookingStatus === "ACCEPTED" ? "bg-purple-500" :
+                    localBookingStatus === "PAID" ? "bg-blue-500" :
+                    localBookingStatus === "IN_PROGRESS" ? "bg-emerald-500 animate-bounce" : "bg-emerald-500"
+                  }`} />
+                  <span className="text-xs font-black uppercase text-white tracking-wider font-outfit">
+                    {localBookingStatus === "PENDING" ? "Pendiente Aprobación" :
+                     localBookingStatus === "ACCEPTED" ? "Aceptada (Espera Pago)" :
+                     localBookingStatus === "PAID" ? "Confirmada (Pagada)" :
+                     localBookingStatus === "IN_PROGRESS" ? "En Curso" : "Completada"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Shared steppers timeline */}
+              <div className="space-y-3">
+                <h5 className="text-[9px] font-black uppercase text-zinc-550 tracking-wider">Timeline del Gig</h5>
+                
+                <div className="relative flex flex-col gap-3 pl-4 before:content-[''] before:absolute before:left-[4px] before:top-2 before:bottom-2 before:w-[1px] before:bg-zinc-800">
+                  
+                  {/* Step 1 */}
+                  <div className="relative flex items-start text-[10px]">
+                    <span className="absolute left-[-16px] top-1 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className="font-bold text-white">Solicitud enviada</span>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="relative flex items-start text-[10px]">
+                    <span className={`absolute left-[-16px] top-1 w-1.5 h-1.5 rounded-full ${
+                      ["ACCEPTED", "PAID", "IN_PROGRESS", "COMPLETED"].includes(localBookingStatus) ? "bg-primary-500" : "bg-zinc-800"
+                    }`} />
+                    <span className={`font-bold ${["ACCEPTED", "PAID", "IN_PROGRESS", "COMPLETED"].includes(localBookingStatus) ? "text-white" : "text-zinc-500"}`}>
+                      Proveedor aceptó
+                    </span>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="relative flex items-start text-[10px]">
+                    <span className={`absolute left-[-16px] top-1 w-1.5 h-1.5 rounded-full ${
+                      ["PAID", "IN_PROGRESS", "COMPLETED"].includes(localBookingStatus) ? "bg-primary-500" : "bg-zinc-800"
+                    }`} />
+                    <span className={`font-bold ${["PAID", "IN_PROGRESS", "COMPLETED"].includes(localBookingStatus) ? "text-white" : "text-zinc-500"}`}>
+                      Pago confirmado
+                    </span>
+                  </div>
+
+                  {/* Step 4 */}
+                  <div className="relative flex items-start text-[10px]">
+                    <span className={`absolute left-[-16px] top-1 w-1.5 h-1.5 rounded-full ${
+                      ["IN_PROGRESS", "COMPLETED"].includes(localBookingStatus) ? "bg-primary-500" : "bg-zinc-800"
+                    }`} />
+                    <span className={`font-bold ${["IN_PROGRESS", "COMPLETED"].includes(localBookingStatus) ? "text-white" : "text-zinc-500"}`}>
+                      Servicio iniciado
+                    </span>
+                  </div>
+
+                  {/* Step 5 */}
+                  <div className="relative flex items-start text-[10px]">
+                    <span className={`absolute left-[-16px] top-1 w-1.5 h-1.5 rounded-full ${
+                      localBookingStatus === "COMPLETED" ? "bg-emerald-500" : "bg-zinc-800"
+                    }`} />
+                    <span className={`font-bold ${localBookingStatus === "COMPLETED" ? "text-white" : "text-zinc-500"}`}>
+                      Servicio finalizado
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Financial specs list */}
+              <div className="p-4 bg-black/40 border border-white/5 rounded-2xl space-y-2.5 text-xs text-zinc-400">
+                <div className="flex justify-between">
+                  <span>Precio Base</span>
+                  <span className="text-white font-bold">${localBookingPrice.toLocaleString("es-CO")} COP</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Comisión Plataforma</span>
+                  <span className="text-zinc-500 font-bold">${(localBookingPrice * 0.1).toLocaleString("es-CO")} COP</span>
+                </div>
+                <div className="flex justify-between border-t border-white/10 pt-2 font-black text-white">
+                  <span>Total Estimado</span>
+                  <span className="text-emerald-400">${localBookingPrice.toLocaleString("es-CO")} COP</span>
+                </div>
+              </div>
+
+              {/* Google Maps Embed Mock */}
+              <div className="p-3 bg-white/[0.01] border border-white/5 rounded-2xl space-y-1.5 text-[10px] text-zinc-400">
+                <p className="font-bold text-white flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-primary-400 shrink-0" />
+                  Lugar: Salón Dulcinea VIP
+                </p>
+                <p>Calle 85 # 11-12, Bogotá</p>
+                <a 
+                  href="https://maps.google.com" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="text-primary-400 hover:text-primary-300 font-bold block mt-1 uppercase flex items-center gap-0.5"
+                >
+                  Abrir en Google Maps <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              {/* Contextual actions buttons */}
+              <div className="space-y-2 pt-2 border-t border-white/5">
+                
+                {localBookingStatus === "PENDING" && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleUpdateLocalStatus("ACCEPTED")}
+                      className="bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-2 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      Aceptar
+                    </button>
+                    <button
+                      onClick={() => handleUpdateLocalStatus("REJECTED")}
+                      className="bg-white/5 hover:bg-white/10 text-zinc-400 rounded-xl py-2 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                )}
+
+                {localBookingStatus === "ACCEPTED" && (
+                  <button
+                    onClick={() => handleUpdateLocalStatus("PAID")}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl py-2 px-4 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-lg shadow-emerald-550/10"
+                  >
+                    <CreditCard className="w-4 h-4" /> Simular Pago Cliente
+                  </button>
+                )}
+
+                {localBookingStatus === "PAID" && (
+                  <button
+                    onClick={() => handleUpdateLocalStatus("IN_PROGRESS")}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl py-2 px-4 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-lg shadow-blue-550/10"
+                  >
+                    Iniciar Servicio
+                  </button>
+                )}
+
+                {localBookingStatus === "IN_PROGRESS" && (
+                  <button
+                    onClick={() => handleUpdateLocalStatus("COMPLETED")}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl py-2 px-4 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1 animate-pulse"
+                  >
+                    Finalizar Servicio
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    const price = prompt("Introduce el nuevo valor de cotización:", localBookingPrice.toString());
+                    if (price) {
+                      setLocalBookingPrice(Number(price));
+                      handleUpdateLocalStatus("PENDING");
+                      alert("Cotización modificada. Reserva devuelta a PENDING.");
+                    }
+                  }}
+                  className="w-full bg-white/5 hover:bg-white/10 border border-white/5 text-zinc-300 rounded-xl py-2 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Modificar Cotización
+                </button>
+
+              </div>
+
+            </div>
+          )}
+
+          {/* CASO B: DISCOTECA / CLUB */}
+          {chatPartner.role === "club" && (
+            <div className="space-y-5">
+              
+              {/* VIP details strip */}
+              <div className="p-4 bg-amber-600/10 border border-amber-500/20 rounded-2xl space-y-2">
+                <span className="text-[8px] bg-amber-550/20 text-amber-300 px-2 py-0.5 rounded font-black uppercase">
+                  Reserva Activa Mesa VIP
+                </span>
+                <h5 className="text-sm font-black text-white font-outfit">Mesa #VIP-12</h5>
+                <p className="text-[10px] text-zinc-400 leading-relaxed">Zona: Terraza Principal (Segundo Nivel)</p>
+              </div>
+
+              {/* Bottles check menu */}
+              <div className="space-y-2.5">
+                <h5 className="text-[9px] font-black uppercase text-zinc-550 tracking-wider">Detalle del Pedido</h5>
+                <div className="bg-black/40 border border-white/5 rounded-2xl p-3 text-[11px] text-zinc-400 space-y-2">
+                  <div className="flex justify-between">
+                    <span>1x Ron Zacapa 23 Años</span>
+                    <span className="text-white">$380.000</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>4x Energizantes Red Bull</span>
+                    <span className="text-white">$48.000</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/10 pt-2 font-bold text-white">
+                    <span>Total Pre-Cuenta</span>
+                    <span className="text-amber-400">$428.000</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Schedule and promotion */}
+              <div className="p-3.5 bg-white/[0.01] border border-white/5 rounded-2xl space-y-2 text-[10px] text-zinc-400">
+                <p><strong className="text-zinc-300">Horario de Ingreso:</strong> 9:00 PM - 11:30 PM</p>
+                <p><strong className="text-zinc-300">Vestimenta:</strong> Casual Premium (No gorras)</p>
+                <div className="p-2 bg-purple-550/15 border border-purple-500/20 rounded-lg text-purple-300 font-bold uppercase tracking-wider text-center mt-2 animate-pulse text-[8px]">
+                  🎁 Cupón Activo: 15% OFF en botellas de Ron
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* CASO C: EVENTO / ORGANIZADOR */}
+          {chatPartner.role === "event" && (
+            <div className="space-y-5">
+              
+              {/* Event card with cover */}
+              <div className="rounded-2xl border border-white/10 overflow-hidden bg-zinc-900 relative aspect-[16/10]">
+                {eventsList[0]?.image_url ? (
+                  <img src={eventsList[0].image_url} alt="Cover" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-700 bg-black/40">
+                    Sin Portada
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-3 left-3 right-3 text-white">
+                  <span className="text-[8px] bg-blue-600 border border-blue-500/20 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
+                    Concierto Oficial
+                  </span>
+                  <h5 className="text-xs font-black mt-1 font-outfit truncate">{eventsList[0]?.title || "Medellín Techno Fest"}</h5>
+                </div>
+              </div>
+
+              {/* Ticket specs */}
+              <div className="space-y-2.5">
+                <h5 className="text-[9px] font-black uppercase text-zinc-550 tracking-wider">Detalles de Aforo</h5>
+                <div className="bg-black/40 border border-white/5 rounded-2xl p-4 text-xs text-zinc-400 space-y-3">
+                  <div className="flex justify-between">
+                    <span>Aforo Reservado</span>
+                    <span className="text-white font-bold">85 / 150 asistentes</span>
+                  </div>
+                  {/* Stepper progress */}
+                  <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                    <div className="bg-primary-600 h-full rounded-full" style={{ width: "56%" }} />
+                  </div>
+                  <div className="flex justify-between text-[10px]">
+                    <span>Fecha: {eventsList[0]?.event_date || "18 Agosto"}</span>
+                    <span>Lugar: {eventsList[0]?.location || "Arena Bogotá"}</span>
+                  </div>
+                </div>
+              </div>
+
+              <Link
+                href={`/events/${eventsList[0]?.id || "1"}`}
+                className="w-full bg-primary-600 hover:bg-primary-500 text-white rounded-xl py-2.5 text-xs font-black uppercase tracking-wider text-center transition-colors cursor-pointer block hover:shadow-lg hover:shadow-primary-500/10"
+              >
+                Ver Detalle Evento
+              </Link>
+
+            </div>
+          )}
+
+          {/* CASO D: SOPORTE / STAFF */}
+          {(chatPartner.role === "staff" || chatPartner.role === "admin") && (
+            <div className="space-y-5">
+              
+              {/* Ticket details */}
+              <div className="p-4 bg-red-600/10 border border-red-500/20 rounded-2xl space-y-2">
+                <p className="text-[8px] font-black uppercase text-red-400 tracking-wider">Caso de Soporte Oficial</p>
+                <h5 className="text-sm font-black text-white font-outfit">Ticket #TKT-89542</h5>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                  <span className="text-[10px] font-bold text-red-300 uppercase tracking-wider">Prioridad: Alta 🔴</span>
+                </div>
+              </div>
+
+              {/* Case metadata list */}
+              <div className="bg-black/40 border border-white/5 rounded-2xl p-4 text-xs text-zinc-400 space-y-2.5">
+                <div className="flex justify-between">
+                  <span>Responsable</span>
+                  <span className="text-white font-bold">Sophia Loren (QA Staff)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tiempo Abierto</span>
+                  <span className="text-white font-bold">14 minutos</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Estado del Ticket</span>
+                  <span className="text-emerald-400 font-bold">En Revisión</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  alert("Caso cerrado con éxito.");
+                }}
+                className="w-full bg-white/5 hover:bg-red-650/20 hover:text-red-400 hover:border-red-500/30 text-zinc-300 rounded-xl py-2.5 text-xs font-black uppercase tracking-wider border border-white/5 transition-all cursor-pointer"
+              >
+                Cerrar Caso
+              </button>
+
+            </div>
+          )}
+
+        </div>
+      )}
 
     </div>
   );
