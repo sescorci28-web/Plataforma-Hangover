@@ -127,7 +127,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
       .select("id")
       .eq("event_id", event.id)
       .eq("user_id", user.id)
-      .eq("status", "completed")
+      .in("status", ["COMPLETED", "completed"])
       .eq("qr_status", "used")
       .gt("qr_validated_at", eightHoursAgo);
     

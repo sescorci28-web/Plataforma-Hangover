@@ -42,7 +42,7 @@ export default async function EventsPage() {
     .from("bookings")
     .select("event_id")
     .gte("created_at", twentyFourHoursAgo)
-    .in("status", ["confirmed", "completed"]);
+    .in("status", ["ACCEPTED", "PAID", "IN_PROGRESS", "COMPLETED", "confirmed", "completed"]);
 
   // Fetch logged in user's city
   let userCity = null;
@@ -61,7 +61,7 @@ export default async function EventsPage() {
   const bookingCounts: Record<string, number> = {};
   if (bookings) {
     bookings.forEach((b) => {
-      if (b.event_id && (b.status === "confirmed" || b.status === "completed")) {
+      if (b.event_id && ["ACCEPTED", "PAID", "IN_PROGRESS", "COMPLETED", "confirmed", "completed"].includes(b.status || "")) {
         bookingCounts[b.event_id] = (bookingCounts[b.event_id] || 0) + 1;
       }
     });

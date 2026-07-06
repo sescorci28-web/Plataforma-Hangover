@@ -74,7 +74,7 @@ export async function getEventAttendees(eventId: string) {
       .from("bookings")
       .select("user_id, profiles (id, full_name, avatar_url, city)")
       .eq("event_id", eventId)
-      .in("status", ["confirmed", "completed"]);
+      .in("status", ["ACCEPTED", "PAID", "IN_PROGRESS", "COMPLETED", "confirmed", "completed"]);
 
     // 2. Get from manual RSVPs
     const { data: attendeesData } = await supabase

@@ -320,7 +320,7 @@ export default async function ClubDetailPage({ params }: PageProps) {
       .select("id, qr_validated_at")
       .eq("club_id", club.id)
       .eq("user_id", user.id)
-      .eq("status", "completed")
+      .in("status", ["COMPLETED", "completed"])
       .eq("qr_status", "used")
       .gt("qr_validated_at", eightHoursAgo);
     

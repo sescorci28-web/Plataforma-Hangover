@@ -68,7 +68,10 @@ export default async function ProviderLayout({ children }: ProviderLayoutProps) 
     const bookings = bookingsRes.data || [];
     bookingsCount = bookings.length;
     monthlyEarnings = bookings
-      .filter((b: any) => b.status === "confirmed" || b.status === "completed")
+      .filter((b: any) => {
+        const s = (b.status || "").toUpperCase();
+        return ["PAID", "COMPLETED", "IN_PROGRESS", "CONFIRMED"].includes(s);
+      })
       .reduce((sum: number, b: any) => sum + Number(b.total_amount || 0), 0);
   } catch (err) {
     console.error("Error calculating provider layout stats:", err);

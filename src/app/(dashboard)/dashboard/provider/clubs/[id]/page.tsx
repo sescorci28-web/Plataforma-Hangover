@@ -227,10 +227,11 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
     
     if (eventBookings) {
       for (const eb of eventBookings) {
-        if (eb.status !== "cancelled" && eb.status !== "rejected") {
+        const s = (eb.status || "").toUpperCase();
+        if (s !== "CANCELLED" && s !== "REJECTED") {
           activeEventStats.ticketsSold += eb.number_of_people || 0;
           activeEventStats.revenue += Number(eb.total_amount) || 0;
-          if (eb.qr_status === "used" || eb.status === "completed") {
+          if (eb.qr_status === "used" || s === "COMPLETED") {
             activeEventStats.attendance += eb.number_of_people || 0;
           }
         }
@@ -489,7 +490,8 @@ export default async function ProviderClubDashboardPage({ params }: PageProps) {
   // 3. Bookings
   for (const b of bookings) {
     const time = new Date(b.created_at).getTime();
-    if (time >= startOfToday && b.status === "confirmed") {
+    const s = (b.status || "").toUpperCase();
+    if (time >= startOfToday && ["PAID", "CONFIRMED"].includes(s)) {
       activityFeed.push({
         id: `booking-${b.id}`,
         type: "booking",

@@ -261,7 +261,7 @@ export async function createEventBooking(
         provider_id: providerId,
         event_date: eventDate,
         total_amount: totalAmount,
-        status: "confirmed", // Automatically confirm ticket purchases
+        status: "PAID", // Automatically confirm ticket purchases
         qr_code: 'QR-' + randomUUID(),
         qr_status: 'active'
       });
@@ -802,7 +802,7 @@ export async function validateQRCode(qrCode: string) {
     }
 
     // 5. Validate booking status
-    if (booking.status !== "confirmed" && booking.status !== "completed") {
+    if (booking.status !== "PAID" && booking.status !== "COMPLETED" && booking.status !== "confirmed" && booking.status !== "completed") {
       return { error: `La reserva asociada a este QR no está confirmada (Estado: ${booking.status}).` };
     }
 
@@ -812,7 +812,7 @@ export async function validateQRCode(qrCode: string) {
       .update({
         qr_status: "used",
         qr_validated_at: new Date().toISOString(),
-        status: "completed" // Automatically complete the booking when validated
+        status: "COMPLETED" // Automatically complete the booking when validated
       })
       .eq("id", booking.id);
 
@@ -1034,7 +1034,7 @@ export async function confirmQRAdmission(bookingId: string) {
     }
 
     // 5. Validate booking status
-    if (booking.status !== "confirmed" && booking.status !== "completed") {
+    if (booking.status !== "PAID" && booking.status !== "COMPLETED" && booking.status !== "confirmed" && booking.status !== "completed") {
       return { error: `La reserva asociada a este QR no está confirmada (Estado: ${booking.status}).` };
     }
 
@@ -1045,7 +1045,7 @@ export async function confirmQRAdmission(bookingId: string) {
       .update({
         qr_status: "used",
         qr_validated_at: nowStr,
-        status: "completed" // Automatically complete the booking when validated
+        status: "COMPLETED" // Automatically complete the booking when validated
       })
       .eq("id", booking.id);
 

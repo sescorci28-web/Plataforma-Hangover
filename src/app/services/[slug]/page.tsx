@@ -131,13 +131,13 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
   } catch (e) {}
   try { const { data } = await supabase.from("service_availability").select("date, status, notes").eq("service_id", service.id); manualAvailability = data || []; } catch (e) {}
   try {
-    const { data } = await supabase.from("bookings").select("event_date").eq("service_id", service.id).in("status", ["confirmed", "completed"]);
+    const { data } = await supabase.from("bookings").select("event_date").eq("service_id", service.id).in("status", ["ACCEPTED", "PAID", "IN_PROGRESS", "COMPLETED", "confirmed", "completed"]);
     bookedDates = (data || []).map((b: any) => b.event_date);
   } catch (e) {}
 
   if (user) {
     try {
-      const { data: userBookings } = await supabase.from("bookings").select("id").eq("user_id", user.id).eq("service_id", service.id).in("status", ["confirmed", "completed"]);
+      const { data: userBookings } = await supabase.from("bookings").select("id").eq("user_id", user.id).eq("service_id", service.id).in("status", ["ACCEPTED", "PAID", "IN_PROGRESS", "COMPLETED", "confirmed", "completed"]);
       if (userBookings && userBookings.length > 0) {
         const bookingIds = userBookings.map((b) => b.id);
         const { data: userReviews } = await supabase.from("service_reviews").select("booking_id").in("booking_id", bookingIds);

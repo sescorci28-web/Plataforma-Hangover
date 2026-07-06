@@ -52,6 +52,12 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
   const activeProfile = profile;
   const isProfileError = false;
 
+  const getNormalizedStatus = (s: string) => {
+    const val = (s || "").toUpperCase();
+    if (val === "CONFIRMED") return "PAID";
+    return val;
+  };
+
   // ----------------------------------------------------
   // PROVIDER METRICS & QUERIES
   // ----------------------------------------------------
@@ -170,12 +176,12 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
   }
 
   const bookingsCount = normalizedBookings.length;
-  const pendingBookingsCount = normalizedBookings.filter((b: any) => b.status === "pending").length;
+  const pendingBookingsCount = normalizedBookings.filter((b: any) => getNormalizedStatus(b.status) === "PENDING").length;
 
-  // Calculate monthly earnings from completed/confirmed bookings
+  // Calculate monthly earnings from completed/confirmed/paid bookings
   const monthlyEarnings = bookings
     ? bookings
-        .filter((b) => b.status === "confirmed" || b.status === "completed")
+        .filter((b) => ["PAID", "COMPLETED", "IN_PROGRESS"].includes(getNormalizedStatus(b.status)))
         .reduce((sum, b) => sum + Number(b.total_amount), 0)
     : 0;
 
@@ -229,12 +235,12 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
 
   const personalBookingsCount = normalizedPersonalBookings.length;
   const personalActiveBookingsCount = normalizedPersonalBookings.filter(
-    (b) => b.status === "pending" || b.status === "confirmed"
+    (b) => ["PENDING", "ACCEPTED", "PAID", "IN_PROGRESS"].includes(getNormalizedStatus(b.status))
   ).length;
 
   // Calculate total spent on completed/confirmed bookings
   const totalSpent = normalizedPersonalBookings
-    .filter((b: any) => b.status === "confirmed" || b.status === "completed")
+    .filter((b: any) => ["PAID", "COMPLETED"].includes(getNormalizedStatus(b.status)))
     .reduce((sum: number, b: any) => sum + Number(b.total_amount), 0);
 
   const formattedTotalSpent = new Intl.NumberFormat('es-CO', {
