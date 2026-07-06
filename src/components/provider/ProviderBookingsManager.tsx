@@ -2,11 +2,12 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { updateBookingStatus } from "@/app/services/actions";
+import { getOrCreateConnectChat } from "@/app/services/connectActions";
 import { 
   Loader2, Check, X, Calendar, DollarSign, Clock, Users, MapPin, 
   CreditCard, MessageCircle, Phone, FileText, Share2, Copy, 
   Map, CalendarPlus, ChevronDown, ChevronUp, Star, Award, 
-  AlertTriangle, Filter, Search, ArrowUpDown, Bell
+  AlertTriangle, Filter, Search, ArrowUpDown, Bell, MessageSquare
 } from "lucide-react";
 
 interface UserProfile {
@@ -35,7 +36,7 @@ interface Booking {
   event_time?: string;
   reservation_date?: string;
   total_amount: number;
-  status: "pending" | "confirmed" | "completed" | "cancelled" | "rejected";
+  status: string;
   notes: string | null;
   user_id: string;
   club_id: string | null;
@@ -98,11 +99,11 @@ export function ProviderBookingsManager({ initialBookings, defaultTab }: Provide
   }, [initialBookings]);
 
   // Handle status update
-  const handleUpdateStatus = (bookingId: string, newStatus: "confirmed" | "completed" | "rejected", reason?: string) => {
+  const handleUpdateStatus = (bookingId: string, newStatus: string, reason?: string) => {
     startTransition(async () => {
       try {
         // Appending reason to notes if rejection
-        const finalReason = newStatus === "rejected" ? `[Rechazado: ${reason}]` : "";
+        const finalReason = newStatus === "REJECTED" ? `[Rechazado: ${reason}]` : "";
         const res = await updateBookingStatus(bookingId, newStatus);
         
         if (res?.error) {
@@ -112,7 +113,7 @@ export function ProviderBookingsManager({ initialBookings, defaultTab }: Provide
             if (b.id === bookingId) {
               return { 
                 ...b, 
-                status: newStatus,
+                status: newStatus as any,
                 notes: finalReason ? (b.notes ? `${b.notes} ${finalReason}` : finalReason) : b.notes,
                 updated_at: new Date().toISOString()
               };
@@ -127,6 +128,20 @@ export function ProviderBookingsManager({ initialBookings, defaultTab }: Provide
         setRejectModalBooking(null);
       }
     });
+  };
+
+  const handleOpenChat = async (clientId: string) => {
+    try {
+      const res = await getOrCreateConnectChat(clientId);
+      if (res.error) {
+        alert(res.error);
+      } else if (res.chatId) {
+        window.location.href = `/connect?chatId=${res.chatId}&userId=${clientId}`;
+      }
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo abrir el chat.");
+    }
   };
 
   const toggleAccordion = (id: string) => {
@@ -159,35 +174,42 @@ export function ProviderBookingsManager({ initialBookings, defaultTab }: Provide
     return `#HVR-${id.substring(id.length - 5).toUpperCase()}`;
   };
 
+  const getNormalizedStatus = (s: string) => {
+    const val = (s || "").toUpperCase();
+    if (val === "CONFIRMED") return "PAID";
+    return val;
+  };
+
   // Stats calculation
-  const pendingCount = bookings.filter(b => b.status === "pending").length;
+  const pendingCount = bookings.filter(b => getNormalizedStatus(b.status) === "PENDING").length;
   
   // Confirmed today
   const confirmedTodayCount = bookings.filter(b => {
-    if (b.status !== "confirmed") return false;
+    if (getNormalizedStatus(b.status) !== "PAID") return false;
     const updatedDate = new Date(b.updated_at || b.created_at).toDateString();
     return updatedDate === new Date().toDateString();
   }).length;
 
   // Earnings
   const totalEarnings = bookings
-    .filter(b => b.status === "confirmed" || b.status === "completed")
+    .filter(b => ["PAID", "COMPLETED"].includes(getNormalizedStatus(b.status)))
     .reduce((sum, b) => sum + Number(b.total_amount), 0);
 
   // Acceptance Rate
-  const totalProcessed = bookings.filter(b => ["confirmed", "completed", "rejected"].includes(b.status)).length;
-  const totalAccepted = bookings.filter(b => ["confirmed", "completed"].includes(b.status)).length;
+  const totalProcessed = bookings.filter(b => ["PAID", "COMPLETED", "REJECTED"].includes(getNormalizedStatus(b.status))).length;
+  const totalAccepted = bookings.filter(b => ["PAID", "COMPLETED"].includes(getNormalizedStatus(b.status))).length;
   const acceptanceRate = totalProcessed > 0 ? Math.round((totalAccepted / totalProcessed) * 100) : 100;
 
   // Filtered & sorted bookings
   const filteredBookings = bookings
     .filter(b => {
+      const s = getNormalizedStatus(b.status);
       // Tab filter
-      if (activeTab === "pending") return b.status === "pending";
-      if (activeTab === "confirmed") return b.status === "confirmed";
-      if (activeTab === "rejected") return b.status === "rejected";
-      if (activeTab === "cancelled") return b.status === "cancelled";
-      if (activeTab === "completed") return b.status === "completed";
+      if (activeTab === "pending") return s === "PENDING";
+      if (activeTab === "confirmed") return s === "PAID" || s === "ACCEPTED";
+      if (activeTab === "rejected") return s === "REJECTED";
+      if (activeTab === "cancelled") return s === "CANCELLED";
+      if (activeTab === "completed") return s === "COMPLETED";
       return true;
     })
     .filter(b => {
@@ -339,9 +361,27 @@ export function ProviderBookingsManager({ initialBookings, defaultTab }: Provide
               }`}
             >
               {tab.label}
-              {bookings.filter(b => tab.id === "all" ? true : (tab.id === "completed" ? b.status === "completed" : b.status === tab.id)).length > 0 && (
+              {bookings.filter(b => {
+                const s = getNormalizedStatus(b.status);
+                if (tab.id === "all") return true;
+                if (tab.id === "completed") return s === "COMPLETED";
+                if (tab.id === "confirmed") return s === "PAID" || s === "ACCEPTED";
+                if (tab.id === "pending") return s === "PENDING";
+                if (tab.id === "rejected") return s === "REJECTED";
+                if (tab.id === "cancelled") return s === "CANCELLED";
+                return false;
+              }).length > 0 && (
                 <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-white/5 text-zinc-500'}`}>
-                  {bookings.filter(b => tab.id === "all" ? true : (tab.id === "completed" ? b.status === "completed" : b.status === tab.id)).length}
+                  {bookings.filter(b => {
+                    const s = getNormalizedStatus(b.status);
+                    if (tab.id === "all") return true;
+                    if (tab.id === "completed") return s === "COMPLETED";
+                    if (tab.id === "confirmed") return s === "PAID" || s === "ACCEPTED";
+                    if (tab.id === "pending") return s === "PENDING";
+                    if (tab.id === "rejected") return s === "REJECTED";
+                    if (tab.id === "cancelled") return s === "CANCELLED";
+                    return false;
+                  }).length}
                 </span>
               )}
             </button>
@@ -421,19 +461,29 @@ export function ProviderBookingsManager({ initialBookings, defaultTab }: Provide
 
             // Color state badges
             const getStatusBadgeStyle = (status: string) => {
-              if (status === "pending") return "bg-amber-550/10 border-amber-500/20 text-amber-300";
-              if (status === "confirmed") return "bg-primary-500/10 border-primary-500/20 text-primary-300";
-              if (status === "completed") return "bg-emerald-500/10 border-emerald-500/20 text-emerald-300";
-              if (status === "rejected") return "bg-red-500/10 border-red-500/20 text-red-400";
-              return "bg-zinc-800 border-white/5 text-zinc-500";
+              const s = (status || "").toUpperCase();
+              if (s === "PENDING") return "bg-amber-500/10 border-amber-500/20 text-amber-300";
+              if (s === "ACCEPTED") return "bg-purple-500/10 border-purple-500/20 text-purple-300";
+              if (s === "PAID" || s === "CONFIRMED") return "bg-primary-500/10 border-primary-500/20 text-primary-300";
+              if (s === "IN_PROGRESS") return "bg-blue-500/10 border-blue-500/20 text-blue-300";
+              if (s === "COMPLETED") return "bg-emerald-500/10 border-emerald-500/20 text-emerald-300";
+              if (s === "REJECTED") return "bg-red-500/10 border-red-500/20 text-red-400";
+              if (s === "CANCELLED") return "bg-zinc-800 border-white/5 text-zinc-500";
+              return "bg-zinc-800 border-white/5 text-zinc-400";
             };
 
             const getStatusText = (status: string) => {
-              if (status === "pending") return "Pendiente";
-              if (status === "confirmed") return "Confirmada";
-              if (status === "completed") return "Finalizada";
-              if (status === "rejected") return "Rechazada";
-              return "Cancelada";
+              const s = (status || "").toUpperCase();
+              if (s === "PENDING") return "Pendiente";
+              if (s === "ACCEPTED") return "Aceptada (Espera Pago)";
+              if (s === "PAID" || s === "CONFIRMED") return "Confirmada (Pagada)";
+              if (s === "IN_PROGRESS") return "En Curso";
+              if (s === "COMPLETED") return "Finalizada";
+              if (s === "REJECTED") return "Rechazada";
+              if (s === "CANCELLED") return "Cancelada";
+              if (s === "REFUNDED") return "Reembolsada";
+              if (s === "EXPIRED") return "Expirada";
+              return s;
             };
 
             return (
@@ -557,46 +607,60 @@ export function ProviderBookingsManager({ initialBookings, defaultTab }: Provide
                           
                           <div className="relative flex flex-col gap-3.5 pl-5 before:content-[''] before:absolute before:left-[5px] before:top-2 before:bottom-2 before:w-[1px] before:bg-zinc-800">
                             
-                            {/* Step 1 */}
+                            {/* Step 1: PENDING */}
                             <div className="relative flex items-start text-[10px]">
                               <span className="absolute left-[-18px] top-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-black" />
                               <div className="flex-1">
-                                <p className="font-bold text-white">Reserva creada por el cliente</p>
+                                <p className="font-bold text-white">Reserva solicitada por el cliente</p>
                                 <p className="text-[8px] text-zinc-500">{formatDate(req.created_at)}</p>
                               </div>
                             </div>
 
-                            {/* Step 2 */}
-                            <div className="relative flex items-start text-[10px]">
-                              <span className="absolute left-[-18px] top-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-black" />
-                              <div className="flex-1">
-                                <p className="font-bold text-white">Pago procesado y verificado</p>
-                                <p className="text-[8px] text-zinc-500">{formatDate(req.created_at)}</p>
-                              </div>
-                            </div>
-
-                            {/* Step 3 */}
+                            {/* Step 2: ACCEPTED */}
                             <div className="relative flex items-start text-[10px]">
                               <span className={`absolute left-[-18px] top-0.5 w-2.5 h-2.5 rounded-full border border-black ${
-                                ["confirmed", "completed"].includes(req.status) ? "bg-primary-500" : "bg-zinc-800"
+                                ["ACCEPTED", "PAID", "IN_PROGRESS", "COMPLETED"].includes(getNormalizedStatus(req.status)) ? "bg-primary-500" : "bg-zinc-800"
                               }`} />
                               <div className="flex-1">
-                                <p className={`font-bold ${["confirmed", "completed"].includes(req.status) ? "text-white" : "text-zinc-500"}`}>
-                                  {req.status === "rejected" ? "Proveedor rechazó la solicitud" : "Proveedor confirmó la reserva"}
+                                <p className={`font-bold ${["ACCEPTED", "PAID", "IN_PROGRESS", "COMPLETED"].includes(getNormalizedStatus(req.status)) ? "text-white" : "text-zinc-500"}`}>
+                                  {getNormalizedStatus(req.status) === "REJECTED" ? "Proveedor rechazó la solicitud" : "Proveedor aceptó la reserva"}
                                 </p>
-                                {req.updated_at && ["confirmed", "rejected", "completed"].includes(req.status) && (
-                                  <p className="text-[8px] text-zinc-500">{formatDate(req.updated_at)}</p>
-                                )}
                               </div>
                             </div>
 
-                            {/* Step 4 */}
+                            {/* Step 3: PAID */}
                             <div className="relative flex items-start text-[10px]">
                               <span className={`absolute left-[-18px] top-0.5 w-2.5 h-2.5 rounded-full border border-black ${
-                                req.status === "completed" ? "bg-emerald-500" : "bg-zinc-800"
+                                ["PAID", "IN_PROGRESS", "COMPLETED"].includes(getNormalizedStatus(req.status)) ? "bg-primary-500" : "bg-zinc-800"
                               }`} />
                               <div className="flex-1">
-                                <p className={`font-bold ${req.status === "completed" ? "text-white" : "text-zinc-500"}`}>Servicio / Admisión ejecutada</p>
+                                <p className={`font-bold ${["PAID", "IN_PROGRESS", "COMPLETED"].includes(getNormalizedStatus(req.status)) ? "text-white" : "text-zinc-500"}`}>
+                                  Pago procesado y verificado (Reserva Confirmada)
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Step 4: IN_PROGRESS */}
+                            <div className="relative flex items-start text-[10px]">
+                              <span className={`absolute left-[-18px] top-0.5 w-2.5 h-2.5 rounded-full border border-black ${
+                                ["IN_PROGRESS", "COMPLETED"].includes(getNormalizedStatus(req.status)) ? "bg-primary-500" : "bg-zinc-800"
+                              }`} />
+                              <div className="flex-1">
+                                <p className={`font-bold ${["IN_PROGRESS", "COMPLETED"].includes(getNormalizedStatus(req.status)) ? "text-white" : "text-zinc-500"}`}>
+                                  Servicio en progreso
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Step 5: COMPLETED */}
+                            <div className="relative flex items-start text-[10px]">
+                              <span className={`absolute left-[-18px] top-0.5 w-2.5 h-2.5 rounded-full border border-black ${
+                                getNormalizedStatus(req.status) === "COMPLETED" ? "bg-emerald-500" : "bg-zinc-800"
+                              }`} />
+                              <div className="flex-1">
+                                <p className={`font-bold ${getNormalizedStatus(req.status) === "COMPLETED" ? "text-white" : "text-zinc-500"}`}>
+                                  Servicio finalizado con éxito
+                                </p>
                               </div>
                             </div>
 
@@ -636,7 +700,7 @@ export function ProviderBookingsManager({ initialBookings, defaultTab }: Provide
                     <div className="space-y-2 w-full">
                       
                       {/* PENDIENTE */}
-                      {req.status === "pending" && (
+                      {(req.status === "pending" || req.status === "PENDING") && (
                         <div className="grid grid-cols-2 gap-2 w-full">
                           <button
                             onClick={() => {
@@ -645,7 +709,7 @@ export function ProviderBookingsManager({ initialBookings, defaultTab }: Provide
                             disabled={isPending}
                             className="bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white rounded-xl py-2 px-3 text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:shadow-lg hover:shadow-primary-500/10 border border-primary-500/20"
                           >
-                            Confirmar
+                            Aceptar
                           </button>
                           
                           <button
@@ -660,28 +724,44 @@ export function ProviderBookingsManager({ initialBookings, defaultTab }: Provide
                         </div>
                       )}
 
-                      {/* CONFIRMADA */}
-                      {req.status === "confirmed" && (
+                      {/* ACEPTADA */}
+                      {(req.status === "accepted" || req.status === "ACCEPTED") && (
+                        <div className="text-center text-[10px] text-zinc-550 border border-white/5 bg-white/[0.01] rounded-xl p-2 font-bold uppercase tracking-wider">
+                          Espera pago del cliente
+                        </div>
+                      )}
+
+                      {/* CONFIRMADA (PAGADA) */}
+                      {(req.status === "confirmed" || req.status === "PAID") && (
                         <button
-                          onClick={() => handleUpdateStatus(req.id, "completed")}
+                          onClick={() => handleUpdateStatus(req.id, "IN_PROGRESS")}
                           disabled={isPending}
-                          className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl py-2.5 px-4 text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:shadow-lg hover:shadow-emerald-500/15"
+                          className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl py-2.5 px-4 text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:shadow-lg hover:shadow-blue-500/15"
                         >
-                          <Check className="w-3.5 h-3.5" /> Completar Reserva
+                          Iniciar Servicio
                         </button>
                       )}
 
-                      {/* COMMONS ACTIONS: CONTACTAR CLIENTE */}
-                      {["pending", "confirmed"].includes(req.status) && (
+                      {/* EN CURSO */}
+                      {(req.status === "in_progress" || req.status === "IN_PROGRESS") && (
+                        <button
+                          onClick={() => handleUpdateStatus(req.id, "COMPLETED")}
+                          disabled={isPending}
+                          className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl py-2.5 px-4 text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:shadow-lg hover:shadow-emerald-500/15 animate-pulse"
+                        >
+                          Finalizar Servicio
+                        </button>
+                      )}
+
+                      {/* ACCIONES DE CONTACTO GENERAL */}
+                      {["pending", "PENDING", "accepted", "ACCEPTED", "confirmed", "PAID", "in_progress", "IN_PROGRESS"].includes(req.status) && (
                         <div className="grid grid-cols-2 gap-2">
-                          <a
-                            href={`https://wa.me/${req.user?.username || ""}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl py-2 text-[10px] font-bold uppercase text-center flex items-center justify-center gap-1 border border-white/5"
+                          <button
+                            onClick={() => handleOpenChat(req.user_id)}
+                            className="bg-primary-600/10 hover:bg-primary-600/20 text-primary-300 hover:text-white rounded-xl py-2 text-[10px] font-bold uppercase text-center flex items-center justify-center gap-1 border border-primary-500/20 cursor-pointer"
                           >
-                            <MessageCircle className="w-3 h-3 text-emerald-400" /> WhatsApp
-                          </a>
+                            <MessageSquare className="w-3 h-3 text-primary-400" /> Chat Connect
+                          </button>
                           
                           <a
                             href={`tel:${req.user?.username || ""}`}

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Calendar, History, ArrowRight, CalendarOff, Clock, Tag, QrCode, X } from "lucide-react";
+import { Calendar, History, ArrowRight, CalendarOff, Clock, Tag, QrCode, X, CreditCard, MessageSquare, Star, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { updateBookingStatus } from "@/app/services/actions";
+import { getOrCreateConnectChat } from "@/app/services/connectActions";
 
 interface UserBookingsTabsProps {
   initialBookings: any[];
@@ -12,16 +14,59 @@ interface UserBookingsTabsProps {
 export function UserBookingsTabs({ initialBookings }: UserBookingsTabsProps) {
   const [activeTab, setActiveTab] = useState<"active" | "history">("active");
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
-  const safeBookings = Array.isArray(initialBookings) ? initialBookings : [];
+  const [bookings, setBookings] = useState<any[]>(initialBookings || []);
+  const [isPending, startTransition] = useTransition();
 
-  const activeBookings = safeBookings.filter(
-    (b) => b.status === "pending" || b.status === "confirmed"
-  );
-  const historyBookings = safeBookings.filter(
-    (b) => b.status === "completed" || b.status === "cancelled" || b.status === "rejected"
-  );
+  const getNormalizedStatus = (s: string) => {
+    const val = (s || "").toUpperCase();
+    if (val === "CONFIRMED") return "PAID";
+    return val;
+  };
+
+  const activeBookings = bookings.filter((b) => {
+    const s = getNormalizedStatus(b.status);
+    return ["PENDING", "ACCEPTED", "PAID", "IN_PROGRESS"].includes(s);
+  });
+  const historyBookings = bookings.filter((b) => {
+    const s = getNormalizedStatus(b.status);
+    return ["COMPLETED", "CANCELLED", "REJECTED", "REFUNDED", "EXPIRED"].includes(s);
+  });
 
   const displayedBookings = activeTab === "active" ? activeBookings : historyBookings;
+
+  const handleOpenChat = async (providerId: string) => {
+    if (!providerId) return;
+    try {
+      const res = await getOrCreateConnectChat(providerId);
+      if (res.error) {
+        alert(res.error);
+      } else if (res.chatId) {
+        window.location.href = `/connect?chatId=${res.chatId}&userId=${providerId}`;
+      }
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo abrir el chat.");
+    }
+  };
+
+  const handlePayBooking = (bookingId: string) => {
+    startTransition(async () => {
+      try {
+        const res = await updateBookingStatus(bookingId, "PAID");
+        if (res.error) {
+          alert(res.error);
+        } else {
+          setBookings((prev) =>
+            prev.map((b) => (b.id === bookingId ? { ...b, status: "PAID" } : b))
+          );
+          alert("¡Pago simulado con éxito! Reserva confirmada.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error al procesar el pago.");
+      }
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -135,37 +180,76 @@ export function UserBookingsTabs({ initialBookings }: UserBookingsTabsProps) {
                       <p className="text-sm font-semibold text-white tracking-tight">${Math.round(booking.total_amount).toLocaleString('es-CO')} COP</p>
 
                       <span className={`text-[10px] px-2.5 py-0.5 rounded-full border capitalize font-bold tracking-wider ${
-                        booking.status === "confirmed"
-                          ? "bg-purple-500/10 text-purple-300 border-purple-500/20"
-                          : booking.status === "completed"
-                          ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
-                          : booking.status === "pending"
-                          ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
-                          : "bg-red-500/10 text-red-300 border-red-500/20"
+                        (() => {
+                          const s = getNormalizedStatus(booking.status);
+                          if (s === "PENDING") return "bg-amber-500/10 text-amber-300 border-amber-500/20";
+                          if (s === "ACCEPTED") return "bg-purple-500/10 text-purple-300 border-purple-500/20";
+                          if (s === "PAID") return "bg-blue-500/10 text-blue-300 border-blue-500/20";
+                          if (s === "IN_PROGRESS") return "bg-primary-500/10 text-primary-300 border-primary-500/20 animate-pulse";
+                          if (s === "COMPLETED") return "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
+                          return "bg-red-500/10 text-red-300 border-red-500/20";
+                        })()
                       }`}>
-                        {booking.status === "confirmed"
-                          ? "confirmada"
-                          : booking.status === "completed"
-                          ? "completada"
-                          : booking.status === "pending"
-                          ? "pendiente"
-                          : "cancelada"}
+                        {(() => {
+                          const s = getNormalizedStatus(booking.status);
+                          if (s === "PENDING") return "Pendiente";
+                          if (s === "ACCEPTED") return "Aprobada (Espera Pago)";
+                          if (s === "PAID") return "Confirmada (Pagada)";
+                          if (s === "IN_PROGRESS") return "En Curso";
+                          if (s === "COMPLETED") return "Completada";
+                          if (s === "REJECTED") return "Rechazada";
+                          if (s === "CANCELLED") return "Cancelada";
+                          return s;
+                        })()}
                       </span>
                     </div>
 
-                    {(booking.status === "confirmed" || booking.status === "completed") && booking.qr_code && (
-                      <button
-                        onClick={() => setSelectedBooking(booking)}
-                        className="px-3 py-1.5 bg-primary-600/20 hover:bg-primary-600/30 border border-primary-500/30 hover:border-primary-500/50 rounded-xl text-xs font-semibold text-primary-300 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
-                      >
-                        <QrCode className="w-3.5 h-3.5" />
-                        <span>Ver QR</span>
-                      </button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* PAGAR (ACCEPTED) */}
+                      {getNormalizedStatus(booking.status) === "ACCEPTED" && (
+                        <button
+                          onClick={() => handlePayBooking(booking.id)}
+                          disabled={isPending}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/30 rounded-xl text-xs font-semibold text-white transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+                          <span>Pagar</span>
+                        </button>
+                      )}
 
-                    {!((booking.status === "confirmed" || booking.status === "completed") && booking.qr_code) && (
-                      <ArrowRight className="w-5 h-5 text-zinc-500 shrink-0 hidden sm:block" />
-                    )}
+                      {/* CHAT CONNECT */}
+                      {["PENDING", "ACCEPTED", "PAID", "IN_PROGRESS"].includes(getNormalizedStatus(booking.status)) && booking.provider_id && (
+                        <button
+                          onClick={() => handleOpenChat(booking.provider_id)}
+                          className="px-3 py-1.5 bg-primary-600/10 hover:bg-primary-600/20 border border-primary-500/20 rounded-xl text-xs font-semibold text-primary-300 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Chat</span>
+                        </button>
+                      )}
+
+                      {/* VER QR (PAID / COMPLETED) */}
+                      {["PAID", "COMPLETED"].includes(getNormalizedStatus(booking.status)) && booking.qr_code && (
+                        <button
+                          onClick={() => setSelectedBooking(booking)}
+                          className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <QrCode className="w-3.5 h-3.5 text-primary-400" />
+                          <span>Código QR</span>
+                        </button>
+                      )}
+
+                      {/* CALIFICAR (COMPLETED) */}
+                      {getNormalizedStatus(booking.status) === "COMPLETED" && (
+                        <button
+                          onClick={() => alert("¡Gracias por calificar tu experiencia en Hangover!")}
+                          className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-550/20 rounded-xl text-xs font-semibold text-amber-300 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Star className="w-3.5 h-3.5 fill-amber-400" />
+                          <span>Calificar</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

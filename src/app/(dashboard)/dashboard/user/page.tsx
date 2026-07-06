@@ -39,7 +39,7 @@ export default async function UserDashboard() {
   try {
     const { data } = await supabase
       .from("bookings")
-      .select("id, event_date, reservation_date, number_of_people, total_amount, status, notes, club_id, club_slug, event_id, qr_code, qr_status, qr_validated_at, booking_type, created_at")
+      .select("id, event_date, reservation_date, number_of_people, total_amount, status, notes, club_id, club_slug, event_id, qr_code, qr_status, qr_validated_at, booking_type, created_at, provider_id, service_id, event_name, event_type, end_time, duration, address, location_name, google_maps_url, special_requirements, file_urls")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 

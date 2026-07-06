@@ -69,7 +69,7 @@ export async function createServiceBooking(
   }
 
   try {
-    const { error: insertError } = await supabase
+    const { data: newBooking, error: insertError } = await supabase
       .from("bookings")
       .insert({
         user_id: user.id,
@@ -78,7 +78,7 @@ export async function createServiceBooking(
         event_date: eventDate,
         event_time: quoteDetails?.startTime || '00:00:00',
         total_amount: totalAmount,
-        status: "pending",
+        status: "PENDING",
         notes: notes || null,
         qr_code: 'QR-' + randomUUID(),
         qr_status: 'active',
@@ -95,11 +95,15 @@ export async function createServiceBooking(
         special_requirements: quoteDetails?.specialRequirements || null,
         file_urls: quoteDetails?.fileUrls || null,
         budget: quoteDetails?.budget || null
-      });
+      })
+      .select("id")
+      .single();
 
-    if (insertError) {
-      return { error: `Error al crear la reserva: ${insertError.message}` };
+    if (insertError || !newBooking) {
+      return { error: `Error al crear la reserva: ${insertError?.message || "No se pudo obtener el ID."}` };
     }
+
+    const newBookingId = newBooking.id;
 
     // Create connect chat and send automated message
     let chatId = "";
@@ -159,6 +163,30 @@ export async function createServiceBooking(
       }
     } catch (chatErr) {
       console.error("Error creating auto chat on booking:", chatErr);
+    }
+
+    // Log initial timeline event & notification
+    try {
+      await supabase
+        .from("booking_timeline_events")
+        .insert({
+          booking_id: newBookingId,
+          state: "PENDING",
+          actor_id: user.id,
+          notes: "Reserva solicitada por el cliente."
+        });
+
+      await supabase
+        .from("user_notifications")
+        .insert({
+          user_id: providerId,
+          booking_id: newBookingId,
+          title: "Nueva Solicitud de Reserva",
+          message: `Has recibido una nueva solicitud para el servicio de parte del cliente.`,
+          type: "booking_update"
+        });
+    } catch (e) {
+      console.error("Error logging initial timeline/notification:", e);
     }
 
     revalidatePath("/dashboard/user");
@@ -337,8 +365,13 @@ export async function createService(data: {
  */
 export async function updateBookingStatus(
   bookingId: string,
-  status: "confirmed" | "cancelled" | "completed" | "rejected"
+  rawStatus: string
 ) {
+  let status = rawStatus.toUpperCase() as "DRAFT" | "PENDING" | "ACCEPTED" | "PAID" | "IN_PROGRESS" | "COMPLETED" | "REJECTED" | "CANCELLED" | "REFUNDED" | "EXPIRED";
+  if ((status as string) === "CONFIRMED") {
+    status = "PAID";
+  }
+
   const supabase = await createClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -375,9 +408,9 @@ export async function updateBookingStatus(
     }
 
     const updatePayload: any = { status };
-    if (status === "cancelled" || status === "rejected") {
+    if (["CANCELLED", "REJECTED", "EXPIRED"].includes(status)) {
       updatePayload.qr_status = "cancelled";
-    } else if (status === "confirmed") {
+    } else if (["ACCEPTED", "PAID", "IN_PROGRESS"].includes(status)) {
       updatePayload.qr_status = "active";
     }
 
@@ -388,6 +421,60 @@ export async function updateBookingStatus(
 
     if (updateError) {
       return { error: `Error al actualizar la reserva: ${updateError.message}` };
+    }
+
+    // Log timeline event
+    try {
+      await supabase
+        .from("booking_timeline_events")
+        .insert({
+          booking_id: bookingId,
+          state: status,
+          actor_id: user.id,
+          notes: `Estado de la reserva cambiado a ${status}.`
+        });
+    } catch (e) {
+      console.error("Error logging timeline event:", e);
+    }
+
+    // Create notifications for the other participant
+    try {
+      const recipientId = user.id === booking.provider_id ? booking.user_id : booking.provider_id;
+      
+      let title = "Actualización de tu reserva";
+      let message = `El estado de tu reserva cambió a ${status}.`;
+      
+      if (status === "ACCEPTED") {
+        title = "¡Reserva aprobada!";
+        message = "El proveedor ha aceptado tu solicitud de reserva. Procede con el pago para confirmarla.";
+      } else if (status === "PAID") {
+        title = "Reserva Confirmada";
+        message = "El pago ha sido procesado correctamente. El servicio queda agendado.";
+      } else if (status === "IN_PROGRESS") {
+        title = "Servicio Iniciado";
+        message = "El proveedor ha marcado el inicio del servicio.";
+      } else if (status === "COMPLETED") {
+        title = "Servicio Finalizado";
+        message = "El servicio ha finalizado con éxito. Por favor, califica tu experiencia.";
+      } else if (status === "REJECTED") {
+        title = "Solicitud Rechazada";
+        message = "El proveedor ha rechazado tu solicitud de reserva.";
+      } else if (status === "CANCELLED") {
+        title = "Reserva Cancelada";
+        message = "La reserva ha sido cancelada.";
+      }
+
+      await supabase
+        .from("user_notifications")
+        .insert({
+          user_id: recipientId,
+          booking_id: bookingId,
+          title,
+          message,
+          type: "booking_update"
+        });
+    } catch (e) {
+      console.error("Error logging notification:", e);
     }
 
     revalidatePath("/dashboard/user");
