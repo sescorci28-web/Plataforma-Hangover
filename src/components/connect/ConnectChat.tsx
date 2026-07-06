@@ -60,6 +60,7 @@ interface Message {
   sender_id: string;
   text: string;
   created_at: string;
+  status?: "sending" | "sent" | "error";
   attachment?: {
     type: "club" | "event" | "service" | "profile" | "agenda" | "quotation" | "invoice";
     id: string;
@@ -90,6 +91,10 @@ export function ConnectChat({
   const [loadingChats, setLoadingChats] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [showNewMessagesBanner, setShowNewMessagesBanner] = useState(false);
+  const isAtBottomRef = useRef(true);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
 
   // Find active chat partner profile
   const chatPartner = allProfiles.find((p) => p.id === selectedChatUserId) || null;
@@ -115,6 +120,19 @@ export function ConnectChat({
 
   const getContactStatus = (id: string) => {
     return { label: "Disponible en Connect", style: "text-zinc-500 font-bold" };
+  };
+
+  const handleScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    
+    // Check if user is scrolled near the bottom (within 60px)
+    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
+    isAtBottomRef.current = isAtBottom;
+    
+    if (isAtBottom) {
+      setShowNewMessagesBanner(false);
+    }
   };
 
   // 1. Fetch real chat list for currentUser
@@ -173,9 +191,9 @@ export function ConnectChat({
     };
 
     fetchChats();
-  }, [allProfiles, selectedChatUserId]);
+  }, [allProfiles, selectedChatUserId, reloadTrigger]);
 
-  // 2. Fetch real messages for selected conversation
+  // 2. Fetch real messages for selected conversation & auto-scroll
   useEffect(() => {
     if (!selectedChatUserId) {
       setMessages([]);
@@ -207,9 +225,17 @@ export function ConnectChat({
                 id: m.id,
                 sender_id: m.sender_id,
                 text: m.message_text,
-                created_at: m.created_at
+                created_at: m.created_at,
+                status: "sent"
               }))
             );
+
+            // Force initial scroll to bottom on load
+            setTimeout(() => {
+              if (messagesContainerRef.current) {
+                messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+              }
+            }, 100);
           }
         } else {
           setMessages([]);
@@ -220,15 +246,17 @@ export function ConnectChat({
     };
 
     fetchMessages();
+    setShowNewMessagesBanner(false);
   }, [selectedChatUserId, currentUser.id]);
 
-  // 3. Real-time PostgreSQL subscription for connect_messages
+  // 3. Real-time PostgreSQL subscription for connect_messages (active chat only)
   useEffect(() => {
     if (!selectedChatUserId) return;
 
     const supabase = createClient();
     const [userA, userB] = [currentUser.id, selectedChatUserId].sort();
     let activeChatId = "";
+    let channel: any = null;
 
     const setupSubscription = async () => {
       const { data: chatRecord } = await supabase
@@ -241,7 +269,7 @@ export function ConnectChat({
       if (chatRecord) {
         activeChatId = chatRecord.id;
 
-        const channel = supabase
+        channel = supabase
           .channel(`realtime-messages:${activeChatId}`)
           .on(
             "postgres_changes",
@@ -253,6 +281,10 @@ export function ConnectChat({
             },
             (payload) => {
               const newMsg = payload.new;
+              
+              // If sent by the current user, it is already handled by optimistic state
+              if (newMsg.sender_id === currentUser.id) return;
+
               setMessages((prev) => {
                 if (prev.some((m) => m.id === newMsg.id)) return prev;
                 return [
@@ -261,28 +293,65 @@ export function ConnectChat({
                     id: newMsg.id,
                     sender_id: newMsg.sender_id,
                     text: newMsg.message_text,
-                    created_at: newMsg.created_at
+                    created_at: newMsg.created_at,
+                    status: "sent"
                   }
                 ];
               });
+
+              // Auto-scroll logic if user is at bottom, else show banner
+              if (isAtBottomRef.current) {
+                setTimeout(() => {
+                  if (messagesContainerRef.current) {
+                    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                  }
+                }, 50);
+              } else {
+                setShowNewMessagesBanner(true);
+              }
             }
           )
           .subscribe();
-
-        return channel;
       }
     };
 
-    const subPromise = setupSubscription();
+    setupSubscription();
 
     return () => {
-      subPromise.then((channel) => {
-        if (channel) supabase.removeChannel(channel);
-      });
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [selectedChatUserId, currentUser.id]);
 
-  // 4. Fetch real booking details between participants for Contextual Panel (Column 3)
+  // 4. Real-time user notifications listener (Sub 3) to reload sidebar chats list
+  useEffect(() => {
+    if (!currentUser.id) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`realtime-notifications:${currentUser.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "user_notifications",
+          filter: `user_id=eq.${currentUser.id}`
+        },
+        (payload) => {
+          // Trigger chats list reload
+          setReloadTrigger((prev) => prev + 1);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser.id]);
+
+  // 5. Fetch real booking details between participants for Contextual Panel (Column 3)
   useEffect(() => {
     if (!selectedChatUserId) {
       setRealBooking(null);
@@ -310,50 +379,148 @@ export function ConnectChat({
     fetchBooking();
   }, [selectedChatUserId, currentUser.id]);
 
-  // 5. Send message action
+  // 6. Real-time booking changes subscription (Sub 2) to update contextual panel on the fly
+  useEffect(() => {
+    if (!realBooking?.id) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`realtime-booking:${realBooking.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "bookings",
+          filter: `id=eq.${realBooking.id}`
+        },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            setRealBooking(null);
+          } else {
+            setRealBooking(payload.new);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [realBooking?.id]);
+
+  // 5. Send message action (with Optimistic Updates)
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || !selectedChatUserId) return;
+    const textToSend = inputText.trim();
+    if (!textToSend || !selectedChatUserId) return;
+
+    setInputText(""); // Clear input field immediately
+
+    const tempId = `optimistic-${Date.now()}`;
+    const optimisticMsg: Message = {
+      id: tempId,
+      sender_id: currentUser.id,
+      text: textToSend,
+      created_at: new Date().toISOString(),
+      status: "sending"
+    };
+
+    // Append optimistic message locally
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    // Scroll to bottom immediately
+    setTimeout(() => {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
+    }, 50);
 
     try {
       const supabase = createClient();
       const [userA, userB] = [currentUser.id, selectedChatUserId].sort();
-      let chatId = "";
+      let chatId = chats.find((c) => c.partner.id === selectedChatUserId)?.id || "";
 
-      // Fetch or insert chat room
-      const { data: chatRecord } = await supabase
-        .from("connect_chats")
-        .select("id")
-        .eq("user_a_id", userA)
-        .eq("user_b_id", userB)
-        .maybeSingle();
-
-      if (chatRecord) {
-        chatId = chatRecord.id;
-      } else {
-        const { data: newChat } = await supabase
+      if (!chatId) {
+        // Fetch or create chat room
+        const { data: chatRecord } = await supabase
           .from("connect_chats")
-          .insert({ user_a_id: userA, user_b_id: userB })
           .select("id")
-          .single();
-        if (newChat) chatId = newChat.id;
+          .eq("user_a_id", userA)
+          .eq("user_b_id", userB)
+          .maybeSingle();
+
+        if (chatRecord) {
+          chatId = chatRecord.id;
+        } else {
+          const { data: newChat } = await supabase
+            .from("connect_chats")
+            .insert({ user_a_id: userA, user_b_id: userB })
+            .select("id")
+            .single();
+          if (newChat) chatId = newChat.id;
+        }
       }
 
       if (chatId) {
-        const { error } = await supabase.from("connect_messages").insert({
-          chat_id: chatId,
-          sender_id: currentUser.id,
-          message_text: inputText.trim()
-        });
+        const { data: insertedMsg, error } = await supabase
+          .from("connect_messages")
+          .insert({
+            chat_id: chatId,
+            sender_id: currentUser.id,
+            message_text: textToSend
+          })
+          .select("*")
+          .single();
 
-        if (!error) {
-          setInputText("");
+        if (!error && insertedMsg) {
+          // Replace optimistic message with actual persisted message
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === tempId
+                ? {
+                    id: insertedMsg.id,
+                    sender_id: insertedMsg.sender_id,
+                    text: insertedMsg.message_text,
+                    created_at: insertedMsg.created_at,
+                    status: "sent"
+                  }
+                : m
+            )
+          );
+
+          // Update latest message info on the sidebar chat item
+          setChats((prev) => {
+            const list = [...prev];
+            const idx = list.findIndex((c) => c.id === chatId);
+            if (idx !== -1) {
+              list[idx].lastMessage = textToSend;
+              list[idx].lastMessageTime = new Date(insertedMsg.created_at).toLocaleTimeString("es-CO", {
+                hour: "numeric",
+                minute: "numeric"
+              });
+              list[idx].rawLastMsgTime = insertedMsg.created_at;
+              list.sort((a, b) => new Date(b.rawLastMsgTime).getTime() - new Date(a.rawLastMsgTime).getTime());
+            }
+            return list;
+          });
         } else {
-          alert("Error al enviar el mensaje: " + error.message);
+          // Set status to error
+          setMessages((prev) =>
+            prev.map((m) => (m.id === tempId ? { ...m, status: "error" } : m))
+          );
+          alert("Error al enviar el mensaje: " + (error?.message || "Error desconocido"));
         }
+      } else {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, status: "error" } : m))
+        );
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, status: "error" } : m))
+      );
     }
   };
 
@@ -601,47 +768,84 @@ export function ConnectChat({
             </div>
 
             {/* MESSAGES LOG */}
-            <div className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-thin">
-              {messages.map((msg) => {
-                const isOwn = msg.sender_id === currentUser.id;
-                const isSystemMessage = msg.text.startsWith("🔔") || msg.text.startsWith("[COTIZACIÓN]") || msg.text.includes("Cambio de estado") || msg.text.includes("Estado de la reserva");
-                
-                return (
-                  <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"} animate-fadeIn`}>
-                    <div className={`max-w-[80%] space-y-1.5 ${isOwn ? "order-1" : "order-2"}`}>
-                      
-                      {isSystemMessage ? (
-                        /* SYSTEM NOTIFICATION CARD */
-                        <div className="bg-[#0b0b15] border border-primary-500/25 rounded-2xl p-4 text-xs max-w-sm space-y-2.5 shadow-lg shadow-primary-950/10">
-                          <div className="flex items-center gap-1.5 text-primary-400 font-black uppercase text-[10px] tracking-wider border-b border-white/5 pb-1.5">
-                            <Sparkles className="w-3.5 h-3.5" />
-                            <span>Notificación de Sistema</span>
+            <div className="flex-grow relative flex flex-col min-h-0">
+              <div 
+                ref={messagesContainerRef}
+                onScroll={handleScroll}
+                className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-thin"
+              >
+                {messages.map((msg) => {
+                  const isOwn = msg.sender_id === currentUser.id;
+                  const isSystemMessage = msg.text.startsWith("🔔") || msg.text.startsWith("[COTIZACIÓN]") || msg.text.includes("Cambio de estado") || msg.text.includes("Estado de la reserva");
+                  
+                  return (
+                    <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"} animate-fadeIn`}>
+                      <div className={`max-w-[80%] space-y-1.5 ${isOwn ? "order-1" : "order-2"}`}>
+                        
+                        {isSystemMessage ? (
+                          /* SYSTEM NOTIFICATION CARD */
+                          <div className="bg-[#0b0b15] border border-primary-500/25 rounded-2xl p-4 text-xs max-w-sm space-y-2.5 shadow-lg shadow-primary-950/10">
+                            <div className="flex items-center gap-1.5 text-primary-400 font-black uppercase text-[10px] tracking-wider border-b border-white/5 pb-1.5">
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Notificación de Sistema</span>
+                            </div>
+                            <p className="text-zinc-300 leading-relaxed whitespace-pre-line font-mono text-[10px]">{msg.text}</p>
+                            <div className="text-[8px] text-zinc-550 font-bold uppercase tracking-wider text-right">
+                              {new Date(msg.created_at).toLocaleTimeString("es-CO", { hour: "numeric", minute: "numeric" })}
+                            </div>
                           </div>
-                          <p className="text-zinc-300 leading-relaxed whitespace-pre-line font-mono text-[10px]">{msg.text}</p>
-                          <div className="text-[8px] text-zinc-550 font-bold uppercase tracking-wider text-right">
+                        ) : (
+                          /* STANDARD CHAT BUBBLE */
+                          <div className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
+                            isOwn
+                              ? "bg-primary-600/15 border border-primary-500/25 text-zinc-100 rounded-tr-none shadow-md shadow-primary-950/5"
+                              : "bg-[#09090f] border border-white/5 text-zinc-300 rounded-tl-none"
+                          }`}>
+                            <p>{msg.text}</p>
+                          </div>
+                        )}
+  
+                        {/* Timestamp & Indicators */}
+                        <div className={`flex items-center gap-1.5 justify-end ${isOwn ? "text-right" : "text-left"}`}>
+                          <span className="text-[8px] text-zinc-650 font-bold uppercase tracking-wider">
                             {new Date(msg.created_at).toLocaleTimeString("es-CO", { hour: "numeric", minute: "numeric" })}
-                          </div>
+                          </span>
+                          {isOwn && (
+                            <span className="text-[9px] font-bold">
+                              {msg.status === "sending" ? (
+                                <span className="text-zinc-500 animate-pulse">Enviando...</span>
+                              ) : msg.status === "error" ? (
+                                <span className="text-red-500 font-extrabold flex items-center gap-0.5" title="Error al enviar el mensaje">
+                                  <AlertTriangle className="w-2.5 h-2.5" /> Error
+                                </span>
+                              ) : (
+                                <span className="text-emerald-500 font-extrabold" title="Enviado">✓</span>
+                              )}
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        /* STANDARD CHAT BUBBLE */
-                        <div className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
-                          isOwn
-                            ? "bg-primary-600/15 border border-primary-500/25 text-zinc-100 rounded-tr-none shadow-md shadow-primary-950/5"
-                            : "bg-[#09090f] border border-white/5 text-zinc-300 rounded-tl-none"
-                        }`}>
-                          <p>{msg.text}</p>
-                        </div>
-                      )}
-
-                      {/* Timestamp */}
-                      <span className={`text-[8px] text-zinc-650 font-bold uppercase tracking-wider block ${isOwn ? "text-right" : "text-left"}`}>
-                        {new Date(msg.created_at).toLocaleTimeString("es-CO", { hour: "numeric", minute: "numeric" })}
-                      </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-              <div ref={messagesEndRef} />
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {showNewMessagesBanner && (
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20">
+                  <button
+                    onClick={() => {
+                      if (messagesContainerRef.current) {
+                        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                      }
+                      setShowNewMessagesBanner(false);
+                    }}
+                    className="bg-primary-600 hover:bg-primary-500 text-white text-[10px] font-black uppercase tracking-wider px-4 py-2 rounded-full border border-primary-500/30 flex items-center gap-1.5 shadow-lg shadow-black/50 animate-pulse cursor-pointer"
+                  >
+                    <span>Nuevos mensajes ↓</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* CHAT INPUT AREA */}
