@@ -84,9 +84,9 @@ export function ConnectView({
   activePresenceList,
 }: ConnectViewProps) {
   // Navigation & View States
-  const [activeTab, setActiveTab] = useState<"feed" | "reels" | "messages" | "explore" | "profile">("feed");
+  const [activeTab, setActiveTab] = useState<"feed" | "reels" | "messages" | "explore" | "profile">("messages");
   const [selectedCity, setSelectedCity] = useState("Barranquilla");
-  const [currentProfileView, setCurrentProfileView] = useState<"social" | "client" | "provider" | "club">("social");
+  const [currentProfileView, setCurrentProfileView] = useState<"social" | "client" | "provider" | "club">("client");
   
   // Mood / social state
   const [currentMood, setCurrentMood] = useState<string | null>(null);
@@ -335,7 +335,7 @@ export function ConnectView({
                 onChange={(e) => setCurrentProfileView(e.target.value as any)}
                 className="w-full bg-[#09090f] border border-white/10 text-white py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wide focus:outline-none cursor-pointer appearance-none select-none"
               >
-                <option value="social">Perfil Social (Connect)</option>
+                {/* <option value="social">Perfil Social (Connect)</option> */}
                 <option value="client">Perfil Cliente (Comprar)</option>
                 <option value="provider">Perfil Proveedor (Gigs)</option>
                 <option value="club">Perfil Discoteca (Ops)</option>
@@ -346,14 +346,10 @@ export function ConnectView({
 
           <div className="hidden lg:block h-px bg-white/5" />
 
-          {/* Social Navigation Tabs */}
+          {/* Social Navigation Tabs (Simplified MVP: Only Chats) */}
           <nav className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 gap-1.5 scrollbar-none w-full">
             {[
-              { id: "feed", label: "Feed", icon: Flame },
-              { id: "reels", label: "Reels", icon: Compass },
               { id: "messages", label: "Chats", icon: MessageSquare },
-              { id: "explore", label: "Mapa", icon: MapPin },
-              { id: "profile", label: "Perfil", icon: Award },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -361,11 +357,9 @@ export function ConnectView({
                 <button
                   key={tab.id}
                   onClick={() => {
-                    if (tab.id === "messages") {
-                      setActiveTab("messages");
+                    setActiveTab("messages");
+                    if (allProfiles.length > 0) {
                       setSelectedChatUserId(allProfiles[0]?.id || null);
-                    } else {
-                      setActiveTab(tab.id as any);
                     }
                   }}
                   className={`whitespace-nowrap px-3.5 py-2.5 rounded-xl text-[10px] lg:text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-colors border cursor-pointer ${
