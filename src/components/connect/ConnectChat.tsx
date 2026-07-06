@@ -95,6 +95,7 @@ export function ConnectChat({
   const [showNewMessagesBanner, setShowNewMessagesBanner] = useState(false);
   const isAtBottomRef = useRef(true);
   const [reloadTrigger, setReloadTrigger] = useState(0);
+  const activeChatIdRef = useRef<string | null>(null);
 
   // Find active chat partner profile
   const chatPartner = allProfiles.find((p) => p.id === selectedChatUserId) || null;
@@ -197,6 +198,7 @@ export function ConnectChat({
   useEffect(() => {
     if (!selectedChatUserId) {
       setMessages([]);
+      activeChatIdRef.current = null;
       return;
     }
 
@@ -213,6 +215,9 @@ export function ConnectChat({
           .maybeSingle();
 
         if (chatRecord) {
+          // Store active chat ID so the Realtime callback can filter
+          activeChatIdRef.current = chatRecord.id;
+
           const { data: messagesData } = await supabase
             .from("connect_messages")
             .select("*")
@@ -238,6 +243,7 @@ export function ConnectChat({
             }, 100);
           }
         } else {
+          activeChatIdRef.current = null;
           setMessages([]);
         }
       } catch (err) {
@@ -249,26 +255,16 @@ export function ConnectChat({
     setShowNewMessagesBanner(false);
   }, [selectedChatUserId, currentUser.id]);
 
-  // 3. Reset unread count for selected chat room
-  useEffect(() => {
-    if (!selectedChatUserId) return;
-    setChats((prev) =>
-      prev.map((c) =>
-        c.partner.id === selectedChatUserId ? { ...c, unreadCount: 0 } : c
-      )
-    );
-  }, [selectedChatUserId]);
-
-  // 4. Real-time PostgreSQL subscription for connect_messages and connect_chats (Global user level)
+  // 3. Real-time PostgreSQL subscription for connect_messages
+  // NOTE: We listen WITHOUT a row-level filter to avoid requiring REPLICA IDENTITY FULL.
+  // Filtering is done inside the callback using activeChatIdRef.
   useEffect(() => {
     if (!currentUser.id) return;
 
     const supabase = createClient();
 
-    // Channel for messages: since connect_messages has RLS, Supabase only sends messages
-    // belonging to chat rooms where the current user is a participant.
-    const messagesChannel = supabase
-      .channel(`realtime-global-messages:${currentUser.id}`)
+    const channel = supabase
+      .channel(`realtime-incoming-messages:${currentUser.id}`)
       .on(
         "postgres_changes",
         {
@@ -277,101 +273,87 @@ export function ConnectChat({
           table: "connect_messages"
         },
         (payload) => {
-          const newMsg = payload.new;
+          const newMsg = payload.new as any;
 
-          // Find active chat room ID if a chat is selected
-          let activeChatId = "";
-          if (selectedChatUserId) {
-            const [userA, userB] = [currentUser.id, selectedChatUserId].sort();
-            const activeChat = chats.find(
-              (c) => c.partner.id === selectedChatUserId
-            );
-            if (activeChat) {
-              activeChatId = activeChat.id;
-            }
+          // Only handle messages from the currently open chat
+          if (newMsg.chat_id !== activeChatIdRef.current) {
+            // Message belongs to a different chat — just trigger sidebar reload
+            setReloadTrigger((prev) => prev + 1);
+            return;
           }
 
-          // Case A: Message belongs to the active open chat room
-          if (activeChatId && newMsg.chat_id === activeChatId) {
-            if (newMsg.sender_id !== currentUser.id) {
-              setMessages((prev) => {
-                if (prev.some((m) => m.id === newMsg.id)) return prev;
-                return [
-                  ...prev,
-                  {
-                    id: newMsg.id,
-                    sender_id: newMsg.sender_id,
-                    text: newMsg.message_text,
-                    created_at: newMsg.created_at,
-                    status: "sent"
-                  }
-                ];
-              });
+          // Skip messages sent by the current user (already handled optimistically)
+          if (newMsg.sender_id === currentUser.id) return;
 
-              // Scroll management
-              if (isAtBottomRef.current) {
-                setTimeout(() => {
-                  if (messagesContainerRef.current) {
-                    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-                  }
-                }, 50);
-              } else {
-                setShowNewMessagesBanner(true);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [
+              ...prev,
+              {
+                id: newMsg.id,
+                sender_id: newMsg.sender_id,
+                text: newMsg.message_text,
+                created_at: newMsg.created_at,
+                status: "sent" as const
               }
-            }
-          }
-
-          // Case B: Update sidebar chats list items (lastMessage preview, order, time, unreadCount)
-          setChats((prev) => {
-            const list = [...prev];
-            const idx = list.findIndex((c) => c.id === newMsg.chat_id);
-            if (idx !== -1) {
-              list[idx].lastMessage = newMsg.message_text;
-              list[idx].lastMessageTime = new Date(newMsg.created_at).toLocaleTimeString("es-CO", {
-                hour: "numeric",
-                minute: "numeric"
-              });
-              list[idx].rawLastMsgTime = newMsg.created_at;
-
-              // If it's NOT the active chat, and sent by partner, increment unreadCount
-              if (newMsg.chat_id !== activeChatId && newMsg.sender_id !== currentUser.id) {
-                list[idx].unreadCount = (list[idx].unreadCount || 0) + 1;
-              }
-
-              // Re-sort sidebar by most recent message
-              list.sort((a, b) => new Date(b.rawLastMsgTime).getTime() - new Date(a.rawLastMsgTime).getTime());
-              return list;
-            } else {
-              // Message from a new chat room not currently in the sidebar list: Reload list
-              setReloadTrigger((prevVal) => prevVal + 1);
-              return prev;
-            }
+            ];
           });
+
+          // Update sidebar preview for this conversation
+          setReloadTrigger((prev) => prev + 1);
+
+          // Auto-scroll if user is at bottom, else show "Nuevos mensajes" banner
+          if (isAtBottomRef.current) {
+            setTimeout(() => {
+              if (messagesContainerRef.current) {
+                messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+              }
+            }, 50);
+          } else {
+            setShowNewMessagesBanner(true);
+          }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("[Realtime] Subscribed to connect_messages");
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("[Realtime] Subscription issue:", status);
+        }
+      });
 
-    // Channel for chats: trigger sidebar reload when a new chat room is created
-    const chatsChannel = supabase
-      .channel(`realtime-global-chats:${currentUser.id}`)
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser.id]);
+
+  // 4. Real-time user notifications listener (Sub 3) to reload sidebar chats list
+  useEffect(() => {
+    if (!currentUser.id) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`realtime-notifications:${currentUser.id}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
-          table: "connect_chats"
+          table: "user_notifications",
+          filter: `user_id=eq.${currentUser.id}`
         },
         (payload) => {
-          setReloadTrigger((prevVal) => prevVal + 1);
+          // Trigger chats list reload
+          setReloadTrigger((prev) => prev + 1);
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(messagesChannel);
-      supabase.removeChannel(chatsChannel);
+      supabase.removeChannel(channel);
     };
-  }, [currentUser.id, selectedChatUserId, chats]);
+  }, [currentUser.id]);
 
   // 5. Fetch real booking details between participants for Contextual Panel (Column 3)
   useEffect(() => {
@@ -678,16 +660,9 @@ export function ConnectChat({
                       <span className="text-[8px] text-zinc-550 shrink-0 font-bold">{chat.lastMessageTime}</span>
                     </div>
 
-                    <div className="flex justify-between items-center gap-1.5 mt-1">
-                      <p className="text-[10px] text-zinc-550 truncate leading-relaxed flex-grow">
-                        {chat.lastMessage}
-                      </p>
-                      {chat.unreadCount > 0 && (
-                        <span className="text-[8px] bg-primary-600 border border-primary-500/20 text-white font-extrabold w-4 h-4 rounded-full flex items-center justify-center shrink-0 shadow-md">
-                          {chat.unreadCount}
-                        </span>
-                      )}
-                    </div>
+                    <p className="text-[10px] text-zinc-550 truncate mt-1 leading-relaxed">
+                      {chat.lastMessage}
+                    </p>
                   </div>
                 </button>
               );
