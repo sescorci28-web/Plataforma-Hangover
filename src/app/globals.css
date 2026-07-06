@@ -30,8 +30,14 @@
 }
 
 @layer base {
-  body {
+  :root, body {
+    color-scheme: dark;
     @apply bg-[#05050a] text-zinc-100 antialiased selection:bg-primary-500/30 selection:text-white;
+  }
+
+  input[type="date"],
+  input[type="time"] {
+    color-scheme: dark;
   }
 }
 
