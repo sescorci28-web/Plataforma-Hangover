@@ -398,14 +398,14 @@ export function ServiceBookingWidget({
       {/* Booking Modal (AnimatePresence) */}
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto">
             
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
-              className="glass-card w-full max-w-4xl bg-[#090911]/98 border border-white/10 rounded-[28px] overflow-hidden shadow-2xl relative flex flex-col md:flex-row h-full max-h-[85vh]"
+              className="glass-card w-full max-w-4xl bg-[#090911]/98 border border-white/10 rounded-[28px] overflow-y-auto md:overflow-hidden shadow-2xl relative flex flex-col md:flex-row h-auto md:h-full max-h-[90vh] md:max-h-[85vh]"
             >
               
               {/* CLOSE BUTTON */}
@@ -416,9 +416,8 @@ export function ServiceBookingWidget({
               >
                 <X className="w-4 h-4" />
               </button>
-
-              {/* COLUMNA IZQUIERDA: FORMULARIO */}
-              <div className="flex-1 p-6 sm:p-8 space-y-6 overflow-y-auto scrollbar-thin">
+ 
+              <div className="flex-1 p-6 sm:p-8 space-y-6 md:overflow-y-auto scrollbar-thin">
                 <div>
                   <h3 className="text-lg font-black text-white font-outfit uppercase tracking-wider">Solicitud de Reserva</h3>
                   <p className="text-xs text-zinc-500">Completa los detalles de tu evento para iniciar la contratación.</p>
@@ -690,7 +689,7 @@ export function ServiceBookingWidget({
               </div>
 
               {/* COLUMNA DERECHA: RESUMEN LATERAL */}
-              <div className="w-full md:w-[350px] bg-zinc-950/60 border-t md:border-t-0 md:border-l border-white/5 p-6 sm:p-8 flex flex-col justify-between overflow-y-auto scrollbar-thin">
+              <div className="w-full md:w-[350px] bg-zinc-950/60 border-t md:border-t-0 md:border-l border-white/5 p-6 sm:p-8 flex flex-col justify-between md:overflow-y-auto scrollbar-thin shrink-0">
                 
                 <div className="space-y-6">
                   
