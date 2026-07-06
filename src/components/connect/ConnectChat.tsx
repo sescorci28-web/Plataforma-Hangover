@@ -756,7 +756,7 @@ export function ConnectChat({
 
       {/* COLUMNA 3: PANEL CONTEXTUAL INTELIGENTE */}
       {selectedChatUserId && showRightPanel && (
-        <div className="hidden xl:flex w-80 border-l border-white/5 bg-[#050509]/95 flex-col overflow-y-auto p-5 space-y-6 shrink-0 select-none animate-[slideInRight_0.2s_ease-out]">
+        <div className="hidden xl:flex w-80 md:w-[330px] border-l border-white/5 bg-[#050509]/95 flex-col overflow-y-auto pt-5 pb-5 pl-5 pr-3.5 space-y-6 shrink-0 select-none animate-[slideInRight_0.2s_ease-out]">
           
           <div>
             <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-550">Panel de Control Operativo</h4>

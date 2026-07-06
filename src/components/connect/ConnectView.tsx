@@ -312,7 +312,7 @@ export function ConnectView({
   ];
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-[#020205] text-zinc-100 font-sans relative">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-80px-96px)] md:h-[calc(100vh-80px)] overflow-hidden bg-[#020205] text-zinc-100 font-sans relative">
       
       {/* Toast Notification */}
       {toastMessage && (
