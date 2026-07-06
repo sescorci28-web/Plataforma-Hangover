@@ -421,6 +421,12 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
               duration={service.duration || "4 horas"}
               responseTime={service.response_time || "Menos de 1 hora"}
               availabilityStatus={service.availability_status || "available"}
+              provider={service.provider}
+              serviceImageUrl={service.image_url}
+              bookedDates={bookedDates}
+              manualAvailability={manualAvailability}
+              reviewsCount={reviews.length}
+              averageRating={reviews.length ? (reviews.reduce((sum: any, r: any) => sum + r.rating, 0) / reviews.length).toFixed(1) : "4.9"}
             />
 
             {/* Geographic Coverage Quick Summary Box */}

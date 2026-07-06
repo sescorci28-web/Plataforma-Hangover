@@ -674,3 +674,51 @@ export async function toggleFavoriteService(serviceId: string) {
     return { error: err.message || "Error al modificar favoritos." };
   }
 }
+
+/**
+ * Gets or creates a permanent Connect conversation between user and provider
+ */
+export async function getOrCreateConnectChat(providerId: string) {
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return { error: "No estás autenticado." };
+  }
+
+  try {
+    const [userA, userB] = [user.id, providerId].sort();
+    
+    const { data: existingChat, error: checkError } = await supabase
+      .from("connect_chats")
+      .select("id")
+      .eq("user_a_id", userA)
+      .eq("user_b_id", userB)
+      .maybeSingle();
+
+    if (checkError) {
+      return { error: `Error al buscar chat: ${checkError.message}` };
+    }
+
+    if (existingChat) {
+      return { success: true, chatId: existingChat.id };
+    }
+
+    const { data: newChat, error: insertError } = await supabase
+      .from("connect_chats")
+      .insert({
+        user_a_id: userA,
+        user_b_id: userB
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !newChat) {
+      return { error: `Error al crear chat: ${insertError?.message || "No se pudo crear."}` };
+    }
+
+    return { success: true, chatId: newChat.id };
+  } catch (err: any) {
+    return { error: err.message || "Error al inicializar el chat." };
+  }
+}

@@ -4,8 +4,19 @@ import { ConnectView } from "@/components/connect/ConnectView";
 
 export const revalidate = 0; // Dynamic route
 
-export default async function ConnectPage() {
+export default async function ConnectPage({
+  searchParams
+}: {
+  searchParams: Promise<{
+    chatId?: string;
+    userId?: string;
+    providerId?: string;
+    bookingSuccess?: string;
+  }>
+}) {
   const supabase = await createClient();
+  const params = await searchParams;
+  const targetProviderId = params?.providerId || params?.userId;
 
   // 1. Get current authenticated user session
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -32,6 +43,20 @@ export default async function ConnectPage() {
       .select("id, full_name, avatar_url, username, role, city")
       .limit(30);
     allProfiles = data || [];
+
+    if (targetProviderId) {
+      const alreadyHas = allProfiles.some(p => p.id === targetProviderId);
+      if (!alreadyHas) {
+        const { data: pData } = await supabase
+          .from("profiles")
+          .select("id, full_name, avatar_url, username, role, city")
+          .eq("id", targetProviderId)
+          .maybeSingle();
+        if (pData) {
+          allProfiles.unshift(pData);
+        }
+      }
+    }
   } catch (err) {
     console.error("Error fetching profiles list:", err);
   }

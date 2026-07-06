@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useTransition } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/lib/supabase/client';
 import { 
   X, Play, Trash2, UploadCloud, Film, Image as ImageIcon, Loader2, 
@@ -21,6 +22,7 @@ interface ServiceProfileManagerProps {
   service: {
     id: string;
     title: string;
+    category: string;
     spotify_url?: string | null;
     soundcloud_url?: string | null;
     youtube_url?: string | null;
@@ -54,7 +56,19 @@ interface PastEvent {
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 export function ServiceProfileManager({ service, isOpen, onClose }: ServiceProfileManagerProps) {
+  const isArtistOrDj = 
+    service.category === "music" || 
+    service.category?.toLowerCase().includes("music") ||
+    service.category?.toLowerCase().includes("dj") ||
+    service.category?.toLowerCase().includes("show");
+
   const [activeTab, setActiveTab] = useState<'media' | 'calendar' | 'past_events' | 'productions'>('media');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
   
   // Media specific tab
   const [activeMediaTab, setActiveMediaTab] = useState<'stories' | 'gallery'>('stories');
@@ -416,19 +430,19 @@ export function ServiceProfileManager({ service, isOpen, onClose }: ServiceProfi
   };
 
   if (!isOpen) return null;
+  if (!mounted) return null;
 
   const tabs = [
     { id: 'media',       label: 'Historias y Galería',   icon: ImageIcon   },
     { id: 'calendar',    label: 'Disponibilidad',         icon: CalendarIcon },
     { id: 'past_events', label: 'Eventos Realizados',     icon: Sparkles    },
-    { id: 'productions', label: 'Producciones',           icon: Music       },
-  ] as const;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4">
-      <div className="w-full sm:max-w-2xl bg-[#0a0a12] border border-white/10 rounded-t-[28px] sm:rounded-[28px] shadow-[0_0_80px_rgba(139,92,246,0.2)] flex flex-col max-h-[96vh] sm:max-h-[88vh] overflow-hidden">
+    ...(isArtistOrDj ? [{ id: 'productions', label: 'Producciones', icon: Music }] : []),
+  ];
+ 
+  return createPortal(
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md sm:max-w-lg bg-[#0a0a12] border border-white/10 rounded-[24px] shadow-[0_0_80px_rgba(139,92,246,0.25)] flex flex-col max-h-[82vh] overflow-hidden">
         
-        {/* ── Header ─────────────────────────────── */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/6 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-primary-600/20 border border-primary-500/20 flex items-center justify-center shrink-0">
@@ -446,7 +460,7 @@ export function ServiceProfileManager({ service, isOpen, onClose }: ServiceProfi
             <X className="w-4 h-4" />
           </button>
         </div>
-
+ 
         {/* ── Tab Bar ────────────────────────────── */}
         <div className="flex bg-black/30 border-b border-white/6 shrink-0 overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => {
@@ -455,8 +469,8 @@ export function ServiceProfileManager({ service, isOpen, onClose }: ServiceProfi
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3.5 text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer border-b-2 flex-1 justify-center ${
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-1.5 px-4 py-3.5 text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer border-b-2 justify-center shrink-0 flex-1 ${
                   isActive
                     ? 'text-primary-400 border-primary-500 bg-primary-500/5'
                     : 'text-zinc-500 border-transparent hover:text-white hover:bg-white/3'
@@ -489,7 +503,7 @@ export function ServiceProfileManager({ service, isOpen, onClose }: ServiceProfi
                         : 'text-zinc-500 hover:text-white'
                     }`}
                   >
-                    {sub === 'stories' ? '🎬 Historias (Stories)' : '🖼️ Galería del Perfil'}
+                    {sub === 'stories' ? 'Historias (Stories)' : 'Galería del Perfil'}
                   </button>
                 ))}
               </div>
@@ -659,7 +673,7 @@ export function ServiceProfileManager({ service, isOpen, onClose }: ServiceProfi
                           {/* Top badges */}
                           <div className="relative z-10 flex justify-between items-start p-1.5">
                             <span className="bg-black/70 border border-white/10 px-1.5 py-0.5 rounded text-[7px] font-bold text-white uppercase">
-                              {isVid ? '▶' : '🖼'} {isVid ? 'Vid' : 'Foto'}
+                              {isVid ? 'Video' : 'Foto'}
                             </span>
                             <button
                               type="button"
@@ -763,10 +777,10 @@ export function ServiceProfileManager({ service, isOpen, onClose }: ServiceProfi
                       <button
                         key={day}
                         onClick={() => handleCalendarDayClick(day)}
-                        className={`aspect-square rounded-xl border flex flex-col items-center justify-center text-xs font-bold relative transition-all ${cls} ${isToday ? 'ring-1 ring-primary-500 ring-offset-1 ring-offset-black' : ''}`}
+                        className={`h-11 sm:h-12 rounded-xl border flex flex-col items-center justify-center text-xs font-black relative transition-all ${cls} ${isToday ? 'ring-1 ring-primary-500 ring-offset-1 ring-offset-black' : ''}`}
                       >
                         {day}
-                        <span className={`w-1 h-1 rounded-full absolute bottom-1.5 ${
+                        <span className={`w-1 h-1 rounded-full absolute bottom-1 ${
                           status === 'available' ? 'bg-emerald-500' :
                           status === 'booked' ? 'bg-rose-500 animate-pulse' : 'bg-zinc-600'
                         }`} />
@@ -953,6 +967,7 @@ export function ServiceProfileManager({ service, isOpen, onClose }: ServiceProfi
 
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

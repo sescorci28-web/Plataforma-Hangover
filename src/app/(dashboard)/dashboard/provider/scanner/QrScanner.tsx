@@ -74,6 +74,14 @@ export function QrScanner() {
   const [retryCount, setRetryCount] = useState(0);
   const [cameraStartError, setCameraStartError] = useState(false);
   
+  const [cameraState, setCameraState] = useState<"idle" | "requesting" | "ready" | "error">("idle");
+  const cameraStateRef = useRef<"idle" | "requesting" | "ready" | "error">("idle");
+
+  const updateCameraState = (state: "idle" | "requesting" | "ready" | "error") => {
+    setCameraState(state);
+    cameraStateRef.current = state;
+  };
+  
   const scannerRef = useRef<any>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -222,6 +230,33 @@ export function QrScanner() {
     };
   }, []);
 
+  // List cameras on mount to populate devices
+  useEffect(() => {
+    let isMounted = true;
+    import("html5-qrcode").then(async (module) => {
+      try {
+        const cameras = await module.Html5Qrcode.getCameras();
+        if (!isMounted) return;
+        const mapped = (cameras || []).map(c => ({ id: c.id, label: c.label }));
+        setDevices(mapped);
+        if (mapped.length > 0 && !activeCameraId) {
+          const environmentCamera = mapped.find(
+            c => c.label.toLowerCase().includes("back") || 
+                 c.label.toLowerCase().includes("rear") || 
+                 c.label.toLowerCase().includes("trasera") || 
+                 c.label.toLowerCase().includes("environment")
+          );
+          setActiveCameraId(environmentCamera ? environmentCamera.id : mapped[0].id);
+        }
+      } catch (err) {
+        console.warn("[QrScanner] Error listing cameras on mount:", err);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Stop active camera scan
   const stopScanner = async () => {
     if (scannerRef.current) {
@@ -230,179 +265,279 @@ export function QrScanner() {
           await scannerRef.current.stop();
         }
       } catch (err) {
-        console.warn("Error stopping camera scanner:", err);
+        console.warn("[QrScanner] Error stopping camera scanner:", err);
+      } finally {
+        scannerRef.current = null;
+        updateCameraState("idle");
       }
+    } else {
+      updateCameraState("idle");
     }
   };
 
   // Start/restart scanner
-  const startScanner = () => {
+  const startScanner = async () => {
+    if (activeMode !== "camera") return;
+
+    // 1. Guard against concurrent initialization
+    if (cameraStateRef.current === "requesting") {
+      console.log("[QrScanner] Already requesting camera. Skipping concurrent start.");
+      return;
+    }
+
+    // If it's already ready and running, we can just reset results without restarting stream
+    if (cameraStateRef.current === "ready" && scannerRef.current?.isScanning) {
+      console.log("[QrScanner] Camera already active and scanning.");
+      setScanResult(null);
+      setErrorMsg(null);
+      setScanStatus("scanning");
+      setIsConfirming(false);
+      setTorchEnabled(false);
+      return;
+    }
+
+    // 2. Stop any existing instance first
+    await stopScanner();
+
+    // 3. Set state to requesting
+    updateCameraState("requesting");
     setScanResult(null);
     setErrorMsg(null);
     setScanStatus("scanning");
     setIsConfirming(false);
     setTorchEnabled(false);
 
-    import("html5-qrcode").then((module) => {
-      setTimeout(async () => {
-        const qrReaderElem = document.getElementById("qr-reader");
-        if (!qrReaderElem) return;
+    try {
+      const module = await import("html5-qrcode");
 
-        let html5Qrcode = scannerRef.current;
+      // Determine container ID based on mode
+      const containerId = mode === "operator" ? "qr-reader-operator" : "qr-reader-standard";
+      
+      // Small timeout to ensure DOM layout is updated and element is mounted
+      await new Promise((resolve) => setTimeout(resolve, 80));
 
-        // Cleanup or reuse html5-qrcode instance
-        if (!html5Qrcode) {
-          html5Qrcode = new module.Html5Qrcode("qr-reader");
-          scannerRef.current = html5Qrcode;
-        } else {
-          try {
-            if (html5Qrcode.isScanning) {
-              await html5Qrcode.stop();
-            }
-          } catch (err) {
-            console.warn("Error stopping scanner before reuse:", err);
-          }
-        }
+      const qrReaderElem = document.getElementById(containerId);
+      if (!qrReaderElem) {
+        console.warn(`[QrScanner] Element #${containerId} not found in DOM.`);
+        updateCameraState("idle");
+        return;
+      }
 
-        // List available cameras on start
+      // Create new Html5Qrcode instance bound to containerId
+      const html5Qrcode = new module.Html5Qrcode(containerId);
+      scannerRef.current = html5Qrcode;
+
+      // Filter and map available cameras
+      let cameras: any[] = [];
+      try {
+        cameras = await module.Html5Qrcode.getCameras();
+      } catch (e) {
+        console.warn("[QrScanner] Error listing cameras:", e);
+      }
+
+      const mappedDevices = (cameras || []).map(c => ({ id: c.id, label: c.label }));
+      setDevices(mappedDevices);
+
+      // Select appropriate camera device
+      let targetCameraId = activeCameraId;
+      if (!targetCameraId && mappedDevices.length > 0) {
+        // Look for environment/rear camera
+        const environmentCamera = mappedDevices.find(
+          c => c.label.toLowerCase().includes("back") || 
+               c.label.toLowerCase().includes("rear") || 
+               c.label.toLowerCase().includes("trasera") || 
+               c.label.toLowerCase().includes("environment")
+        );
+        targetCameraId = environmentCamera ? environmentCamera.id : mappedDevices[0].id;
+        setActiveCameraId(targetCameraId);
+      }
+
+      const onScanSuccess = async (decodedText: string) => {
+        console.log(`[QrScanner] Scan success: ${decodedText}`);
+        
+        // Stop scanner immediately to prevent multiple scans
         try {
-          const cameras = await module.Html5Qrcode.getCameras();
-          const mappedDevices = cameras.map(c => ({ id: c.id, label: c.label }));
-          setDevices(mappedDevices);
-          if (mappedDevices.length > 0 && !activeCameraId) {
-            // Prefer rear camera
-            const environmentCamera = mappedDevices.find(
-              c => c.label.toLowerCase().includes("back") || 
-                   c.label.toLowerCase().includes("rear") || 
-                   c.label.toLowerCase().includes("trasera") || 
-                   c.label.toLowerCase().includes("environment")
-            );
-            setActiveCameraId(environmentCamera ? environmentCamera.id : mappedDevices[0].id);
-            return; // let useEffect start with the correct cameraId
+          if (scannerRef.current && scannerRef.current.isScanning) {
+            await scannerRef.current.stop();
+            updateCameraState("idle");
           }
         } catch (err) {
-          console.warn("Could not retrieve camera list:", err);
+          console.warn("[QrScanner] Error stopping scanner on success (handled):", err);
         }
 
-        const onScanSuccess = async (decodedText: string) => {
-          console.log(`Scan success: ${decodedText}`);
-          
-          try {
-            if (html5Qrcode.isScanning) {
-              await html5Qrcode.stop();
-            }
-          } catch (err) {
-            console.error("Error stopping scanner on success:", err);
-          }
+        setScanStatus("processing");
 
-          setScanStatus("processing");
-
-          try {
-            const res = await validateQRCodeAndLog(decodedText, deviceDetails, autoConfirm);
-            if (res.error) {
-              // Handle specific warning vs reject
-              if (res.status === "used") {
-                setScanStatus("used");
-                setScanResult(res.bookingDetails);
-                playFeedbackSound("warning");
-                
-                // Gate Operator speed: auto-dismiss used warnings after 1.8s
-                if (mode === "operator") {
-                  setTimeout(() => {
-                    startScanner();
-                  }, 1800);
-                }
-              } else {
-                setScanStatus("invalid");
-                setErrorMsg(res.error);
-                setScanResult(res.bookingDetails || null);
-                playFeedbackSound("error");
-                
-                if (mode === "operator") {
-                  setTimeout(() => {
-                    startScanner();
-                  }, 1800);
-                }
+        try {
+          const res = await validateQRCodeAndLog(decodedText, deviceDetails, autoConfirm);
+          if (res.error) {
+            if (res.status === "used") {
+              setScanStatus("used");
+              setScanResult(res.bookingDetails);
+              playFeedbackSound("warning");
+              
+              if (mode === "operator") {
+                setTimeout(() => {
+                  startScanner();
+                }, 1800);
               }
             } else {
-              setScanResult(res.bookingDetails);
-              setScanStatus(autoConfirm ? "confirmed_success" : "valid");
-              playFeedbackSound("success");
-
-              // Gate Operator speed: auto-dismiss successes after 1.8s
-              if (mode === "operator" && autoConfirm) {
+              setScanStatus("invalid");
+              setErrorMsg(res.error);
+              setScanResult(res.bookingDetails || null);
+              playFeedbackSound("error");
+              
+              if (mode === "operator") {
                 setTimeout(() => {
                   startScanner();
                 }, 1800);
               }
             }
-          } catch (err: any) {
-            setScanStatus("error");
-            setErrorMsg(err.message || "Error al procesar el código QR.");
-            playFeedbackSound("error");
-            
-            if (mode === "operator") {
+          } else {
+            setScanResult(res.bookingDetails);
+            setScanStatus(autoConfirm ? "confirmed_success" : "valid");
+            playFeedbackSound("success");
+
+            if (mode === "operator" && autoConfirm) {
               setTimeout(() => {
                 startScanner();
               }, 1800);
             }
           }
-        };
+        } catch (err: any) {
+          setScanStatus("error");
+          setErrorMsg(err.message || "Error al procesar el código QR.");
+          playFeedbackSound("error");
+          
+          if (mode === "operator") {
+            setTimeout(() => {
+              startScanner();
+            }, 1800);
+          }
+        }
+      };
 
-        const onScanFailure = () => {
-          // Continuous quiet scan failures
-        };
+      const onScanFailure = () => {
+        // Quiet continuous scanner failures
+      };
 
-        // Select camera constraint: specific camera ID, or facingMode fallback
-        const cameraConstraint = activeCameraId ? activeCameraId : { facingMode };
+      // Constraints priority: targetCameraId -> facingMode -> default fallback
+      const cameraConstraint = targetCameraId ? targetCameraId : { facingMode };
 
+      try {
+        await html5Qrcode.start(
+          cameraConstraint,
+          {
+            fps: 15,
+            qrbox: { width: 260, height: 260 },
+            aspectRatio: 1.0,
+          },
+          onScanSuccess,
+          onScanFailure
+        );
+        updateCameraState("ready");
+        setCameraStartError(false);
+        setErrorMsg(null);
+      } catch (startErr: any) {
+        console.warn("[QrScanner] Primary camera constraint failed, attempting fallback...", startErr);
+        
+        // Fallback 1: If we used a specific cameraId, try generic facingMode constraints
+        if (targetCameraId) {
+          try {
+            console.log("[QrScanner] Retrying with generic facingMode environment constraint");
+            await html5Qrcode.start(
+              { facingMode: "environment" },
+              {
+                fps: 15,
+                qrbox: { width: 260, height: 260 },
+                aspectRatio: 1.0,
+              },
+              onScanSuccess,
+              onScanFailure
+            );
+            setActiveCameraId(""); // clear specific invalid cameraId
+            updateCameraState("ready");
+            setCameraStartError(false);
+            setErrorMsg(null);
+            return;
+          } catch (err2) {
+            console.warn("[QrScanner] Generic environment constraint failed, trying user constraint");
+          }
+        }
+        
+        // Fallback 2: Try front camera / user facingMode
         try {
+          setFacingMode("user");
           await html5Qrcode.start(
-            cameraConstraint,
+            { facingMode: "user" },
             {
-              fps: 15, // High frame rate for faster, high-speed validation
+              fps: 15,
               qrbox: { width: 260, height: 260 },
               aspectRatio: 1.0,
             },
             onScanSuccess,
             onScanFailure
           );
-          setRetryCount(0);
+          setActiveCameraId("");
+          updateCameraState("ready");
           setCameraStartError(false);
-        } catch (err: any) {
-          console.error("Error starting camera:", err);
-          setCameraStartError(true);
-          
-          // Auto retry constraint
-          if (retryCount < 3) {
-            setRetryCount(prev => prev + 1);
-            setTimeout(() => {
-              startScanner();
-            }, 1200);
-          } else {
-            setScanStatus("error");
-            setErrorMsg("No se pudo iniciar la cámara. Revisa los permisos e intenta recargar la cámara.");
-          }
+          setErrorMsg(null);
+          return;
+        } catch (err3) {
+          console.warn("[QrScanner] Generic user constraint failed, trying default media constraint");
         }
-      }, 150);
-    }).catch(err => {
-      console.error("Failed to load html5-qrcode library:", err);
+
+        // Fallback 3: Last resort, try to start with empty/default constraints which just requests any default camera
+        try {
+          await html5Qrcode.start(
+            {}, // empty constraints lets browser decide
+            {
+              fps: 15,
+              qrbox: { width: 260, height: 260 },
+              aspectRatio: 1.0,
+            },
+            onScanSuccess,
+            onScanFailure
+          );
+          setActiveCameraId("");
+          updateCameraState("ready");
+          setCameraStartError(false);
+          setErrorMsg(null);
+          return;
+        } catch (err4) {
+          // If all fallbacks failed, throw the original error to be handled by the outer try-catch
+          throw startErr;
+        }
+      }
+    } catch (err: any) {
+      console.warn("[QrScanner] Error initializing camera (handled):", err);
+      updateCameraState("error");
+      setCameraStartError(true);
       setScanStatus("error");
-      setErrorMsg("No fue posible cargar el escáner.");
-    });
+      setErrorMsg("No se pudo iniciar la cámara. Verifica que tengas una cámara disponible y hayas otorgado los permisos necesarios.");
+    }
   };
 
   useEffect(() => {
-    if (activeMode === "camera") {
-      startScanner();
-    } else {
-      stopScanner();
-    }
+    let isMounted = true;
+
+    const initCamera = async () => {
+      if (activeMode === "camera") {
+        await stopScanner();
+        if (isMounted) {
+          await startScanner();
+        }
+      } else {
+        await stopScanner();
+      }
+    };
+
+    initCamera();
 
     return () => {
+      isMounted = false;
       stopScanner();
     };
-  }, [activeMode, activeCameraId, facingMode]);
+  }, [activeMode, activeCameraId, facingMode, mode]);
 
   // Flashlight trigger
   const handleToggleTorch = async () => {
@@ -662,16 +797,28 @@ export function QrScanner() {
                       <div className="absolute left-0 right-0 h-0.5 bg-primary-500 shadow-[0_0_8px_#d946ef] z-10 animate-[bounce_3s_infinite]" />
                     )}
 
-                    <div id="qr-reader" className="w-full h-full" />
+                    <div id="qr-reader-operator" className="w-full h-full" />
                     
-                    {cameraStartError && (
+                    {cameraState === "requesting" && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-black/90 text-center space-y-3 z-20">
+                        <Loader2 className="w-10 h-10 text-primary-400 animate-spin" />
+                        <p className="text-xs text-zinc-300">Iniciando cámara...</p>
+                      </div>
+                    )}
+
+                    {cameraState === "error" && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-black/95 text-center space-y-4 z-20">
-                        <ShieldAlert className="w-12 h-12 text-red-500 animate-bounce" />
-                        <h4 className="text-white font-bold text-sm">Error de Cámara</h4>
-                        <p className="text-xs text-zinc-400">La cámara está bloqueada o en uso por otra aplicación.</p>
+                        <ShieldAlert className="w-12 h-12 text-red-500 animate-pulse" />
+                        <h4 className="text-white font-bold text-sm">Cámara no disponible</h4>
+                        <p className="text-xs text-zinc-400 px-4">
+                          {errorMsg || "La cámara está bloqueada o no se encuentra en el dispositivo."}
+                        </p>
                         <button
-                          onClick={startScanner}
-                          className="bg-primary-600 hover:bg-primary-500 text-white text-[10px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg cursor-pointer"
+                          onClick={() => {
+                            setActiveCameraId("");
+                            startScanner();
+                          }}
+                          className="bg-primary-650 hover:bg-primary-600 text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
                         >
                           Reintentar Cámara 🔁
                         </button>
@@ -951,7 +1098,38 @@ export function QrScanner() {
                     </div>
                     
                     <div className="max-w-sm mx-auto overflow-hidden rounded-2xl border border-white/10 bg-black/40 relative">
-                      <div id="qr-reader" className="w-full h-full" />
+                      {/* Laser line effect */}
+                      {scanStatus === "scanning" && (
+                        <div className="absolute left-0 right-0 h-0.5 bg-primary-500 shadow-[0_0_8px_#d946ef] z-10 animate-[bounce_3s_infinite]" />
+                      )}
+
+                      <div id="qr-reader-standard" className="w-full h-full" />
+
+                      {cameraState === "requesting" && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-black/90 text-center space-y-3 z-20">
+                          <Loader2 className="w-10 h-10 text-primary-400 animate-spin" />
+                          <p className="text-xs text-zinc-300">Iniciando cámara...</p>
+                        </div>
+                      )}
+
+                      {cameraState === "error" && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-black/95 text-center space-y-4 z-20">
+                          <ShieldAlert className="w-12 h-12 text-red-500 animate-pulse" />
+                          <h4 className="text-white font-bold text-sm">Cámara no disponible</h4>
+                          <p className="text-xs text-zinc-400 px-4">
+                            {errorMsg || "La cámara está bloqueada o no se encuentra en el dispositivo."}
+                          </p>
+                          <button
+                            onClick={() => {
+                              setActiveCameraId("");
+                              startScanner();
+                            }}
+                            className="bg-primary-650 hover:bg-primary-600 text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-xl cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+                          >
+                            Reintentar Cámara 🔁
+                          </button>
+                        </div>
+                      )}
                     </div>
                     
                     <p className="text-xs text-zinc-400">

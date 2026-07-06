@@ -1,8 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { BarChart3, Settings, LogOut, Building2, QrCode, Camera, Sliders, ShoppingBag } from "lucide-react";
-import Link from "next/link";
-import { logout } from "@/app/(auth)/actions";
 import { ClubsManager } from "./ClubsManager";
 
 export const revalidate = 0; // Always dynamic page
@@ -31,8 +28,6 @@ export default async function ProviderClubsPage() {
   if (profile.role !== "provider") {
     redirect(`/dashboard/${profile.role}`);
   }
-
-  const activeProfile = profile;
 
   // Fetch clubs belonging to this provider
   let clubs = [];
@@ -76,74 +71,6 @@ export default async function ProviderClubsPage() {
     console.error("Error loading clubs:", err);
   }
 
-  const initials = activeProfile.full_name
-    ? activeProfile.full_name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()
-    : "P";
-
-  return (
-    <div className="container mx-auto px-4 md:px-6 py-12">
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar */}
-        <div className="w-full md:w-64 flex-shrink-0">
-          <div className="glass-card p-6 sticky top-24">
-            <div className="flex items-center gap-4 mb-8">
-              {activeProfile.avatar_url ? (
-                <img
-                  src={activeProfile.avatar_url}
-                  alt={activeProfile.full_name || ""}
-                  className="w-12 h-12 rounded-full object-cover border border-white/10"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center text-xl font-bold font-outfit text-white shrink-0">
-                  {initials}
-                </div>
-              )}
-              <div className="overflow-hidden">
-                <h3 className="font-semibold text-white truncate">{activeProfile.full_name || "Proveedor"}</h3>
-                <p className="text-xs text-zinc-400">@{activeProfile.username || "proveedor"}</p>
-              </div>
-            </div>
-            
-            <nav className="space-y-2">
-              <Link href="/dashboard/provider" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <BarChart3 className="w-5 h-5" />
-                Panel de Control
-              </Link>
-              <Link href="/dashboard/provider/clubs" className="flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl text-primary-400 font-medium">
-                <Building2 className="w-5 h-5 text-primary-400" />
-                Mis Discotecas
-              </Link>
-              <Link href="/dashboard/provider/tables" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <Sliders className="w-5 h-5 text-primary-400" />
-                Control de Mesas
-              </Link>
-              <Link href="/dashboard/provider/orders" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <ShoppingBag className="w-5 h-5 text-primary-400" />
-                Pedidos en Vivo
-              </Link>
-              <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <QrCode className="w-5 h-5 text-primary-400" />
-                Validar Accesos
-              </Link>
-              <Link href="/dashboard/profile" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium">
-                <Settings className="w-5 h-5" />
-                Editar Perfil
-              </Link>
-              <form action={logout}>
-                <button type="submit" className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors text-left font-medium cursor-pointer">
-                  <LogOut className="w-5 h-5" />
-                  Cerrar Sesión
-                </button>
-              </form>
-            </nav>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-grow">
-          <ClubsManager clubs={clubs} />
-        </div>
-      </div>
-    </div>
-  );
+  return <ClubsManager clubs={clubs} />;
 }
+

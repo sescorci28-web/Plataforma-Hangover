@@ -41,6 +41,7 @@ interface EventTabsProps {
   hasTablesModule?: boolean;
   isAdultsOnly?: boolean;
   isFreeEntry?: boolean;
+  variant?: "default" | "community-only";
 }
 
 export function EventTabs({
@@ -63,9 +64,12 @@ export function EventTabs({
   hasVipZone = false,
   hasTablesModule = false,
   isAdultsOnly = false,
-  isFreeEntry = false
+  isFreeEntry = false,
+  variant = "default"
 }: EventTabsProps) {
-  const [activeTab, setActiveTab] = useState<"info" | "gallery" | "community">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "gallery" | "community">(
+    variant === "community-only" ? "community" : "info"
+  );
   const [isMounted, setIsMounted] = useState(false);
   
     // Gallery states
@@ -188,43 +192,45 @@ export function EventTabs({
   return (
     <div className="space-y-6">
       {/* Navigation Tabs Header */}
-      <div className="flex p-1 bg-black/45 rounded-2xl gap-2 shrink-0 w-full sm:max-w-lg border border-white/6 shadow-lg">
-        <button
-          onClick={() => setActiveTab("info")}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
-            activeTab === "info"
-              ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-lg shadow-primary-500/20"
-              : "text-zinc-500 hover:text-zinc-300 hover:bg-white/3"
-          }`}
-        >
-          <Info className="w-3.5 h-3.5" />
-          Info
-        </button>
-        <button
-          onClick={() => setActiveTab("gallery")}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
-            activeTab === "gallery"
-              ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-lg shadow-primary-500/20"
-              : "text-zinc-500 hover:text-zinc-300 hover:bg-white/3"
-          }`}
-        >
-          <ImageIcon className="w-3.5 h-3.5" />
-          Galería
-        </button>
-        {(showCommunity || showChat) && (
+      {variant !== "community-only" && (
+        <div className="flex p-1 bg-black/45 rounded-2xl gap-2 shrink-0 w-full sm:max-w-lg border border-white/6 shadow-lg">
           <button
-            onClick={() => setActiveTab("community")}
+            onClick={() => setActiveTab("info")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
-              activeTab === "community"
+              activeTab === "info"
                 ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-lg shadow-primary-500/20"
                 : "text-zinc-500 hover:text-zinc-300 hover:bg-white/3"
             }`}
           >
-            <Users className="w-3.5 h-3.5" />
-            Comunidad
+            <Info className="w-3.5 h-3.5" />
+            Info
           </button>
-        )}
-      </div>
+          <button
+            onClick={() => setActiveTab("gallery")}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+              activeTab === "gallery"
+                ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-lg shadow-primary-500/20"
+                : "text-zinc-500 hover:text-zinc-300 hover:bg-white/3"
+            }`}
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+            Galería
+          </button>
+          {(showCommunity || showChat) && (
+            <button
+              onClick={() => setActiveTab("community")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+                activeTab === "community"
+                  ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-lg shadow-primary-500/20"
+                  : "text-zinc-500 hover:text-zinc-300 hover:bg-white/3"
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              Comunidad
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Tab Contents */}
       <div className="mt-6">

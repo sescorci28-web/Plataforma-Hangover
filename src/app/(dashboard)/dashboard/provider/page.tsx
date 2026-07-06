@@ -7,6 +7,7 @@ import { BookingActions } from "@/components/provider/BookingActions";
 import { ProviderServicesList } from "@/components/provider/ProviderServicesList";
 import { UserBookingsTabs } from "@/components/dashboard/UserBookingsTabs";
 import { EventTicketingManager } from "@/components/provider/EventTicketingManager";
+import { ProviderBookingsManager } from "@/components/provider/ProviderBookingsManager";
 
 export const revalidate = 0; // Always dynamic
 
@@ -111,7 +112,7 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
   try {
     const { data, error } = await supabase
       .from("bookings")
-      .select("id, event_date, reservation_date, total_amount, status, notes, user_id, club_id, club_slug, number_of_people, event_id")
+      .select("id, event_date, event_time, reservation_date, total_amount, status, notes, user_id, club_id, club_slug, number_of_people, event_id, service_id, created_at, updated_at")
       .eq("provider_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -130,33 +131,40 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
     const userIds = [...new Set(normalizedBookings.map((booking: any) => booking.user_id).filter(Boolean))];
     const clubIds = [...new Set(normalizedBookings.map((booking: any) => booking.club_id).filter(Boolean))];
     const eventIds = [...new Set(normalizedBookings.map((booking: any) => booking.event_id).filter(Boolean))];
+    const serviceIds = [...new Set(normalizedBookings.map((booking: any) => booking.service_id).filter(Boolean))];
 
-    const [userProfilesResult, clubsResult, eventsResult] = await Promise.all([
+    const [userProfilesResult, clubsResult, eventsResult, servicesResult] = await Promise.all([
       userIds.length
-        ? supabase.from("profiles").select("id, full_name").in("id", userIds)
-        : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null }> }),
+        ? supabase.from("profiles").select("id, full_name, username, avatar_url").in("id", userIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null; username: string | null; avatar_url: string | null }> }),
       clubIds.length
         ? supabase.from("clubs").select("id, name").in("id", clubIds)
         : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
       eventIds.length
         ? supabase.from("events").select("id, title").in("id", eventIds)
         : Promise.resolve({ data: [] as Array<{ id: string; title: string }> }),
+      serviceIds.length
+        ? supabase.from("services").select("id, title").in("id", serviceIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; title: string }> }),
     ]);
 
     const userMap = new Map((userProfilesResult.data || []).map((item) => [item.id, item]));
     const clubMap = new Map((clubsResult.data || []).map((item) => [item.id, item]));
     const eventMap = new Map((eventsResult.data || []).map((item) => [item.id, item]));
+    const serviceMap = new Map((servicesResult.data || []).map((item) => [item.id, item]));
 
     normalizedBookings = normalizedBookings.map((booking: any) => {
       const club = booking.club_id ? clubMap.get(booking.club_id) || null : null;
       const event = booking.event_id ? eventMap.get(booking.event_id) || null : null;
+      const serviceObj = booking.service_id ? serviceMap.get(booking.service_id) || null : null;
 
       return {
         ...booking,
         user: booking.user_id ? userMap.get(booking.user_id) || null : null,
         club,
         event,
-        title: event?.title || club?.name || booking.club_slug || "Entrada de evento",
+        service: serviceObj,
+        title: event?.title || serviceObj?.title || club?.name || booking.club_slug || "Reserva de servicio",
       };
     });
   }
@@ -241,305 +249,35 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
   const displayUsername = activeProfile.username || activeProfile.full_name?.toLowerCase().replace(/\s+/g, "_") || "proveedor";
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-12">
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar */}
-        <div className="w-full md:w-64 flex-shrink-0">
-          <div className="glass-card p-6 sticky top-24">
-            <div className="flex items-center gap-4 mb-8">
-              {activeProfile.avatar_url ? (
-                <img
-                  src={activeProfile.avatar_url}
-                  alt={activeProfile.full_name || ""}
-                  className="w-12 h-12 rounded-full object-cover border border-white/10"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center text-xl font-bold font-outfit text-white shrink-0">
-                  {initials}
-                </div>
-              )}
-              <div className="overflow-hidden">
-                <h3 className="font-semibold text-white truncate">{activeProfile.full_name || "Proveedor"}</h3>
-                <p className="text-xs text-zinc-400">@{displayUsername}</p>
-              </div>
-            </div>
-            
-            <nav className="space-y-2">
-              <Link 
-                href="/dashboard/provider?view=provider" 
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all cursor-pointer ${
-                  view === "provider" || ["events", "tickets", "attendees", "sales", "services", "requests", "bookings", "calendar"].includes(view)
-                    ? "bg-white/10 text-primary-400"
-                    : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <BarChart3 className="w-5 h-5 text-primary-400" />
-                Panel de Negocio
-              </Link>
-              <Link 
-                href="/dashboard/provider?view=client" 
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all cursor-pointer ${
-                  view === "client"
-                    ? "bg-white/10 text-primary-400"
-                    : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <Ticket className="w-5 h-5" />
-                Mi Actividad Cliente
-              </Link>
-
-              <div className="h-px bg-white/5 my-4" />
-
-              {/* Secciones según provider_type */}
-              {profile.provider_type === "club" && (
-                <>
-                  <Link href="/dashboard/provider/clubs" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
-                    <Building2 className="w-5 h-5 text-primary-400" />
-                    Mis Discotecas
-                  </Link>
-                  <Link href="/dashboard/provider/tables" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
-                    <Sliders className="w-5 h-5 text-primary-400" />
-                    Control de Mesas
-                  </Link>
-                  <Link href="/dashboard/provider/orders" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
-                    <ShoppingBag className="w-5 h-5 text-primary-400" />
-                    Pedidos en Vivo
-                  </Link>
-                  <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
-                    <QrCode className="w-5 h-5 text-primary-400" />
-                    Validar Accesos
-                  </Link>
-                  <Link href="/dashboard/provider/new-event" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
-                    <Calendar className="w-5 h-5 text-primary-400" />
-                    Crear Evento
-                  </Link>
-                </>
-              )}
-
-              {profile.provider_type === "event_organizer" && (
-                <>
-                  <Link 
-                    href="/dashboard/provider?view=events" 
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors cursor-pointer ${
-                      view === "events" ? "bg-white/10 text-primary-400" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <Calendar className="w-5 h-5 text-primary-400" />
-                    Mis Eventos
-                  </Link>
-                  <Link 
-                    href="/dashboard/provider?view=tickets" 
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors cursor-pointer ${
-                      view === "tickets" ? "bg-white/10 text-primary-400" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <Ticket className="w-5 h-5 text-primary-400" />
-                    Boletería
-                  </Link>
-                  <Link href="/dashboard/provider/scanner" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
-                    <QrCode className="w-5 h-5 text-primary-400" />
-                    Validar Accesos
-                  </Link>
-                  <Link 
-                    href="/dashboard/provider?view=attendees" 
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors cursor-pointer ${
-                      view === "attendees" ? "bg-white/10 text-primary-400" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <Users className="w-5 h-5 text-primary-400" />
-                    Asistentes
-                  </Link>
-                  <Link 
-                    href="/dashboard/provider?view=sales" 
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors cursor-pointer ${
-                      view === "sales" ? "bg-white/10 text-primary-400" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <DollarSign className="w-5 h-5 text-primary-400" />
-                    Ventas
-                  </Link>
-                </>
-              )}
-
-              {profile.provider_type === "service_provider" && (
-                <>
-                  <Link 
-                    href="/dashboard/provider?view=services" 
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors cursor-pointer ${
-                      view === "services" ? "bg-white/10 text-primary-400" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <Sparkles className="w-5 h-5 text-primary-400" />
-                    Mis Servicios
-                  </Link>
-                  <Link 
-                    href="/dashboard/provider?view=requests" 
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors cursor-pointer ${
-                      view === "requests" ? "bg-white/10 text-primary-400" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <Bell className="w-5 h-5 text-primary-400" />
-                    Solicitudes
-                  </Link>
-                  <Link 
-                    href="/dashboard/provider?view=bookings" 
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors cursor-pointer ${
-                      view === "bookings" ? "bg-white/10 text-primary-400" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <Calendar className="w-5 h-5 text-primary-400" />
-                    Reservas
-                  </Link>
-                  <Link 
-                    href="/dashboard/provider?view=calendar" 
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors cursor-pointer ${
-                      view === "calendar" ? "bg-white/10 text-primary-400" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <CalendarDays className="w-5 h-5 text-primary-400" />
-                    Calendario
-                  </Link>
-                </>
-              )}
-
-              <div className="h-px bg-white/5 my-4" />
-
-              <Link 
-                href="/dashboard/user" 
-                className="flex items-center justify-between gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-all font-medium cursor-pointer"
-              >
-                <span className="flex items-center gap-3">
-                  <User className="w-5 h-5" />
-                  Vista de Cliente
-                </span>
-                <ArrowRight className="w-4 h-4 text-zinc-500" />
-              </Link>
-              <Link href="/dashboard/profile" className="flex items-center gap-3 px-4 py-3 text-zinc-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors font-medium cursor-pointer">
-                <Settings className="w-5 h-5" />
-                Editar Perfil
-              </Link>
-              <form action={logout}>
-                <button type="submit" className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors text-left font-medium cursor-pointer">
-                  <LogOut className="w-5 h-5" />
-                  Cerrar Sesión
-                </button>
-              </form>
-            </nav>
+    <div className="space-y-8 w-full">
+      {/* Recovery Alert Banner */}
+      {isProfileError && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-sm flex flex-col gap-2">
+          <div className="font-semibold flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            <span>Modo de Recuperación (Sin Conexión a Perfil de Base de Datos)</span>
+          </div>
+          <p className="text-xs text-zinc-300">
+            No pudimos obtener tu registro de perfil de Supabase. Esto puede deberse a que el perfil aún no ha sido sincronizado o hay un inconveniente temporal con la base de datos.
+            Por favor, intenta actualizar tu perfil manualmente para crearlo.
+          </p>
+          <div>
+            <Link 
+              href="/dashboard/profile" 
+              className="inline-block bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
+            >
+              Configurar / Crear mi Perfil ahora
+            </Link>
           </div>
         </div>
+      )}
 
-        {/* Main Content */}
-        <div className="flex-grow space-y-8">
-          {/* Recovery Alert Banner */}
-          {isProfileError && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-sm flex flex-col gap-2">
-              <div className="font-semibold flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-                <span>Modo de Recuperación (Sin Conexión a Perfil de Base de Datos)</span>
-              </div>
-              <p className="text-xs text-zinc-300">
-                No pudimos obtener tu registro de perfil de Supabase. Esto puede deberse a que el perfil aún no ha sido sincronizado o hay un inconveniente temporal con la base de datos.
-                Por favor, intenta actualizar tu perfil manualmente para crearlo.
-              </p>
-              <div>
-                <Link 
-                  href="/dashboard/profile" 
-                  className="inline-block bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
-                >
-                  Configurar / Crear mi Perfil ahora
-                </Link>
-              </div>
-            </div>
-          )}
-          {view !== "client" ? (
-            // ====================================================
-            // BUSINESS VIEWS (PROVIDER PANEL)
-            // ====================================================
-            <>
-              {/* Header dinámico por tipo de proveedor y vista */}
-              <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-zinc-950/40 p-6 rounded-2xl border border-white/5">
-                <div>
-                  <div className="flex items-center gap-2.5 mb-1 flex-wrap">
-                    <h1 className="text-2xl font-bold font-outfit text-white">
-                      {profile.provider_type === "club" && "Panel de Discoteca"}
-                      {profile.provider_type === "event_organizer" && "Panel de Organización"}
-                      {profile.provider_type === "service_provider" && "Panel de Servicios"}
-                      {!profile.provider_type && "Panel de Proveedor"}
-                      {" "}
-                      {view === "events" && "• Eventos"}
-                      {view === "tickets" && "• Entradas"}
-                      {view === "attendees" && "• Asistentes"}
-                      {view === "sales" && "• Reporte de Ventas"}
-                      {view === "services" && "• Servicios"}
-                      {view === "requests" && "• Solicitudes"}
-                      {view === "bookings" && "• Reservas"}
-                      {view === "calendar" && "• Calendario de Actividades"}
-                    </h1>
-                    {activeProfile.city && activeProfile.city !== "No especificada" && (
-                      <div className="flex items-center gap-1 text-zinc-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full text-xs font-semibold">
-                        <MapPin className="w-3.5 h-3.5 text-primary-400 shrink-0" />
-                        <span>{activeProfile.city}</span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-zinc-400">
-                    {profile.provider_type === "club" && "Administra tu discoteca, controla mesas, atiende pedidos y valida accesos."}
-                    {profile.provider_type === "event_organizer" && "Publica eventos oficiales, vende entradas, gestiona asistentes y analiza ventas."}
-                    {profile.provider_type === "service_provider" && "Ofrece servicios de sonido, luces, animación o barra y gestiona reservas de clientes."}
-                  </p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
-                  {/* Validar Accesos (solo club y event_organizer) */}
-                  {(profile.provider_type === "club" || profile.provider_type === "event_organizer") && (
-                    <Link href="/dashboard/provider/scanner" className="bg-primary-600 hover:bg-primary-500 text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center shrink-0 shadow-md hover:shadow-primary-500/15 transform hover:scale-[1.02] active:scale-[0.98]">
-                      <QrCode className="w-3.5 h-3.5 shrink-0 text-white" />
-                      Validar Accesos
-                    </Link>
-                  )}
-
-                  {/* Acciones de creación */}
-                  <div className="flex gap-2.5">
-                    {profile.provider_type === "service_provider" && (
-                      <Link href="/dashboard/provider/new-service" className="bg-zinc-900/60 border border-primary-500/20 hover:border-primary-500/50 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none shadow-md hover:shadow-primary-500/10 transform hover:scale-[1.02] active:scale-[0.98]">
-                        <Plus className="w-3.5 h-3.5 shrink-0 text-primary-400" />
-                        Nuevo Servicio
-                      </Link>
-                    )}
-                    {(profile.provider_type === "club" || profile.provider_type === "event_organizer") && (
-                      <Link href="/dashboard/provider/new-event" className="bg-zinc-900/60 border border-primary-500/20 hover:border-primary-500/50 hover:bg-primary-950/20 text-zinc-300 hover:text-white px-4.5 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer text-xs justify-center flex-grow sm:flex-none shadow-md hover:shadow-primary-500/10 transform hover:scale-[1.02] active:scale-[0.98]">
-                        <Plus className="w-3.5 h-3.5 shrink-0 text-primary-400" />
-                        Crear Evento
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              </header>
-
-              {/* Profile Summary Card (solo en la vista principal) */}
-              {view === "provider" && (
-                <div className="glass-card p-6 bg-gradient-to-r from-primary-950/20 to-transparent flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-primary-400">Presentación / Biografía</h3>
-                    <div className="text-sm text-zinc-300 space-y-1">
-                      <p><span className="text-zinc-500">Nombre de Proveedor:</span> {activeProfile.full_name || "No especificado"}</p>
-                      <p><span className="text-zinc-500">Usuario:</span> @{displayUsername}</p>
-                      <p><span className="text-zinc-500">Tipo de Negocio:</span> <span className="capitalize text-primary-300 font-semibold">{profile.provider_type === "club" ? "Discoteca / Club" : profile.provider_type === "event_organizer" ? "Organizador de Eventos" : "Proveedor de Servicios"}</span></p>
-                    </div>
-                    {activeProfile.bio && (
-                      <p className="text-sm text-zinc-400 italic mt-2">"{activeProfile.bio}"</p>
-                    )}
-                  </div>
-                  <Link 
-                    href="/dashboard/profile" 
-                    className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shrink-0 text-sm glow text-center w-full md:w-auto"
-                  >
-                    Editar Perfil completo
-                  </Link>
-                </div>
-              )}
-
-              {/* CONTENIDO PRINCIPAL SEGÚN LA VISTA SELECCIONADA */}
+      {view !== "client" ? (
+        // ====================================================
+        // BUSINESS VIEWS (PROVIDER PANEL)
+        // ====================================================
+        <>
+          {/* CONTENIDO PRINCIPAL SEGÚN LA VISTA SELECCIONADA */}
               
               {/* VISTA GENERAL: PANEL DE NEGOCIO */}
               {view === "provider" && (
@@ -849,15 +587,28 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
                 </div>
               )}
 
-              {/* VISTAS ESPECÍFICAS: ASISTENTES / VENTAS / SOLICITUDES / RESERVAS */}
-              {["sales", "attendees", "requests", "bookings", "calendar"].includes(view) && (
+              {/* VISTA ESPECÍFICA: CENTRO DE GESTIÓN DE RESERVAS / SOLICITUDES */}
+              {["requests", "bookings"].includes(view) && (
+                <div className="glass-card p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold text-white">
+                      {view === "requests" ? "Solicitudes Pendientes de Confirmación" : "Centro de Gestión de Reservas"}
+                    </h2>
+                  </div>
+                  <ProviderBookingsManager 
+                    initialBookings={normalizedBookings} 
+                    defaultTab={view === "requests" ? "pending" : "all"} 
+                  />
+                </div>
+              )}
+
+              {/* VISTAS ESPECÍFICAS: ASISTENTES / VENTAS / CALENDARIO */}
+              {["sales", "attendees", "calendar"].includes(view) && (
                 <div className="glass-card p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-white">
                       {view === "sales" && "Registro de Ventas e Ingresos"}
                       {view === "attendees" && "Reporte de Asistentes Confirmados"}
-                      {view === "requests" && "Solicitudes Pendientes de Confirmación"}
-                      {view === "bookings" && "Listado Histórico de Reservas"}
                       {view === "calendar" && "Calendario / Próximas Fechas"}
                     </h2>
                   </div>
@@ -867,7 +618,6 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
                       normalizedBookings
                         .filter((req: any) => {
                           if (view === "tickets") return !!req.event_id;
-                          if (view === "requests") return req.status === "pending";
                           return true;
                         })
                         .map((req: any) => (
@@ -983,8 +733,6 @@ export default async function ProviderDashboard({ searchParams }: ProviderDashbo
               </div>
             </>
           )}
-        </div>
-      </div>
     </div>
   );
 }

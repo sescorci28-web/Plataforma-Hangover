@@ -47,32 +47,30 @@ export default async function NewServicePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#06060e]">
-      <div className="container mx-auto px-4 md:px-6 py-10 max-w-2xl">
-        {/* Back link */}
-        <Link
-          href="/dashboard/provider"
-          className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-white transition-colors mb-8"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Volver al Panel
-        </Link>
+    <div className="container mx-auto px-4 md:px-6 py-10 max-w-2xl">
+      {/* Back link */}
+      <Link
+        href="/dashboard/provider"
+        className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-white transition-colors mb-8"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        Volver al Panel
+      </Link>
 
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-2xl bg-primary-600/20 border border-primary-500/20 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-primary-400" />
-            </div>
-            <h1 className="text-2xl font-black font-outfit text-white">Publicar Servicio</h1>
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-2xl bg-primary-600/20 border border-primary-500/20 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary-400" />
           </div>
-          <p className="text-sm text-zinc-500">
-            Ponlo en el marketplace de Hangover en menos de 2 minutos.
-          </p>
+          <h1 className="text-2xl font-black font-outfit text-white">Publicar Servicio</h1>
         </div>
-
-        <NewServiceForm categories={dbCategories} subcategories={dbSubcategories} />
+        <p className="text-sm text-zinc-500">
+          Ponlo en el marketplace de Hangover en menos de 2 minutos.
+        </p>
       </div>
+
+      <NewServiceForm categories={dbCategories} subcategories={dbSubcategories} />
     </div>
   );
 }

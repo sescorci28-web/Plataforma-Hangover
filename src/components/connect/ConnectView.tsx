@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Sparkles,
   MapPin,
@@ -155,6 +155,24 @@ export function ConnectView({
 
   // Chat State
   const [selectedChatUserId, setSelectedChatUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const targetUid = params.get("userId") || params.get("providerId");
+      const success = params.get("bookingSuccess");
+      
+      if (targetUid) {
+        setActiveTab("messages");
+        setSelectedChatUserId(targetUid);
+      }
+      
+      if (success === "true") {
+        setToastMessage("✅ ¡Tu solicitud fue enviada correctamente! Ahora puedes conversar con el proveedor mientras revisa tu solicitud.");
+        setTimeout(() => setToastMessage(null), 8000);
+      }
+    }
+  }, []);
 
   // Moderation state
   const [moderatingPostId, setModeratingPostId] = useState<string | null>(null);

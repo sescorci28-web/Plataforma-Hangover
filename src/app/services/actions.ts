@@ -15,10 +15,19 @@ export async function createServiceBooking(
   totalAmount: number,
   notes?: string,
   quoteDetails?: {
+    eventName?: string;
     eventType?: string;
+    startTime?: string;
+    endTime?: string;
+    duration?: string;
     bookingCity?: string;
-    budget?: number;
+    address?: string;
+    locationName?: string;
+    googleMapsUrl?: string;
     guestsCount?: number;
+    specialRequirements?: string;
+    fileUrls?: string[];
+    budget?: number;
   }
 ) {
   const supabase = await createClient();
@@ -67,25 +76,94 @@ export async function createServiceBooking(
         provider_id: providerId,
         service_id: serviceId,
         event_date: eventDate,
+        event_time: quoteDetails?.startTime || '00:00:00',
         total_amount: totalAmount,
         status: "pending",
         notes: notes || null,
         qr_code: 'QR-' + randomUUID(),
         qr_status: 'active',
-        // Quotation details support
+        // Extended fields
+        event_name: quoteDetails?.eventName || null,
         event_type: quoteDetails?.eventType || null,
+        end_time: quoteDetails?.endTime || null,
+        duration: quoteDetails?.duration || null,
         booking_city: quoteDetails?.bookingCity || null,
-        budget: quoteDetails?.budget || null,
-        number_of_people: quoteDetails?.guestsCount || 1
+        address: quoteDetails?.address || null,
+        location_name: quoteDetails?.locationName || null,
+        google_maps_url: quoteDetails?.googleMapsUrl || null,
+        number_of_people: quoteDetails?.guestsCount || 1,
+        special_requirements: quoteDetails?.specialRequirements || null,
+        file_urls: quoteDetails?.fileUrls || null,
+        budget: quoteDetails?.budget || null
       });
 
     if (insertError) {
       return { error: `Error al crear la reserva: ${insertError.message}` };
     }
 
+    // Create connect chat and send automated message
+    let chatId = "";
+    try {
+      const [userA, userB] = [user.id, providerId].sort();
+      
+      const { data: existingChat } = await supabase
+        .from("connect_chats")
+        .select("id")
+        .eq("user_a_id", userA)
+        .eq("user_b_id", userB)
+        .maybeSingle();
+
+      if (existingChat) {
+        chatId = existingChat.id;
+      } else {
+        const { data: newChat } = await supabase
+          .from("connect_chats")
+          .insert({
+            user_a_id: userA,
+            user_b_id: userB
+          })
+          .select("id")
+          .single();
+        if (newChat) {
+          chatId = newChat.id;
+        }
+      }
+
+      if (chatId) {
+        // Fetch service title to construct message
+        const { data: service } = await supabase
+          .from("services")
+          .select("title")
+          .eq("id", serviceId)
+          .single();
+
+        const serviceTitle = service?.title || "Servicio contratado";
+        
+        let detailSummary = `🔔 SOLICITUD DE SERVICIO RECIBIDA\n\n`;
+        detailSummary += `Servicio: ${serviceTitle}\n`;
+        detailSummary += `Fecha: ${eventDate}\n`;
+        detailSummary += `Horario: ${quoteDetails?.startTime || "00:00"} - ${quoteDetails?.endTime || "00:00"}\n`;
+        detailSummary += `Asistentes: ${quoteDetails?.guestsCount || 1} personas\n`;
+        if (quoteDetails?.bookingCity) detailSummary += `Ubicación: ${quoteDetails.bookingCity}, ${quoteDetails.address || ""}\n`;
+        if (quoteDetails?.specialRequirements) detailSummary += `Requerimientos: ${quoteDetails.specialRequirements}\n`;
+        detailSummary += `Precio Base: $${totalAmount.toLocaleString("es-CO")} COP\n\n`;
+        detailSummary += `Estado: Pendiente de revisión`;
+
+        await supabase
+          .from("connect_messages")
+          .insert({
+            chat_id: chatId,
+            sender_id: user.id,
+            message_text: detailSummary
+          });
+      }
+    } catch (chatErr) {
+      console.error("Error creating auto chat on booking:", chatErr);
+    }
+
     revalidatePath("/dashboard/user");
     revalidatePath("/dashboard/provider");
-    return { success: true };
+    return { success: true, chatId };
   } catch (err: any) {
     return { error: err.message || "Ocurrió un error inesperado al procesar la reserva." };
   }

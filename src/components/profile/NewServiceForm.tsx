@@ -53,6 +53,31 @@ const STATIC_SUBCATEGORIES_MAP: Record<string, string[]> = {
 
 const COLOMBIA_CITIES = ["Barranquilla", "Cartagena", "Medellín", "Bogotá", "Cali", "Santa Marta", "Otro"];
 
+const COUNTRY_CODES = [
+  { code: "57", country: "Colombia", display: "🇨🇴 +57" },
+  { code: "1", country: "USA/Canada", display: "🇺🇸 +1" },
+  { code: "34", country: "España", display: "🇪🇸 +34" },
+  { code: "52", country: "México", display: "🇲🇽 +52" },
+  { code: "54", country: "Argentina", display: "🇦🇷 +54" },
+  { code: "58", country: "Venezuela", display: "🇻🇪 +58" },
+  { code: "56", country: "Chile", display: "🇨🇱 +56" },
+  { code: "51", country: "Perú", display: "🇵🇪 +51" },
+  { code: "593", country: "Ecuador", display: "🇪🇨 +593" },
+  { code: "502", country: "Guatemala", display: "🇬🇹 +502" },
+  { code: "506", country: "Costa Rica", display: "🇨🇷 +506" },
+  { code: "507", country: "Panamá", display: "🇵🇦 +507" },
+  { code: "591", country: "Bolivia", display: "🇧🇴 +591" },
+  { code: "595", country: "Paraguay", display: "🇵🇾 +595" },
+  { code: "598", country: "Uruguay", display: "🇺🇾 +598" },
+  { code: "503", country: "El Salvador", display: "🇸🇻 +503" },
+  { code: "504", country: "Honduras", display: "🇭🇳 +504" },
+  { code: "505", country: "Nicaragua", display: "🇳🇮 +505" },
+  { code: "509", country: "Haití", display: "🇭🇹 +509" },
+  { code: "590", country: "Guadalupe", display: "🇬🇵 +590" },
+  { code: "597", country: "Surinam", display: "🇸🇷 +597" },
+  { code: "592", country: "Guyana", display: "🇬🇾 +592" },
+];
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface UploadedMedia {
   id: string;
@@ -159,12 +184,36 @@ export function NewServiceForm({ initialService, categories = [], subcategories 
   const [experience, setExperience] = useState(initialService?.experience || "");
   const [baseCity, setBaseCity] = useState(initialService?.base_city || "Barranquilla");
   const [customCity, setCustomCity] = useState("");
-  const [citiesCoverage, setCitiesCoverage] = useState(initialService?.cities_coverage?.join(", ") || "");
-  const [whatsappNumber, setWhatsappNumber] = useState(initialService?.whatsapp_number || "");
+  const [citiesCoverage, setCitiesCoverage] = useState<string[]>(initialService?.cities_coverage || []);
+  
+  // Parse initial WhatsApp number into country code and local number
+  const getInitialPhoneParts = () => {
+    const raw = initialService?.whatsapp_number?.replace(/\D/g, "") || "";
+    if (!raw) return { code: "57", local: "" };
+    
+    // Sort from longest code prefix to shortest to avoid partial matches
+    const sortedCodes = [
+      { code: "593" }, { code: "502" }, { code: "506" }, { code: "507" }, 
+      { code: "591" }, { code: "595" }, { code: "598" }, { code: "503" }, 
+      { code: "504" }, { code: "505" }, { code: "509" }, { code: "590" }, 
+      { code: "597" }, { code: "592" }, { code: "57" }, { code: "34" }, 
+      { code: "52" }, { code: "54" }, { code: "58" }, { code: "56" }, 
+      { code: "51" }, { code: "1" }
+    ];
+    for (const c of sortedCodes) {
+      if (raw.startsWith(c.code)) {
+        return { code: c.code, local: raw.substring(c.code.length) };
+      }
+    }
+    return { code: "57", local: raw }; // fallback
+  };
+
+  const initialParts = getInitialPhoneParts();
+  const [selectedCountryCode, setSelectedCountryCode] = useState(initialParts.code);
+  const [localPhone, setLocalPhone] = useState(initialParts.local);
+
   const [instagram, setInstagram] = useState((initialService?.social_media as any)?.instagram || "");
   const [facebook, setFacebook] = useState((initialService?.social_media as any)?.facebook || "");
-  const [tags, setTags] = useState(initialService?.tags?.join(", ") || "");
-  const [specialties, setSpecialties] = useState(initialService?.specialties?.join(", ") || "");
   const [providerStatus, setProviderStatus] = useState(initialService?.provider_status || "active");
 
   const isDynamic = categories.length > 0;
@@ -285,8 +334,12 @@ export function NewServiceForm({ initialService, categories = [], subcategories 
       if (!description.trim()) e.description = "La descripción es obligatoria";
     }
     if (s === 4) {
-      if (!whatsappNumber.trim()) e.whatsapp = "El WhatsApp es obligatorio";
-      else if (!/^\d{11,15}$/.test(whatsappNumber.replace(/\D/g, ""))) e.whatsapp = "Incluye el código de país (ej. 573001234567)";
+      const cleanLocal = localPhone.replace(/\D/g, "");
+      if (!cleanLocal.trim()) {
+        e.whatsapp = "El número de WhatsApp es obligatorio";
+      } else if (cleanLocal.length < 7 || cleanLocal.length > 12) {
+        e.whatsapp = "Ingresa un número de teléfono local válido";
+      }
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -319,11 +372,11 @@ export function NewServiceForm({ initialService, categories = [], subcategories 
       cover_url: coverUrl || null,
       video_url: videoUrl || null,
       experience: experience || null,
-      cities_coverage: citiesCoverage.split(",").map(c => c.trim()).filter(Boolean),
+      cities_coverage: citiesCoverage,
       social_media: { instagram: instagram.trim(), facebook: facebook.trim() },
-      whatsapp_number: whatsappNumber.trim() || null,
-      tags: tags.split(",").map(t => t.trim()).filter(Boolean),
-      specialties: specialties.split(",").map(s => s.trim()).filter(Boolean),
+      whatsapp_number: localPhone.trim() ? `${selectedCountryCode}${localPhone.replace(/\D/g, "")}` : null,
+      tags: [],
+      specialties: [],
       latitude: null,
       longitude: null,
       provider_status: providerStatus as any,
@@ -680,7 +733,7 @@ export function NewServiceForm({ initialService, categories = [], subcategories 
               </div>
 
               {/* Location row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-xs font-black uppercase tracking-wider text-zinc-400">Ciudad Base</label>
                   <select
@@ -696,30 +749,36 @@ export function NewServiceForm({ initialService, categories = [], subcategories 
                       placeholder="Escribe tu ciudad" className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 px-4 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 mt-2" />
                   )}
                 </div>
+
                 <div className="space-y-2">
                   <label className="text-xs font-black uppercase tracking-wider text-zinc-400">Ciudades de Cobertura</label>
-                  <input
-                    type="text"
-                    value={citiesCoverage}
-                    onChange={e => setCitiesCoverage(e.target.value)}
-                    disabled={isPending || success}
-                    placeholder="Ej. Barranquilla, Cartagena, Santa Marta"
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-3.5 px-4 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30 text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Tags & Specialties — compact */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-black uppercase tracking-wider text-zinc-400">Tags (separadas por coma)</label>
-                  <input type="text" value={tags} onChange={e => setTags(e.target.value)} disabled={isPending || success}
-                    placeholder="electrónica, techno, house" className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 px-4 text-white placeholder:text-zinc-600 focus:outline-none text-sm" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black uppercase tracking-wider text-zinc-400">Especialidades</label>
-                  <input type="text" value={specialties} onChange={e => setSpecialties(e.target.value)} disabled={isPending || success}
-                    placeholder="bodas, pool parties, corporativos" className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 px-4 text-white placeholder:text-zinc-600 focus:outline-none text-sm" />
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {COLOMBIA_CITIES.filter(c => c !== "Otro").map(city => {
+                      const isSelected = citiesCoverage.includes(city);
+                      return (
+                        <button
+                          key={city}
+                          type="button"
+                          disabled={isPending || success}
+                          onClick={() => {
+                            if (isSelected) {
+                              setCitiesCoverage(prev => prev.filter(c => c !== city));
+                            } else {
+                              setCitiesCoverage(prev => [...prev, city]);
+                            }
+                          }}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                            isSelected
+                              ? "bg-primary-600/20 border-primary-500/40 text-white shadow-sm shadow-primary-500/10"
+                              : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"
+                          }`}
+                        >
+                          {city} {isSelected && "✓"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-zinc-600 mt-1">Selecciona todas las ciudades donde puedes prestar este servicio.</p>
                 </div>
               </div>
             </div>
@@ -743,16 +802,41 @@ export function NewServiceForm({ initialService, categories = [], subcategories 
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-zinc-400">WhatsApp * (con código de país)</label>
-                  <div className="relative">
-                    <MessageCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
-                    <input type="tel" value={whatsappNumber}
-                      onChange={e => { setWhatsappNumber(e.target.value); if (errors.whatsapp) setErrors(p => ({ ...p, whatsapp: "" })); }}
-                      disabled={isPending || success} placeholder="573001234567"
-                      className={`w-full bg-black/40 border rounded-2xl py-3.5 pl-11 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 text-sm ${
-                        errors.whatsapp ? "border-red-500/50 focus:ring-red-500/30" : "border-white/10 focus:ring-emerald-500/30"
-                      }`}
-                    />
+                  <label className="text-xs font-bold text-zinc-400">WhatsApp *</label>
+                  <div className="flex gap-2">
+                    {/* Country Code Select */}
+                    <div className="relative w-1/3 sm:w-2/5 shrink-0">
+                      <select
+                        value={selectedCountryCode}
+                        onChange={e => setSelectedCountryCode(e.target.value)}
+                        disabled={isPending || success}
+                        className="w-full bg-black/40 border border-white/10 rounded-2xl py-3.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 text-xs sm:text-sm cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23a1a1aa%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:10px_10px] bg-[right_1rem_center] bg-no-repeat pr-8"
+                      >
+                        {COUNTRY_CODES.map(c => (
+                          <option key={c.code} value={c.code} className="bg-zinc-950 text-white text-xs">
+                            {c.display} ({c.country})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Local Number Input */}
+                    <div className="relative flex-1">
+                      <MessageCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400 pointer-events-none" />
+                      <input
+                        type="tel"
+                        value={localPhone}
+                        onChange={e => {
+                          setLocalPhone(e.target.value.replace(/\D/g, ""));
+                          if (errors.whatsapp) setErrors(p => ({ ...p, whatsapp: "" }));
+                        }}
+                        placeholder="3001234567"
+                        disabled={isPending || success}
+                        className={`w-full bg-black/40 border rounded-2xl py-3.5 pl-11 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 text-sm ${
+                          errors.whatsapp ? "border-red-500/50 focus:ring-red-500/30" : "border-white/10 focus:ring-primary-500/30"
+                        }`}
+                      />
+                    </div>
                   </div>
                   {errors.whatsapp && <p className="text-xs text-red-400 font-bold">{errors.whatsapp}</p>}
                 </div>
@@ -839,11 +923,6 @@ export function NewServiceForm({ initialService, categories = [], subcategories 
                         <p className="text-xs text-zinc-500 mt-2 line-clamp-2 leading-relaxed">{description}</p>
                       )}
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        {tags.split(",").filter(Boolean).slice(0, 3).map(t => (
-                          <span key={t} className="text-[9px] bg-zinc-900 border border-white/5 text-zinc-400 px-2 py-0.5 rounded-md font-bold">
-                            #{t.trim()}
-                          </span>
-                        ))}
                         {videoUrl && (
                           <span className="text-[9px] bg-purple-900/30 border border-purple-500/20 text-purple-400 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
                             <Play className="w-2.5 h-2.5" /> Video
