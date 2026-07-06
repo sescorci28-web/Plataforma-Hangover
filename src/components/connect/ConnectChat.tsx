@@ -96,6 +96,7 @@ export function ConnectChat({
   const isAtBottomRef = useRef(true);
   const [reloadTrigger, setReloadTrigger] = useState(0);
   const activeChatIdRef = useRef<string | null>(null);
+  const [inAppNotification, setInAppNotification] = useState<{ senderName: string; chatUserId: string } | null>(null);
 
   // Find active chat partner profile
   const chatPartner = allProfiles.find((p) => p.id === selectedChatUserId) || null;
@@ -194,17 +195,24 @@ export function ConnectChat({
     fetchChats();
   }, [allProfiles, selectedChatUserId, reloadTrigger]);
 
-  // 2. Fetch real messages for selected conversation & auto-scroll
+  // 2. EFECTO UNIFICADO: Fetch mensajes + Suscripción Realtime por chat activo
+  // Un solo efecto sin race conditions. Cuando cambia selectedChatUserId:
+  // 1) Cancela el canal anterior
+  // 2) Carga mensajes históricos
+  // 3) Abre suscripción Realtime filtrada por chat_id
   useEffect(() => {
-    if (!selectedChatUserId) {
+    if (!selectedChatUserId || !currentUser.id) {
       setMessages([]);
       activeChatIdRef.current = null;
       return;
     }
 
-    const fetchMessages = async () => {
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let aborted = false; // previene actualizaciones de estado si el efecto limpió antes
+
+    const init = async () => {
       try {
-        const supabase = createClient();
         const [userA, userB] = [currentUser.id, selectedChatUserId].sort();
 
         const { data: chatRecord } = await supabase
@@ -214,57 +222,139 @@ export function ConnectChat({
           .eq("user_b_id", userB)
           .maybeSingle();
 
-        if (chatRecord) {
-          // Store active chat ID so the Realtime callback can filter
-          activeChatIdRef.current = chatRecord.id;
+        if (aborted) return;
 
-          const { data: messagesData } = await supabase
-            .from("connect_messages")
-            .select("*")
-            .eq("chat_id", chatRecord.id)
-            .order("created_at", { ascending: true });
-
-          if (messagesData) {
-            setMessages(
-              messagesData.map((m) => ({
-                id: m.id,
-                sender_id: m.sender_id,
-                text: m.message_text,
-                created_at: m.created_at,
-                status: "sent"
-              }))
-            );
-
-            // Force initial scroll to bottom on load
-            setTimeout(() => {
-              if (messagesContainerRef.current) {
-                messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-              }
-            }, 100);
-          }
-        } else {
+        if (!chatRecord) {
           activeChatIdRef.current = null;
           setMessages([]);
+          return;
         }
+
+        const chatId = chatRecord.id;
+        activeChatIdRef.current = chatId;
+
+        // Cargar historial de mensajes
+        const { data: messagesData } = await supabase
+          .from("connect_messages")
+          .select("*")
+          .eq("chat_id", chatId)
+          .order("created_at", { ascending: true });
+
+        if (aborted) return;
+
+        if (messagesData) {
+          setMessages(
+            messagesData.map((m) => ({
+              id: m.id,
+              sender_id: m.sender_id,
+              text: m.message_text,
+              created_at: m.created_at,
+              status: "sent" as const
+            }))
+          );
+          setTimeout(() => {
+            if (messagesContainerRef.current) {
+              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            }
+          }, 100);
+        }
+
+        // Suscripción Realtime para este chat específico
+        // Requiere que connect_messages tenga REPLICA IDENTITY FULL
+        // y esté en la publicación supabase_realtime
+        channel = supabase
+          .channel(`chat-messages:${chatId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "connect_messages",
+              filter: `chat_id=eq.${chatId}`
+            },
+            (payload) => {
+              if (aborted) return;
+              const newMsg = payload.new as any;
+
+              // Ignorar mensajes propios (ya están por actualización optimista)
+              if (newMsg.sender_id === currentUser.id) return;
+
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === newMsg.id)) return prev;
+                return [
+                  ...prev,
+                  {
+                    id: newMsg.id,
+                    sender_id: newMsg.sender_id,
+                    text: newMsg.message_text,
+                    created_at: newMsg.created_at,
+                    status: "sent" as const
+                  }
+                ];
+              });
+
+              // Actualizar preview en la barra lateral
+              setChats((prev) => {
+                const list = [...prev];
+                const idx = list.findIndex((c) => c.id === chatId);
+                if (idx !== -1) {
+                  list[idx].lastMessage = newMsg.message_text;
+                  list[idx].lastMessageTime = new Date(newMsg.created_at).toLocaleTimeString("es-CO", {
+                    hour: "numeric",
+                    minute: "numeric"
+                  });
+                  list[idx].rawLastMsgTime = newMsg.created_at;
+                  list.sort((a, b) => new Date(b.rawLastMsgTime).getTime() - new Date(a.rawLastMsgTime).getTime());
+                }
+                return list;
+              });
+
+              // Auto-scroll o banner de nuevos mensajes
+              if (isAtBottomRef.current) {
+                setTimeout(() => {
+                  if (messagesContainerRef.current) {
+                    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                  }
+                }, 50);
+              } else {
+                setShowNewMessagesBanner(true);
+              }
+            }
+          )
+          .subscribe((status) => {
+            console.log(`[Realtime] chat-messages:${chatId} →`, status);
+          });
       } catch (err) {
-        console.error("Error loading messages:", err);
+        console.error("[ConnectChat] Error initializing chat:", err);
       }
     };
 
-    fetchMessages();
     setShowNewMessagesBanner(false);
+    init();
+
+    return () => {
+      aborted = true;
+      activeChatIdRef.current = null;
+      if (channel) {
+        channel.unsubscribe();
+        supabase.removeChannel(channel);
+        console.log("[Realtime] Channel cleaned up");
+      }
+    };
   }, [selectedChatUserId, currentUser.id]);
 
-  // 3. Real-time PostgreSQL subscription for connect_messages
-  // NOTE: We listen WITHOUT a row-level filter to avoid requiring REPLICA IDENTITY FULL.
-  // Filtering is done inside the callback using activeChatIdRef.
+  // 3. Suscripción global para mensajes en OTROS chats (notificaciones + sidebar)
   useEffect(() => {
     if (!currentUser.id) return;
 
     const supabase = createClient();
 
+    // Escucha todos los INSERT en connect_messages sin filtro de fila.
+    // Para mensajes del chat activo, el efecto #2 ya lo maneja con su canal propio.
+    // Este canal solo procesa mensajes de OTROS chats para actualizar la barra lateral
+    // y mostrar notificaciones in-app.
     const channel = supabase
-      .channel(`realtime-incoming-messages:${currentUser.id}`)
+      .channel(`global-messages:${currentUser.id}`)
       .on(
         "postgres_changes",
         {
@@ -275,80 +365,28 @@ export function ConnectChat({
         (payload) => {
           const newMsg = payload.new as any;
 
-          // Only handle messages from the currently open chat
-          if (newMsg.chat_id !== activeChatIdRef.current) {
-            // Message belongs to a different chat — just trigger sidebar reload
-            setReloadTrigger((prev) => prev + 1);
-            return;
-          }
-
-          // Skip messages sent by the current user (already handled optimistically)
+          // Si pertenece al chat activo, ya fue manejado por el efecto #2
+          if (newMsg.chat_id === activeChatIdRef.current) return;
+          // Si lo envié yo, no notificar
           if (newMsg.sender_id === currentUser.id) return;
 
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [
-              ...prev,
-              {
-                id: newMsg.id,
-                sender_id: newMsg.sender_id,
-                text: newMsg.message_text,
-                created_at: newMsg.created_at,
-                status: "sent" as const
-              }
-            ];
-          });
-
-          // Update sidebar preview for this conversation
+          // Actualizar barra lateral (reodernar y preview)
           setReloadTrigger((prev) => prev + 1);
 
-          // Auto-scroll if user is at bottom, else show "Nuevos mensajes" banner
-          if (isAtBottomRef.current) {
-            setTimeout(() => {
-              if (messagesContainerRef.current) {
-                messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-              }
-            }, 50);
-          } else {
-            setShowNewMessagesBanner(true);
-          }
+          // Mostrar notificación in-app con el nombre del remitente
+          setChats((prev) => {
+            const chat = prev.find((c) => c.id === newMsg.chat_id);
+            if (chat) {
+              const senderName = chat.partner?.full_name || "Alguien";
+              setInAppNotification({ senderName, chatUserId: chat.partner?.id || "" });
+            }
+            return prev;
+          });
         }
       )
       .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          console.log("[Realtime] Subscribed to connect_messages");
-        }
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.warn("[Realtime] Subscription issue:", status);
-        }
+        console.log(`[Realtime] global-messages:${currentUser.id} →`, status);
       });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentUser.id]);
-
-  // 4. Real-time user notifications listener (Sub 3) to reload sidebar chats list
-  useEffect(() => {
-    if (!currentUser.id) return;
-
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`realtime-notifications:${currentUser.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "user_notifications",
-          filter: `user_id=eq.${currentUser.id}`
-        },
-        (payload) => {
-          // Trigger chats list reload
-          setReloadTrigger((prev) => prev + 1);
-        }
-      )
-      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -568,6 +606,46 @@ export function ConnectChat({
 
   return (
     <div className="h-full flex bg-[#050509]/45 relative overflow-hidden">
+
+      {/* IN-APP NOTIFICATION TOAST (mensajes de otros chats) */}
+      {inAppNotification && (
+        <div className="absolute top-4 right-4 z-50 max-w-xs w-full animate-fadeIn">
+          <div className="bg-[#0f0f1a] border border-primary-500/30 rounded-2xl p-4 shadow-2xl shadow-black/60 flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary-600/20 border border-primary-500/20 flex items-center justify-center shrink-0">
+                <MessageSquare className="w-4 h-4 text-primary-400" />
+              </div>
+              <div className="min-w-0 flex-grow">
+                <p className="text-[10px] font-black uppercase tracking-wider text-primary-400 mb-0.5">💬 Nuevo mensaje</p>
+                <p className="text-xs font-bold text-white truncate">de {inAppNotification.senderName}</p>
+              </div>
+              <button
+                onClick={() => setInAppNotification(null)}
+                className="text-zinc-500 hover:text-white shrink-0 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (onSelectUser) onSelectUser(inAppNotification.chatUserId);
+                  setInAppNotification(null);
+                }}
+                className="flex-grow bg-primary-600 hover:bg-primary-500 text-white text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+              >
+                Ver conversación
+              </button>
+              <button
+                onClick={() => setInAppNotification(null)}
+                className="bg-white/5 hover:bg-white/10 text-zinc-400 text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl border border-white/5 transition-all cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* COLUMNA 1: LISTADO DE CHATS OPERATIVOS */}
       <div className={`w-full md:w-80 border-r border-white/5 bg-[#050509]/90 flex flex-col shrink-0 ${
