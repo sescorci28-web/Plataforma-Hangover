@@ -113,6 +113,10 @@ export function ConnectChat({
     return "bg-zinc-500/10 text-zinc-400 border-zinc-550/20";
   };
 
+  const getContactStatus = (id: string) => {
+    return { label: "Disponible en Connect", style: "text-zinc-500 font-bold" };
+  };
+
   // 1. Fetch real chat list for currentUser
   useEffect(() => {
     const fetchChats = async () => {
@@ -535,32 +539,52 @@ export function ConnectChat({
             {/* CHAT HEADER */}
             <div className="p-4 border-b border-white/5 bg-[#09090f]/75 flex items-center justify-between sticky top-0 z-10 shrink-0">
               
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center gap-3.5 min-w-0">
+                {/* Back button for mobile */}
                 <button 
                   onClick={onBack} 
                   className="md:hidden text-zinc-400 hover:text-white shrink-0 p-1 cursor-pointer"
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </button>
-                
-                {chatPartner.avatar_url ? (
-                  <img src={chatPartner.avatar_url} alt={chatPartner.full_name} className="w-9 h-9 rounded-full object-cover border border-white/10" />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-primary-600 flex items-center justify-center text-sm font-bold text-white shrink-0 border border-white/5">
-                    {chatPartner.full_name?.[0].toUpperCase() || "S"}
+
+                {/* LOGO DE HANGOVER UNIFICADO */}
+                <div className="hidden sm:flex items-center gap-1.5 border-r border-white/5 pr-3">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-primary-600 to-accent-650 flex items-center justify-center">
+                    <span className="font-outfit font-black text-white text-xs">H</span>
                   </div>
-                )}
-                
-                <div className="min-w-0">
-                  <h4 className="text-xs font-black uppercase text-white font-outfit truncate">{chatPartner.full_name}</h4>
-                  <span className="text-[9px] font-bold block text-zinc-500 uppercase">
-                    Connect Chat Oficial
-                  </span>
+                  <span className="text-[9px] text-zinc-550 font-black uppercase tracking-wider">Chats</span>
                 </div>
+                
+                <div className="flex items-center gap-3.5 min-w-0">
+                  {chatPartner.avatar_url ? (
+                    <img src={chatPartner.avatar_url} alt={chatPartner.full_name} className="w-9 h-9 rounded-full object-cover border border-white/10 shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-primary-600 flex items-center justify-center text-sm font-bold text-white shrink-0 border border-white/5">
+                      {chatPartner.full_name?.[0].toUpperCase() || "S"}
+                    </div>
+                  )}
+                  
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-black uppercase text-white font-outfit truncate">{chatPartner.full_name}</h4>
+                    <span className={`text-[9px] font-bold block ${getContactStatus(chatPartner.id).style}`}>
+                      {getContactStatus(chatPartner.id).label}
+                    </span>
+                  </div>
+                </div>
+
               </div>
 
-              {/* Panel toggler */}
-              <div className="flex gap-2">
+              {/* Chat action controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => alert(`Buscando archivos compartidos con ${chatPartner.full_name}...`)}
+                  className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-[9px] font-black uppercase tracking-wider text-zinc-300 hover:text-white rounded-xl border border-white/5 transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Archivos</span>
+                </button>
+
                 <button
                   onClick={() => setShowRightPanel(prev => !prev)}
                   className={`px-2.5 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 border ${
@@ -570,7 +594,7 @@ export function ConnectChat({
                   }`}
                 >
                   <Info className="w-3.5 h-3.5" />
-                  <span>Panel Contextual</span>
+                  <span>Información</span>
                 </button>
               </div>
 

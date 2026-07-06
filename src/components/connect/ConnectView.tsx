@@ -322,25 +322,18 @@ export function ConnectView({
         </div>
       )}
 
-      {/* 1. LEFT SIDEBAR NAVIGATION WITH PROFILE SWITCHER */}
+      {/* 1. LEFT SIDEBAR NAVIGATION */}
       <aside className="w-full lg:w-64 border-b lg:border-b-0 lg:border-r border-white/5 bg-[#050509]/60 shrink-0 flex flex-col justify-between p-4 lg:p-5">
         <div className="flex flex-col md:flex-row lg:flex-col gap-4 lg:gap-6 justify-between lg:justify-start items-stretch md:items-center lg:items-stretch w-full">
           
-          {/* MULTI-PROFILE SWITCHER DROPDOWN */}
-          <div className="space-y-1.5 flex-grow md:max-w-xs lg:w-full">
-            <label className="text-[9px] font-black uppercase tracking-wider text-zinc-500 ml-1 block lg:inline">Cambiar Consola Perfil</label>
-            <div className="relative">
-              <select
-                value={currentProfileView}
-                onChange={(e) => setCurrentProfileView(e.target.value as any)}
-                className="w-full bg-[#09090f] border border-white/10 text-white py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wide focus:outline-none cursor-pointer appearance-none select-none"
-              >
-                {/* <option value="social">Perfil Social (Connect)</option> */}
-                <option value="client">Perfil Cliente (Comprar)</option>
-                <option value="provider">Perfil Proveedor (Gigs)</option>
-                <option value="club">Perfil Discoteca (Ops)</option>
-              </select>
-              <span className="absolute right-3.5 top-3 text-[9px] pointer-events-none">▼</span>
+          {/* PREMIUM LOGO HANGOVER */}
+          <div className="flex items-center gap-2.5 pb-2 px-1">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary-600 to-accent-650 flex items-center justify-center shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+              <span className="font-outfit font-black text-white text-base">H</span>
+            </div>
+            <div>
+              <span className="font-outfit font-black tracking-widest text-sm uppercase text-white bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">Hangover</span>
+              <span className="font-outfit font-black uppercase text-[8px] text-primary-400 tracking-widest block mt-0.5">Connect 2.1</span>
             </div>
           </div>
 
@@ -390,48 +383,6 @@ export function ConnectView({
 
       {/* 2. DYNAMIC MAIN CENTRAL AREA */}
       <main className="flex-grow flex flex-col min-h-0 overflow-y-auto bg-black/10">
-        
-        {/* TOP CITY SELECTOR & MOOD SELECTOR BAR */}
-        <header className="p-4 border-b border-white/5 bg-[#050509]/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sticky top-0 z-20 backdrop-blur-md">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-primary-400 shrink-0" />
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="bg-transparent text-sm font-black uppercase text-white font-outfit focus:outline-none cursor-pointer"
-            >
-              <option value="Barranquilla">Barranquilla</option>
-              <option value="Medellín">Medellín</option>
-              <option value="Bogotá">Bogotá</option>
-            </select>
-          </div>
-
-          {/* Active Mood selector */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[9px] text-zinc-500 font-bold uppercase mr-1">Mood Hoy:</span>
-            {[
-              { id: "salir", label: "Quiero salir" },
-              { id: "parche", label: "Busco parche" },
-              { id: "tomar", label: "Quiero tomar algo" },
-              { id: "evento", label: "Busco evento" }
-            ].map((mood) => {
-              const isActive = currentMood === mood.id;
-              return (
-                <button
-                  key={mood.id}
-                  onClick={() => setCurrentMood(isActive ? null : mood.id)}
-                  className={`px-2.5 py-1 rounded-full border text-[9px] font-extrabold uppercase transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-primary-600/10 border-primary-500 text-primary-400"
-                      : "bg-[#09090f] border-white/5 text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  {mood.label}
-                </button>
-              );
-            })}
-          </div>
-        </header>
 
         {/* CONDITIONAL SUBVIEW RENDERING */}
         {activeTab === "feed" && (
