@@ -322,64 +322,7 @@ export function ConnectView({
         </div>
       )}
 
-      {/* 1. LEFT SIDEBAR NAVIGATION */}
-      <aside className="w-full lg:w-64 border-b lg:border-b-0 lg:border-r border-white/5 bg-[#050509]/60 shrink-0 flex flex-col justify-between p-4 lg:p-5">
-        <div className="flex flex-col md:flex-row lg:flex-col gap-4 lg:gap-6 justify-between lg:justify-start items-stretch md:items-center lg:items-stretch w-full">
-          
-          {/* PREMIUM LOGO HANGOVER */}
-          <div className="flex items-center gap-2.5 pb-2 px-1">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary-600 to-accent-650 flex items-center justify-center shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-              <span className="font-outfit font-black text-white text-base">H</span>
-            </div>
-            <div>
-              <span className="font-outfit font-black tracking-widest text-sm uppercase text-white bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">Hangover</span>
-              <span className="font-outfit font-black uppercase text-[8px] text-primary-400 tracking-widest block mt-0.5">Connect 2.1</span>
-            </div>
-          </div>
 
-          <div className="hidden lg:block h-px bg-white/5" />
-
-          {/* Social Navigation Tabs (Simplified MVP: Only Chats) */}
-          <nav className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 gap-1.5 scrollbar-none w-full">
-            {[
-              { id: "messages", label: "Chats", icon: MessageSquare },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setActiveTab("messages");
-                    if (allProfiles.length > 0) {
-                      setSelectedChatUserId(allProfiles[0]?.id || null);
-                    }
-                  }}
-                  className={`whitespace-nowrap px-3.5 py-2.5 rounded-xl text-[10px] lg:text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-colors border cursor-pointer ${
-                    isActive
-                      ? "bg-primary-600/10 text-primary-400 border-primary-500/20"
-                      : "text-zinc-400 border-transparent hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* User Card footer */}
-        <div className="hidden lg:flex items-center gap-3 p-3 bg-zinc-950/40 border border-white/5 rounded-2xl">
-          <div className="w-9 h-9 rounded-full bg-primary-600 flex items-center justify-center text-sm font-black font-outfit text-white">
-            {profile.full_name[0].toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <h5 className="text-[10px] font-black uppercase text-white font-outfit truncate">{profile.full_name}</h5>
-            <span className="text-[8px] text-zinc-500 block">Social Level: Rookie</span>
-          </div>
-        </div>
-      </aside>
 
       {/* 2. DYNAMIC MAIN CENTRAL AREA */}
       <main className="flex-grow flex flex-col min-h-0 overflow-y-auto bg-black/10">

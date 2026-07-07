@@ -764,28 +764,7 @@ export function ConnectChat({
           />
         </div>
 
-        {/* Filters Quick bar */}
-        <div className="px-4 pb-3 border-b border-white/5 flex gap-1.5 overflow-x-auto scrollbar-none shrink-0">
-          {([
-            { id: "all", label: "Todos" },
-            { id: "user", label: "Clientes" },
-            { id: "provider", label: "Proveedores" },
-            { id: "club", label: "Locales" },
-            { id: "staff", label: "Soporte" }
-          ] as const).map(filter => (
-            <button
-              key={filter.id}
-              onClick={() => setActiveFilter(filter.id)}
-              className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all cursor-pointer whitespace-nowrap ${
-                activeFilter === filter.id 
-                  ? "bg-primary-600 border-primary-500 text-white shadow-lg shadow-primary-600/15"
-                  : "bg-white/5 border-transparent text-zinc-400 hover:text-white"
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
+
 
         {/* Chats list */}
         <div className="flex-grow overflow-y-auto p-2 space-y-1 scrollbar-thin">
@@ -891,13 +870,7 @@ export function ConnectChat({
                   <ArrowLeft className="w-4 h-4" />
                 </button>
 
-                {/* LOGO DE HANGOVER UNIFICADO */}
-                <div className="hidden sm:flex items-center gap-1.5 border-r border-white/5 pr-3">
-                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-primary-600 to-accent-650 flex items-center justify-center">
-                    <span className="font-outfit font-black text-white text-xs">H</span>
-                  </div>
-                  <span className="text-[9px] text-zinc-550 font-black uppercase tracking-wider">Chats</span>
-                </div>
+
                 
                 <div className="flex items-center gap-3.5 min-w-0">
                   {chatPartner.avatar_url ? (
