@@ -4,6 +4,9 @@
 -- Habilitar extensión pg_trgm si no está activa
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
+-- Asegurar que la columna city existe en public.profiles para evitar errores en las consultas de búsqueda
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS city TEXT DEFAULT 'Barranquilla';
+
 -- Índices trigram para búsquedas de perfiles (ilike)
 CREATE INDEX IF NOT EXISTS idx_profiles_trgm_name ON public.profiles USING gin (full_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_profiles_trgm_username ON public.profiles USING gin (username gin_trgm_ops);
