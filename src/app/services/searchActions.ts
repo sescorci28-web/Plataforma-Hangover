@@ -43,8 +43,8 @@ export async function searchUniversal(queryText: string) {
     // 4. Query events (eventos)
     const { data: eventosData } = await supabase
       .from("events")
-      .select("id, title, event_date, city, image_url")
-      .or(`title.ilike.${cleanQuery},city.ilike.${cleanQuery}`)
+      .select("id, title, event_date, location, image_url")
+      .or(`title.ilike.${cleanQuery},location.ilike.${cleanQuery}`)
       .limit(5);
 
     // 5. Query services (servicios)

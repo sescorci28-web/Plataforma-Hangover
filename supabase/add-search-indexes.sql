@@ -18,8 +18,9 @@ CREATE INDEX IF NOT EXISTS idx_clubs_trgm_city ON public.clubs USING gin (city g
 
 -- Índices trigram para búsquedas en events (eventos)
 CREATE INDEX IF NOT EXISTS idx_events_trgm_title ON public.events USING gin (title gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS idx_events_trgm_city ON public.events USING gin (city gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_events_trgm_location ON public.events USING gin (location gin_trgm_ops);
 
 -- Índices trigram para búsquedas en services (servicios)
 CREATE INDEX IF NOT EXISTS idx_services_trgm_title ON public.services USING gin (title gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_services_trgm_category ON public.services USING gin (category gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_services_trgm_base_city ON public.services USING gin (base_city gin_trgm_ops);

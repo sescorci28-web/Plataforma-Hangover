@@ -425,10 +425,9 @@ export function GlobalSearch({ userEmail = 'anonymous' }: GlobalSearchProps) {
                   </div>
                 )}
 
-                {/* 🎉 EVENTOS */}
-                {results.eventos.length > 0 && (
+                      {results.eventos.length > 0 && (
                   <div className="space-y-2">
-                    <h6 className="text-[9px] font-black uppercase tracking-widest text-zinc-500 border-b border-white/5 pb-1">🎉 Eventos</h6>
+                    <h6 className="text-[9px] font-black uppercase tracking-widest text-zinc-550 border-b border-white/5 pb-1">🎉 Eventos</h6>
                     <div className="space-y-2">
                       {results.eventos.map(e => {
                         const dateText = new Date(e.event_date).toLocaleDateString('es-CO', {
@@ -439,7 +438,7 @@ export function GlobalSearch({ userEmail = 'anonymous' }: GlobalSearchProps) {
                           e.id, 
                           'evento', 
                           e.title, 
-                          e.city ? `${dateText} • Ciudad: ${e.city}` : dateText, 
+                          e.location ? `${dateText} • Ubicación: ${e.location}` : dateText, 
                           e.image_url, 
                           `/events`, 
                           'Ver Evento'
@@ -663,7 +662,7 @@ export function GlobalSearch({ userEmail = 'anonymous' }: GlobalSearchProps) {
                     <div className="space-y-2.5">
                       <h6 className="text-[9px] font-black uppercase tracking-widest text-zinc-550 border-b border-white/5 pb-1">🎉 Eventos</h6>
                       {results.eventos.map(e => 
-                        renderResultItem(e.id, 'evento', e.title, e.city, e.image_url, `/events`, 'Evento')
+                        renderResultItem(e.id, 'evento', e.title, e.location, e.image_url, `/events`, 'Evento')
                       )}
                     </div>
                   )}
