@@ -155,6 +155,7 @@ export function ConnectView({
 
   // Chat State
   const [selectedChatUserId, setSelectedChatUserId] = useState<string | null>(null);
+  const [viewingProfile, setViewingProfile] = useState<any | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -717,6 +718,7 @@ export function ConnectView({
               eventsList={eventsList}
               onBack={() => setSelectedChatUserId(null)}
               onSelectUser={(uid) => setSelectedChatUserId(uid)}
+              onViewProfile={(partner) => setViewingProfile(partner)}
             />
           </div>
         )}
@@ -949,6 +951,25 @@ export function ConnectView({
                 Cancelar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* 7. VIEW PROFILE MODAL OVERLAY */}
+      {viewingProfile && (
+        <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="max-w-2xl w-full my-auto">
+            <ConnectProfile
+              userProfile={viewingProfile}
+              currentUser={profile}
+              validatedBookings={validatedBookings}
+              allClubs={clubsList}
+              allEvents={eventsList}
+              onOpenChat={(uid) => {
+                setViewingProfile(null);
+                setSelectedChatUserId(uid);
+              }}
+              onClose={() => setViewingProfile(null)}
+            />
           </div>
         </div>
       )}

@@ -45,6 +45,7 @@ interface ChatProps {
   eventsList: any[];
   onBack?: () => void;
   onSelectUser?: (userId: string) => void;
+  onViewProfile?: (profile: any) => void;
 }
 
 interface ChatListItem {
@@ -79,6 +80,7 @@ export function ConnectChat({
   eventsList,
   onBack,
   onSelectUser,
+  onViewProfile,
 }: ChatProps) {
   const [inputText, setInputText] = useState("");
   const [chats, setChats] = useState<ChatListItem[]>([]);
@@ -872,7 +874,12 @@ export function ConnectChat({
 
 
                 
-                <div className="flex items-center gap-3.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => onViewProfile && onViewProfile(chatPartner)}
+                  className="flex items-center gap-3.5 min-w-0 text-left hover:opacity-80 transition-opacity cursor-pointer"
+                  title={`Ver perfil y actividad de ${chatPartner.full_name}`}
+                >
                   {chatPartner.avatar_url ? (
                     <img src={chatPartner.avatar_url} alt={chatPartner.full_name} className="w-9 h-9 rounded-full object-cover border border-white/10 shrink-0" />
                   ) : (
@@ -887,7 +894,7 @@ export function ConnectChat({
                       {getContactStatus(chatPartner.id).label}
                     </span>
                   </div>
-                </div>
+                </button>
 
               </div>
 
