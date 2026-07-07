@@ -7,6 +7,7 @@ import { Menu, X, Wine } from "lucide-react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import { createClient } from "@/lib/supabase/client";
+import { GlobalSearch } from "./GlobalSearch";
 
 interface NavbarProps {
   user: { email: string | undefined; type: string } | null;
@@ -65,6 +66,9 @@ export function Navbar({ user }: NavbarProps) {
               Connect
             </Link>
           </nav>
+
+          {/* Buscador Universal */}
+          <GlobalSearch userEmail={user?.email} />
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-4">

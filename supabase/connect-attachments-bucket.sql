@@ -6,8 +6,8 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('connect-attachments', 'connect-attachments', true)
 ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 
--- Asegurar que RLS esté habilitado en storage.objects
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- Asegurar que RLS esté habilitado en storage.objects (comentado porque Supabase lo maneja por defecto y puede dar error de propietario)
+-- ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- Políticas para connect-attachments
 DROP POLICY IF EXISTS "Permitir lectura pública de archivos de Connect" ON storage.objects;
