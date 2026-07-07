@@ -133,19 +133,69 @@ export default async function UserDashboard() {
     console.error("Error fetching presence:", err);
   }
 
-  // 9. Fetch active chat count
-  let chatCount = 0;
+  // 9. Fetch recent chats with last message & partner profile
+  let recentChats: any[] = [];
   try {
-    const { count } = await supabase
+    const { data: chatsData } = await supabase
       .from("connect_chats")
-      .select("id", { count: "exact", head: true })
-      .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`);
-    chatCount = count || 0;
+      .select("id, user_a_id, user_b_id, created_at")
+      .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
+      .limit(6);
+
+    if (chatsData) {
+      const partnerIds = chatsData.map((c: any) => c.user_a_id === user.id ? c.user_b_id : c.user_a_id);
+      
+      const { data: partnerProfiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, username, avatar_url, role")
+        .in("id", partnerIds);
+
+      for (const chat of chatsData) {
+        const partnerId = chat.user_a_id === user.id ? chat.user_b_id : chat.user_a_id;
+        const partner = partnerProfiles?.find((p: any) => p.id === partnerId);
+        
+        if (partner) {
+          const { data: lastMsg } = await supabase
+            .from("connect_messages")
+            .select("message_text, created_at, sender_id, is_read")
+            .eq("chat_id", chat.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          recentChats.push({
+            id: chat.id,
+            partner,
+            lastMessage: lastMsg?.message_text || "No hay mensajes aún",
+            lastMessageTime: lastMsg?.created_at
+              ? new Date(lastMsg.created_at).toLocaleTimeString("es-CO", { hour: "numeric", minute: "numeric" })
+              : "",
+            rawLastMsgTime: lastMsg?.created_at || chat.created_at,
+            unreadCount: (lastMsg && !lastMsg.is_read && lastMsg.sender_id !== user.id) ? 1 : 0
+          });
+        }
+      }
+    }
+    recentChats.sort((a, b) => new Date(b.rawLastMsgTime).getTime() - new Date(a.rawLastMsgTime).getTime());
   } catch (err) {
-    console.error("Error fetching chat count:", err);
+    console.error("Error fetching recent chats:", err);
   }
 
-  // 10. Fetch pending connection requests count
+  // 10. Fetch user notifications
+  let userNotifications: any[] = [];
+  try {
+    const { data } = await supabase
+      .from("user_notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(6);
+    userNotifications = data || [];
+  } catch (err) {
+    console.error("Error fetching notifications:", err);
+  }
+
+  // 11. Fetch pending connection requests count
   let pendingRequestCount = 0;
   try {
     const { count } = await supabase
@@ -170,8 +220,10 @@ export default async function UserDashboard() {
       initialFavoriteEvents={favoriteEventsIds}
       initialFavoriteServices={favoriteServicesIds}
       presence={presence}
-      chatCount={chatCount}
+      chatCount={recentChats.length}
       pendingRequestCount={pendingRequestCount}
+      recentChats={recentChats}
+      userNotifications={userNotifications}
     />
   );
 }
