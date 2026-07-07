@@ -31,7 +31,8 @@ import {
   ShieldCheck,
   AlertTriangle,
   Loader2,
-  Inbox
+  Inbox,
+  Download
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { updateBookingStatus } from "@/app/services/actions";
@@ -97,6 +98,9 @@ export function ConnectChat({
   const [reloadTrigger, setReloadTrigger] = useState(0);
   const activeChatIdRef = useRef<string | null>(null);
   const [inAppNotification, setInAppNotification] = useState<{ senderName: string; chatUserId: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Find active chat partner profile
   const chatPartner = allProfiles.find((p) => p.id === selectedChatUserId) || null;
@@ -168,10 +172,17 @@ export function ConnectChat({
                 .limit(1)
                 .maybeSingle();
 
+              const text = lastMsg?.message_text || "";
+              const previewText = text.startsWith("[IMAGE]:") 
+                ? "📷 Imagen compartida" 
+                : text.startsWith("[FILE]:") 
+                ? "📁 Archivo compartido" 
+                : text || "No hay mensajes aún";
+
               formattedChats.push({
                 id: chat.id,
                 partner: partnerProfile,
-                lastMessage: lastMsg?.message_text || "No hay mensajes aún",
+                lastMessage: previewText,
                 lastMessageTime: lastMsg?.created_at
                   ? new Date(lastMsg.created_at).toLocaleTimeString("es-CO", { hour: "numeric", minute: "numeric" })
                   : "",
@@ -298,7 +309,12 @@ export function ConnectChat({
                 const list = [...prev];
                 const idx = list.findIndex((c) => c.id === chatId);
                 if (idx !== -1) {
-                  list[idx].lastMessage = newMsg.message_text;
+                  const text = newMsg.message_text || "";
+                  list[idx].lastMessage = text.startsWith("[IMAGE]:")
+                    ? "📷 Imagen compartida"
+                    : text.startsWith("[FILE]:")
+                    ? "📁 Archivo compartido"
+                    : text;
                   list[idx].lastMessageTime = new Date(newMsg.created_at).toLocaleTimeString("es-CO", {
                     hour: "numeric",
                     minute: "numeric"
@@ -452,12 +468,8 @@ export function ConnectChat({
   }, [realBooking?.id]);
 
   // 5. Send message action (with Optimistic Updates)
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const textToSend = inputText.trim();
+  const sendMessageText = async (textToSend: string) => {
     if (!textToSend || !selectedChatUserId) return;
-
-    setInputText(""); // Clear input field immediately
 
     const tempId = `optimistic-${Date.now()}`;
     const optimisticMsg: Message = {
@@ -536,7 +548,11 @@ export function ConnectChat({
             const list = [...prev];
             const idx = list.findIndex((c) => c.id === chatId);
             if (idx !== -1) {
-              list[idx].lastMessage = textToSend;
+              list[idx].lastMessage = textToSend.startsWith("[IMAGE]:") 
+                ? "📷 Imagen compartida" 
+                : textToSend.startsWith("[FILE]:") 
+                ? "📁 Archivo compartido" 
+                : textToSend;
               list[idx].lastMessageTime = new Date(insertedMsg.created_at).toLocaleTimeString("es-CO", {
                 hour: "numeric",
                 minute: "numeric"
@@ -563,6 +579,84 @@ export function ConnectChat({
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, status: "error" } : m))
       );
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const textToSend = inputText.trim();
+    if (!textToSend) return;
+    setInputText(""); // Clear input field immediately
+    await sendMessageText(textToSend);
+  };
+
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>, isImageOnly = false) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedChatUserId) return;
+
+    setIsUploading(true);
+    try {
+      const supabase = createClient();
+      const [userA, userB] = [currentUser.id, selectedChatUserId].sort();
+      
+      // Get or create chat to find ID for storage folder structure
+      let chatId = chats.find((c) => c.partner.id === selectedChatUserId)?.id || "";
+      if (!chatId) {
+        const { data: chatRecord } = await supabase
+          .from("connect_chats")
+          .select("id")
+          .eq("user_a_id", userA)
+          .eq("user_b_id", userB)
+          .maybeSingle();
+        if (chatRecord) {
+          chatId = chatRecord.id;
+        } else {
+          const { data: newChat } = await supabase
+            .from("connect_chats")
+            .insert({ user_a_id: userA, user_b_id: userB })
+            .select("id")
+            .single();
+          if (newChat) chatId = newChat.id;
+        }
+      }
+
+      if (!chatId) throw new Error("No se pudo iniciar el chat.");
+
+      const fileExt = file.name.split('.').pop();
+      const safeName = file.name.replace(/[^a-zA-Z0-9]/g, "_");
+      const fileName = `${safeName}_${Date.now()}.${fileExt}`;
+      const filePath = `${chatId}/${fileName}`;
+
+      // Upload to public Supabase Storage bucket 'connect-attachments'
+      const { error: uploadError } = await supabase.storage
+        .from('connect-attachments')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.warn("Storage upload failed, falling back to base64 encoding:", uploadError);
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64 = reader.result as string;
+          const isImg = file.type.startsWith("image/") || isImageOnly;
+          const msgText = isImg ? `[IMAGE]:${base64}` : `[FILE]:${file.name}:${base64}`;
+          await sendMessageText(msgText);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const { data: { publicUrl } } = supabase.storage
+          .from('connect-attachments')
+          .getPublicUrl(filePath);
+
+        const isImg = file.type.startsWith("image/") || isImageOnly;
+        const msgText = isImg ? `[IMAGE]:${publicUrl}` : `[FILE]:${file.name}:${publicUrl}`;
+        await sendMessageText(msgText);
+      }
+    } catch (err: any) {
+      console.error("Error upload file:", err);
+      alert("Error al adjuntar archivo.");
+    } finally {
+      setIsUploading(false);
+      if (e.target) e.target.value = "";
     }
   };
 
@@ -878,12 +972,53 @@ export function ConnectChat({
                           </div>
                         ) : (
                           /* STANDARD CHAT BUBBLE */
-                          <div className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
+                          <div className={`p-3 rounded-2xl text-xs leading-relaxed ${
                             isOwn
                               ? "bg-primary-600/15 border border-primary-500/25 text-zinc-100 rounded-tr-none shadow-md shadow-primary-950/5"
                               : "bg-[#09090f] border border-white/5 text-zinc-300 rounded-tl-none"
                           }`}>
-                            <p>{msg.text}</p>
+                            {msg.text.startsWith("[IMAGE]:") ? (
+                              <div className="relative group max-w-sm rounded-xl overflow-hidden border border-white/10 bg-black/45 shadow-lg">
+                                <img
+                                  src={msg.text.replace("[IMAGE]:", "")}
+                                  alt="Imagen compartida"
+                                  className="w-full h-auto max-h-64 object-cover cursor-pointer hover:scale-[1.01] transition-transform duration-250"
+                                  onClick={() => window.open(msg.text.replace("[IMAGE]:", ""), "_blank")}
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-white bg-black/60 px-2 py-1 rounded-lg">Ver pantalla completa ↗</span>
+                                </div>
+                              </div>
+                            ) : msg.text.startsWith("[FILE]:") ? (
+                              (() => {
+                                const payload = msg.text.replace("[FILE]:", "");
+                                const colonIdx = payload.indexOf(":");
+                                const fileName = colonIdx !== -1 ? payload.substring(0, colonIdx) : "Archivo";
+                                const fileUrl = colonIdx !== -1 ? payload.substring(colonIdx + 1) : payload;
+                                return (
+                                  <div className="flex items-center gap-3 p-2 bg-black/35 rounded-xl border border-white/5 max-w-xs shadow-inner">
+                                    <div className="w-8 h-8 bg-primary-600/15 rounded-lg flex items-center justify-center text-primary-400 shrink-0">
+                                      <FileText className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0 flex-grow">
+                                      <p className="font-bold text-[10px] text-white truncate">{fileName}</p>
+                                      <span className="text-[8px] text-zinc-500 font-bold block uppercase tracking-wider">Documento</span>
+                                    </div>
+                                    <a
+                                      href={fileUrl}
+                                      download={fileName}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                    </a>
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              <p className="whitespace-pre-line">{msg.text}</p>
+                            )}
                           </div>
                         )}
   
@@ -933,27 +1068,30 @@ export function ConnectChat({
             {/* CHAT INPUT AREA */}
             <form onSubmit={handleSendMessage} className="p-4 border-t border-white/5 bg-[#09090f]/70 sticky bottom-0 flex gap-2 items-center shrink-0">
               
+              {/* Real hidden file inputs */}
+              <input
+                type="file"
+                ref={imageInputRef}
+                accept="image/*"
+                onChange={(e) => handleUploadFile(e, true)}
+                className="hidden"
+              />
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                onChange={(e) => handleUploadFile(e, false)}
+                className="hidden"
+              />
+
               {/* Attachment options list */}
               <div className="flex gap-1.5 shrink-0">
                 
                 <button
                   type="button"
-                  onClick={async () => {
-                    const url = prompt("Introduce el enlace de la imagen o selecciona un archivo (simulado):");
-                    if (url && selectedChatUserId) {
-                      const supabase = createClient();
-                      const [userA, userB] = [currentUser.id, selectedChatUserId].sort();
-                      const { data: chatRecord } = await supabase.from("connect_chats").select("id").eq("user_a_id", userA).eq("user_b_id", userB).maybeSingle();
-                      if (chatRecord) {
-                        await supabase.from("connect_messages").insert({
-                          chat_id: chatRecord.id,
-                          sender_id: currentUser.id,
-                          message_text: `Te compartí un archivo: ${url}`
-                        });
-                      }
-                    }
-                  }}
-                  className="p-2 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl border border-white/5 transition-colors cursor-pointer"
+                  disabled={isUploading}
+                  onClick={() => imageInputRef.current?.click()}
+                  className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 text-zinc-400 hover:text-white rounded-xl border border-white/5 transition-colors cursor-pointer"
                   title="Enviar imagen"
                 >
                   <Paperclip className="w-3.5 h-3.5" />
@@ -961,21 +1099,9 @@ export function ConnectChat({
 
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (selectedChatUserId) {
-                      const supabase = createClient();
-                      const [userA, userB] = [currentUser.id, selectedChatUserId].sort();
-                      const { data: chatRecord } = await supabase.from("connect_chats").select("id").eq("user_a_id", userA).eq("user_b_id", userB).maybeSingle();
-                      if (chatRecord) {
-                        await supabase.from("connect_messages").insert({
-                          chat_id: chatRecord.id,
-                          sender_id: currentUser.id,
-                          message_text: `Te compartí un documento de cronograma: Cronograma_Hangover.pdf`
-                        });
-                      }
-                    }
-                  }}
-                  className="p-2 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl border border-white/5 transition-colors cursor-pointer"
+                  disabled={isUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 text-zinc-400 hover:text-white rounded-xl border border-white/5 transition-colors cursor-pointer"
                   title="Enviar documento"
                 >
                   <FileText className="w-3.5 h-3.5" />
@@ -985,16 +1111,7 @@ export function ConnectChat({
                   type="button"
                   onClick={async () => {
                     if (selectedChatUserId) {
-                      const supabase = createClient();
-                      const [userA, userB] = [currentUser.id, selectedChatUserId].sort();
-                      const { data: chatRecord } = await supabase.from("connect_chats").select("id").eq("user_a_id", userA).eq("user_b_id", userB).maybeSingle();
-                      if (chatRecord) {
-                        await supabase.from("connect_messages").insert({
-                          chat_id: chatRecord.id,
-                          sender_id: currentUser.id,
-                          message_text: `Ubicación compartida: Calle 85 # 11-12, Bogotá (Salón Dulcinea VIP)`
-                        });
-                      }
+                      await sendMessageText(`📍 Ubicación compartida: Calle 85 # 11-12, Bogotá (Salón Dulcinea VIP)`);
                     }
                   }}
                   className="p-2 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl border border-white/5 transition-colors cursor-pointer"
@@ -1005,17 +1122,25 @@ export function ConnectChat({
 
               </div>
 
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Escribe un mensaje privado..."
-                className="flex-1 bg-black/60 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary-500 placeholder:text-zinc-650"
-              />
+              {isUploading ? (
+                <div className="flex-1 bg-black/60 border border-white/10 rounded-xl py-2.5 px-3 flex items-center gap-2 text-xs text-zinc-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary-400" />
+                  <span>Subiendo archivo...</span>
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Escribe un mensaje privado..."
+                  className="flex-1 bg-black/60 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary-500 placeholder:text-zinc-650"
+                />
+              )}
               
               <button
                 type="submit"
-                className="w-9 h-9 rounded-xl bg-primary-600 hover:bg-primary-500 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                disabled={isUploading || !inputText.trim()}
+                className="w-9 h-9 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
               >
                 <Send className="w-4 h-4" />
               </button>
