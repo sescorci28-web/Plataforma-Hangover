@@ -1,3 +1,4 @@
+
 -- Migration: Fix Row-Level Security (RLS) policies for connect_chats
 -- To be run in the Supabase SQL Editor
 

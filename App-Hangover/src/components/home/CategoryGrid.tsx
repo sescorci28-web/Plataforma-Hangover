@@ -1,65 +1,82 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Calendar, Building2, Sparkles, Users } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 
-const CATEGORIES = [
-  {
-    id: 'events',
-    title: 'Eventos',
-    subtitle: 'Cartelera en vivo',
-    icon: Calendar,
-    color: '#818cf8',
-    bgColor: 'rgba(129, 140, 248, 0.1)',
-  },
-  {
-    id: 'clubs',
-    title: 'Discotecas',
-    subtitle: 'Salas y VIP',
-    icon: Building2,
-    color: '#a855f7',
-    bgColor: 'rgba(168, 85, 247, 0.1)',
-  },
-  {
-    id: 'services',
-    title: 'Servicios',
-    subtitle: 'DJs y sonido',
-    icon: Sparkles,
-    color: '#c084fc',
-    bgColor: 'rgba(192, 132, 252, 0.1)',
-  },
-  {
-    id: 'connect',
-    title: 'Connect',
-    subtitle: 'Conecta en vivo',
-    icon: Users,
-    color: '#2dd4bf',
-    bgColor: 'rgba(45, 212, 191, 0.1)',
-  },
+const CATEGORY_PAIRS = [
+  [
+    {
+      id: 'events',
+      title: 'Eventos',
+      subtitle: 'CARTELERA EN VIVO',
+      icon: Calendar,
+      color: '#818cf8',
+      bgColor: 'rgba(129, 140, 248, 0.12)',
+      route: '/events',
+    },
+    {
+      id: 'clubs',
+      title: 'Discotecas',
+      subtitle: 'SALAS Y MESAS VIP',
+      icon: Building2,
+      color: '#a855f7',
+      bgColor: 'rgba(168, 85, 247, 0.12)',
+      route: '/clubs',
+    },
+  ],
+  [
+    {
+      id: 'services',
+      title: 'Servicios',
+      subtitle: 'DJS, SONIDO & SHOWS',
+      icon: Sparkles,
+      color: '#c084fc',
+      bgColor: 'rgba(192, 132, 252, 0.12)',
+      route: '/services',
+    },
+    {
+      id: 'connect',
+      title: 'Connect',
+      subtitle: 'COMUNIDAD EN VIVO',
+      icon: Users,
+      color: '#2dd4bf',
+      bgColor: 'rgba(45, 212, 191, 0.12)',
+      route: '/connect',
+    },
+  ],
 ];
 
 export const CategoryGrid = () => {
+  const router = useRouter();
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerSubtitle}>¿QUÉ DESEAS HACER HOY?</Text>
-        <Text style={styles.headerTitle}>EXPLORA LA NOCHE</Text>
+        <Text style={styles.headerTitle}>Explora la Noche</Text>
       </View>
 
-      <View style={styles.grid}>
-        {CATEGORIES.map((category) => (
-          <TouchableOpacity 
-            key={category.id} 
-            style={styles.card}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: category.bgColor }]}>
-              <category.icon size={20} color={category.color} />
-            </View>
-            <View style={styles.textContainer}>
-              <Text style={styles.subtitle}>{category.subtitle}</Text>
-              <Text style={styles.title}>{category.title}</Text>
-            </View>
-          </TouchableOpacity>
+      <View style={styles.gridContainer}>
+        {CATEGORY_PAIRS.map((rowItems, rowIndex) => (
+          <View key={rowIndex} style={styles.row}>
+            {rowItems.map((category) => (
+              <TouchableOpacity 
+                key={category.id} 
+                style={styles.card}
+                activeOpacity={0.75}
+                onPress={() => router.push(category.route as any)}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: category.bgColor }]}>
+                  <category.icon size={18} color={category.color} />
+                </View>
+
+                <View style={styles.textContainer}>
+                  <Text style={styles.subtitle} numberOfLines={1}>{category.subtitle}</Text>
+                  <Text style={styles.title} numberOfLines={1}>{category.title}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         ))}
       </View>
     </View>
@@ -68,60 +85,63 @@ export const CategoryGrid = () => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
-    paddingVertical: 32,
+    paddingVertical: 16,
+    width: '100%',
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 14,
   },
   headerSubtitle: {
     color: '#818cf8',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'bold',
-    letterSpacing: 2,
-    marginBottom: 4,
+    letterSpacing: 1.5,
+    marginBottom: 2,
   },
   headerTitle: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
-  grid: {
+  gridContainer: {
+    width: '100%',
+  },
+  row: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    width: '100%',
     gap: 12,
+    marginBottom: 12,
   },
   card: {
-    width: '48%',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    flex: 1,
+    backgroundColor: '#18181b',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderRadius: 24,
-    padding: 16,
-    height: 140,
+    borderRadius: 16,
+    padding: 14,
+    height: 104,
     justifyContent: 'space-between',
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   textContainer: {
-    gap: 2,
+    gap: 1,
   },
   subtitle: {
-    color: '#71717a',
-    fontSize: 9,
+    color: '#818cf8',
+    fontSize: 8,
     fontWeight: 'bold',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   title: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 'bold',
   },
 });

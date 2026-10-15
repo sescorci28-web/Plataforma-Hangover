@@ -1,0 +1,35 @@
+# EAS Ignore file
+# Explicitly allowing .env to be packed for EAS builds while excluding build artifacts
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native artifacts
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# Debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+.DS_Store
+*.pem
+
+# Typescript
+*.tsbuildinfo
+
+# Generated native folders
+/ios
+/android

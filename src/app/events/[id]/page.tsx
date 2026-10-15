@@ -559,21 +559,31 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
             {/* 5. LINE-UP / ARTISTAS */}
             {lineupList.length > 0 && (
               <div className="bg-zinc-950/30 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-6">
-                <h3 className="text-xs font-black text-primary-400 font-outfit uppercase tracking-widest flex items-center gap-1.5">
-                  <Users className="w-4.5 h-4.5" /> Line-Up & DJs Invitados
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-primary-400 font-outfit uppercase tracking-widest flex items-center gap-1.5">
+                    <Users className="w-4.5 h-4.5" /> Line-Up & DJs Invitados
+                  </h3>
+                  <span className="text-[10px] text-zinc-500 font-bold">Haz clic en un artista para ver su perfil</span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {lineupList.map((artist: any) => (
-                    <div key={artist.id} className="flex gap-4 p-4 bg-[#07070c]/80 border border-white/5 rounded-2xl">
-                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-900 border border-white/10 shrink-0">
+                    <Link
+                      key={artist.id}
+                      href={`/artists/${artist.id}`}
+                      className="flex gap-4 p-4 bg-[#07070c]/80 border border-white/5 hover:border-primary-500/40 hover:bg-primary-950/20 rounded-2xl transition-all group cursor-pointer"
+                    >
+                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-900 border border-white/10 shrink-0 group-hover:scale-105 transition-transform">
                         <img src={artist.image_url || "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=150"} alt={artist.artist_name} className="w-full h-full object-cover" />
                       </div>
-                      <div className="min-w-0">
-                        <h4 className="font-extrabold text-white text-sm font-outfit truncate">{artist.artist_name}</h4>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <h4 className="font-extrabold text-white text-sm font-outfit truncate group-hover:text-primary-300 transition-colors">{artist.artist_name}</h4>
+                          <span className="text-[9px] font-bold text-primary-400 bg-primary-500/10 px-2 py-0.5 rounded-md border border-primary-500/20">Perfil →</span>
+                        </div>
                         <p className="text-[10px] text-primary-400 font-bold mt-0.5">{artist.performance_time}</p>
                         {artist.description && <p className="text-[10px] text-zinc-400 line-clamp-2 leading-relaxed mt-1">{artist.description}</p>}
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>
@@ -626,9 +636,15 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
 
             {/* 8. ORGANIZADOR */}
             <div className="bg-zinc-950/30 border border-white/5 p-6 sm:p-8 rounded-3xl backdrop-blur-md space-y-5">
-              <h3 className="text-xs font-black text-primary-400 font-outfit uppercase tracking-widest block">Anfitrión Autorizado</h3>
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl border border-white/10 overflow-hidden bg-zinc-900 shrink-0 flex items-center justify-center">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black text-primary-400 font-outfit uppercase tracking-widest block">Anfitrión Autorizado</h3>
+                <span className="text-[10px] text-zinc-500 font-bold">Toca para ver trayectoria</span>
+              </div>
+              <Link
+                href={`/organizers/${(event as any).organizer_id || (event as any).user_id || 'org-1'}`}
+                className="flex items-center gap-4 p-3 rounded-2xl bg-[#07070c]/60 border border-white/5 hover:border-primary-500/30 hover:bg-primary-950/10 transition-all group cursor-pointer"
+              >
+                <div className="w-14 h-14 rounded-2xl border border-white/10 overflow-hidden bg-zinc-900 shrink-0 flex items-center justify-center group-hover:scale-105 transition-transform">
                   {creatorAvatar ? (
                     <img src={creatorAvatar} alt={creatorName} className="w-full h-full object-cover" />
                   ) : (
@@ -637,42 +653,31 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                     </div>
                   )}
                 </div>
-                <div className="min-w-0">
-                  <h4 className="font-extrabold text-white text-base truncate font-outfit">{creatorName}</h4>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-white text-base truncate font-outfit group-hover:text-primary-300 transition-colors">{creatorName}</h4>
+                    <span className="text-[9px] font-bold text-primary-400 bg-primary-500/10 px-2 py-0.5 rounded-md border border-primary-500/20">Perfil →</span>
+                  </div>
                   <p className="text-[11px] text-zinc-400 flex items-center gap-1.5 mt-0.5">
                     <span>📍 {city}</span>
                     <span className="w-1 h-1 rounded-full bg-zinc-700" />
                     <span className="text-amber-400 font-bold">⭐ 4.9 ({organizerEventsCount} eventos)</span>
                   </p>
                 </div>
-              </div>
+              </Link>
               <p className="text-xs text-zinc-400 leading-relaxed italic">
                 "{creatorBio}"
               </p>
               <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
-                {creatorInstagram && (
-                  <a
-                    href={`https://instagram.com/${creatorInstagram.replace('@', '')}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex-1 text-center py-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] font-bold text-zinc-300 hover:text-white hover:bg-white/[0.07] hover:border-white/10 transition-all cursor-pointer"
-                  >
-                    Instagram
-                  </a>
-                )}
-                {creatorTiktok && (
-                  <a
-                    href={`https://tiktok.com/@${creatorTiktok.replace('@', '')}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex-1 text-center py-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] font-bold text-zinc-300 hover:text-white hover:bg-white/[0.07] hover:border-white/10 transition-all cursor-pointer"
-                  >
-                    TikTok
-                  </a>
-                )}
+                <Link
+                  href={`/organizers/${(event as any).organizer_id || (event as any).user_id || 'org-1'}`}
+                  className="flex-1 text-center py-2.5 rounded-xl bg-primary-600/20 border border-primary-500/30 text-xs font-bold text-primary-300 hover:bg-primary-600 hover:text-white transition-all"
+                >
+                  Ver Perfil Completo del Anfitrión →
+                </Link>
                 <Link
                   href={`/services?provider=${encodeURIComponent(creatorName)}`}
-                  className="flex-[1.5] text-center py-2.5 rounded-xl bg-primary-600/10 border border-primary-500/20 text-[11px] font-bold text-primary-300 hover:bg-primary-600/20 hover:border-primary-500/35 transition-all text-center"
+                  className="flex-[1.5] text-center py-2.5 rounded-xl bg-primary-600/10 border border-primary-500/20 text-[11px] font-bold text-primary-300 hover:bg-primary-600/20 hover:border-primary-500/35 transition-all"
                 >
                   Ver Perfil y Servicios
                 </Link>
@@ -983,15 +988,13 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
       </div>
 
       {/* MOBILE FLOATING CTA BAR (MOBILE BOTTOM STICKY BAR) */}
-      {event.ticketing_enabled && (
-        <EventDetailActions
-          eventId={event.id}
-          eventDate={event.event_date}
-          ticketPrice={event.ticket_price}
-          isAuthenticated={Boolean(user)}
-          variant="sticky-bar"
-        />
-      )}
+      <EventDetailActions
+        eventId={event.id}
+        eventDate={event.event_date}
+        ticketPrice={event.ticket_price}
+        isAuthenticated={Boolean(user)}
+        variant="sticky-bar"
+      />
     </div>
   );
 }
