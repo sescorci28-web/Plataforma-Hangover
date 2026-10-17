@@ -1,116 +1,267 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ImageBackground, Image, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  ActivityIndicator,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, MapPin, Clock, Star, BadgeCheck, Share2, Calendar, Ticket, ChevronRight, Sparkles } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Building2, ArrowLeft } from 'lucide-react-native';
 
-import { ClubInfo } from '@/data/mockClubs';
+import { supabase } from '@/lib/supabase';
 import { clubService } from '@/services/club.service';
-import { ClubMenu } from '@/components/clubs/ClubMenu';
 import { eventService } from '@/services/event.service';
 import { EventInfo } from '@/data/mockEvents';
-import { supabase } from '@/lib/supabase';
+import {
+  ClubDetail,
+  ClubMenuItem,
+  ClubTable,
+  ClubConnectStats,
+  ClubBookingItem,
+} from '@/types/club.types';
+import { ClubTheme } from '@/constants/clubTheme';
 
-const formatPrice = (p?: number) => {
-  if (p === undefined || p === null || p === 0) return 'Entrada Libre';
-  return `$${p.toLocaleString('es-CO')}`;
-};
+import { ClubHero } from '@/components/clubs/ClubHero';
+import { ClubNavigationTabs, ProfileTabType } from '@/components/clubs/ClubNavigationTabs';
+import { ClubInfoTab } from '@/components/clubs/ClubInfoTab';
+import { ClubMenuTab } from '@/components/clubs/ClubMenuTab';
+import { ClubEventsTab } from '@/components/clubs/ClubEventsTab';
+import { ClubCommunityTab } from '@/components/clubs/ClubCommunityTab';
+import { ClubBookingsTab } from '@/components/clubs/ClubBookingsTab';
 
 export default function ClubDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const [club, setClub] = useState<ClubInfo | null>(null);
-  const [isLoadingClub, setIsLoadingClub] = useState(true);
+  // Estados de datos
+  const [club, setClub] = useState<ClubDetail | null>(null);
+  const [menuItems, setMenuItems] = useState<ClubMenuItem[]>([]);
   const [events, setEvents] = useState<EventInfo[]>([]);
-  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+  const [tables, setTables] = useState<ClubTable[]>([]);
+  const [connectStats, setConnectStats] = useState<ClubConnectStats>({
+    activeConnectCount: 0,
+    visibleConnectCount: 0,
+    occupancyStatus: 'Baja ocupación',
+    occupancyColor: ClubTheme.colors.success,
+    attendees: [],
+  });
+  const [userBookings, setUserBookings] = useState<ClubBookingItem[]>([]);
 
-  // 1. Cargar datos reales de la discoteca desde Supabase mediante clubService
-  useEffect(() => {
-    let isMounted = true;
+  // Estados de sesión
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userFullName, setUserFullName] = useState('');
 
-    async function loadClub() {
-      if (!id) {
-        setIsLoadingClub(false);
+  // Estados de control de UI
+  const [activeTab, setActiveTab] = useState<ProfileTabType>('info');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // 1. Cargar usuario autenticado
+  const checkAuth = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setIsAuthenticated(true);
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (profile?.full_name) {
+          setUserFullName(profile.full_name);
+        }
+      } else {
+        setIsAuthenticated(false);
+      }
+    } catch {
+      setIsAuthenticated(false);
+    }
+  }, []);
+
+  // 2. Cargar todos los datos reales desde Supabase
+  const loadClubData = useCallback(async (showLoader = false) => {
+    if (!id) {
+      setIsLoading(false);
+      return;
+    }
+
+    if (showLoader) setIsLoading(true);
+
+    try {
+      // 2.1 Cargar información del Club
+      const { club: fetchedClub, error: clubError } = await clubService.getClubDetail(String(id));
+
+      if (clubError || !fetchedClub) {
+        setClub(null);
+        setIsLoading(false);
+        setIsRefreshing(false);
         return;
       }
 
-      setIsLoadingClub(true);
-      try {
-        const { club: fetchedClub, error } = await clubService.getClubById(String(id));
-        if (isMounted) {
-          if (!error && fetchedClub) {
-            setClub(fetchedClub);
-          } else {
-            setClub(null);
-          }
-          setIsLoadingClub(false);
-        }
-      } catch {
-        if (isMounted) {
-          setClub(null);
-          setIsLoadingClub(false);
-        }
-      }
+      setClub(fetchedClub);
+
+      // 2.2 Consultar recursos vinculados
+      const realClubId = fetchedClub.id;
+
+      const [menuRes, tablesRes, eventsRes, statsRes, bookingsRes] = await Promise.all([
+        clubService.getClubMenuItems(realClubId),
+        clubService.getClubTables(realClubId),
+        eventService.getEventsByClubId(realClubId),
+        clubService.getClubConnectStats(realClubId),
+        clubService.getUserClubBookings(realClubId),
+      ]);
+
+      setMenuItems(menuRes.items || []);
+      setTables(tablesRes.tables || []);
+      setEvents(eventsRes.events || []);
+      setConnectStats(statsRes);
+      setUserBookings(bookingsRes || []);
+    } catch (err) {
+      console.error('[ClubDetailScreen] Error cargando datos:', err);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-
-    loadClub();
-
-    return () => {
-      isMounted = false;
-    };
   }, [id]);
 
-  // 2. Cargar eventos reales publicados de esta discoteca
   useEffect(() => {
-    let isMounted = true;
+    checkAuth();
+    loadClubData(true);
+  }, [checkAuth, loadClubData]);
 
-    async function loadClubEvents() {
-      if (!id) {
-        setIsLoadingEvents(false);
-        return;
-      }
+  // 3. Suscripciones Realtime de Supabase para reflejar cambios administrados desde Hangover Business
+  useEffect(() => {
+    if (!club?.id) return;
 
-      setIsLoadingEvents(true);
-      const { events: fetchedEvents, error } = await eventService.getEventsByClubId(String(id));
+    const clubId = club.id;
+    const channelName = `realtime-club-profile-${clubId}`;
 
-      if (isMounted) {
-        if (!error && fetchedEvents) {
-          setEvents(fetchedEvents);
-        } else {
-          setEvents([]);
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'clubs', filter: `id=eq.${clubId}` },
+        () => {
+          loadClubData(false);
         }
-        setIsLoadingEvents(false);
-      }
-    }
-
-    loadClubEvents();
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'club_tables', filter: `club_id=eq.${clubId}` },
+        () => {
+          clubService.getClubTables(clubId).then((res) => {
+            if (res.tables) setTables(res.tables);
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'club_menu_items', filter: `club_id=eq.${clubId}` },
+        () => {
+          clubService.getClubMenuItems(clubId).then((res) => {
+            if (res.items) setMenuItems(res.items);
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings', filter: `club_id=eq.${clubId}` },
+        () => {
+          clubService.getUserClubBookings(clubId).then((res) => {
+            setUserBookings(res);
+          });
+        }
+      )
+      .subscribe();
 
     return () => {
-      isMounted = false;
+      supabase.removeChannel(channel);
     };
-  }, [id]);
+  }, [club?.id, loadClubData]);
 
-  const handleReserve = () => {
-    Alert.alert('Próximamente', 'El flujo de reservas VIP y mesas estará disponible en la próxima versión.');
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    loadClubData(false);
+  }, [loadClubData]);
+
+  const handleBookCover = async () => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Iniciar Sesión Requerido',
+        'Inicia sesión con tu cuenta de usuario para comprar tu entrada de cover.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Iniciar Sesión', onPress: () => router.push('/(auth)/login' as any) },
+        ]
+      );
+      return;
+    }
+
+    if (!club) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    Alert.alert(
+      'Adquirir Entrada de Cover',
+      `¿Deseas confirmar la compra del cover para ${club.name} por $${club.cover_price.toLocaleString('es-CO')} COP para hoy?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar y Adquirir',
+          onPress: async () => {
+            const { success, error } = await clubService.buyClubCover({
+              clubId: club.id,
+              clubSlug: club.slug,
+              providerId: club.provider_id,
+              ownerId: club.owner_id,
+              customerName: userFullName || 'Cliente Hangover',
+              visitDate: todayStr,
+              guestCount: 1,
+              coverPrice: club.cover_price,
+            });
+
+            if (success) {
+              Alert.alert('¡Entrada de Cover Creada!', 'Tu cover ha sido registrado exitosamente. Puedes revisar tu código QR en la sección de Reservas.');
+              loadClubData(false);
+              setActiveTab('bookings');
+            } else {
+              Alert.alert('Error', error || 'No se pudo procesar la solicitud.');
+            }
+          },
+        },
+      ]
+    );
   };
 
-  if (isLoadingClub) {
+  // Render: Cargando
+  if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <ActivityIndicator size="large" color="#818cf8" />
-        <Text style={[styles.loadingText, { marginTop: 12 }]}>Cargando discoteca...</Text>
+      <SafeAreaView style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={ClubTheme.colors.primary} />
+        <Text style={styles.loadingText}>Cargando perfil...</Text>
       </SafeAreaView>
     );
   }
 
+  // Render: Discoteca no encontrada o no publicada
   if (!club) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <Text style={styles.errorText}>Discoteca no encontrada</Text>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>Volver</Text>
+      <SafeAreaView style={styles.centerContainer}>
+        <View style={styles.notFoundCircle}>
+          <Building2 size={30} color={ClubTheme.colors.danger} />
+        </View>
+        <Text style={styles.notFoundTitle}>Discoteca no disponible</Text>
+        <Text style={styles.notFoundSubtitle}>
+          El establecimiento que buscas no existe o no está activo públicamente en la plataforma.
+        </Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={16} color="#ffffff" />
+          <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -118,339 +269,129 @@ export default function ClubDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
-        <ImageBackground source={{ uri: club.imageUrl }} style={styles.heroImage}>
-          <LinearGradient
-            colors={['rgba(2,2,5,0.5)', 'transparent', '#020205']}
-            style={styles.heroGradient}
-          >
-            <SafeAreaView edges={['top']} style={styles.header}>
-              <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
-                <ArrowLeft size={24} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton}>
-                <Share2 size={24} color="#fff" />
-              </TouchableOpacity>
-            </SafeAreaView>
-          </LinearGradient>
-        </ImageBackground>
+      <ScrollView
+        bounces={true}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        stickyHeaderIndices={[1]}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={ClubTheme.colors.primary}
+            colors={[ClubTheme.colors.primary, ClubTheme.colors.accent]}
+          />
+        }
+      >
+        {/* Index 0: PORTADA / HERO LIMPIO */}
+        <ClubHero
+          club={club}
+          onBack={() => router.back()}
+          onSelectTab={(tab) => setActiveTab(tab)}
+          onBookCover={club.cover_price > 0 ? handleBookCover : undefined}
+        />
 
-        <View style={styles.content}>
-          <View style={styles.topBadges}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{club.category.toUpperCase()}</Text>
-            </View>
-            <View style={styles.ratingBadge}>
-              <Star size={14} color="#fbbf24" fill="#fbbf24" />
-              <Text style={styles.ratingText}>{club.rating}</Text>
-            </View>
-          </View>
+        {/* Index 1: NAVEGACIÓN PRINCIPAL (Sticky Header) */}
+        <ClubNavigationTabs
+          activeTab={activeTab}
+          onSelectTab={(tab) => setActiveTab(tab)}
+          eventsCount={events.length}
+          tablesCount={tables.length}
+          menuItemsCount={menuItems.length}
+        />
 
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>{club.name}</Text>
-            {club.verified && <BadgeCheck size={28} color="#38bdf8" fill="#fff" />}
-          </View>
+        {/* Index 2: CONTENIDO SEGÚN LA PESTAÑA ACTIVA */}
+        {activeTab === 'info' && <ClubInfoTab club={club} />}
 
-          <View style={styles.infoBox}>
-            <View style={styles.infoItem}>
-              <Clock size={20} color="#818cf8" />
-              <View>
-                <Text style={styles.infoLabel}>Horarios</Text>
-                <Text style={styles.infoValue}>{club.hours}</Text>
-              </View>
-            </View>
-            <View style={styles.infoDivider} />
-            <View style={styles.infoItem}>
-              <MapPin size={20} color="#818cf8" />
-              <View>
-                <Text style={styles.infoLabel}>Ubicación</Text>
-                <Text style={styles.infoValue}>{club.location}</Text>
-              </View>
-            </View>
-          </View>
+        {activeTab === 'menu' && <ClubMenuTab items={menuItems} />}
 
-          {/* SECCIÓN ACERCA DEL LUGAR */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Acerca del lugar</Text>
-            <Text style={styles.description}>{club.description}</Text>
-          </View>
+        {activeTab === 'events' && (
+          <ClubEventsTab
+            club={club}
+            events={events}
+            onBookCover={club.cover_price > 0 ? handleBookCover : undefined}
+          />
+        )}
 
-          {/* SECCIÓN PRÓXIMOS EVENTOS REALES */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionHeaderTitleGroup}>
-                <Calendar size={20} color="#818cf8" />
-                <Text style={styles.sectionTitle}>Próximos eventos</Text>
-              </View>
-              {events.length > 0 && (
-                <View style={styles.eventCountBadge}>
-                  <Text style={styles.eventCountText}>{events.length}</Text>
-                </View>
-              )}
-            </View>
+        {activeTab === 'community' && (
+          <ClubCommunityTab
+            club={club}
+            stats={connectStats}
+            isAuthenticated={isAuthenticated}
+          />
+        )}
 
-            {isLoadingEvents ? (
-              <View style={styles.eventsLoadingContainer}>
-                <ActivityIndicator size="small" color="#818cf8" />
-                <Text style={styles.eventsLoadingText}>Buscando eventos...</Text>
-              </View>
-            ) : events.length === 0 ? (
-              <View style={styles.emptyEventsBox}>
-                <View style={styles.emptyIconCircle}>
-                  <Sparkles size={24} color="#6366f1" />
-                </View>
-                <Text style={styles.emptyTitle}>No hay eventos próximos</Text>
-                <Text style={styles.emptySubtitle}>
-                  Esta discoteca no tiene eventos programados por el momento. ¡Vuelve pronto para enterarte de nuevas fechas!
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.eventsList}>
-                {events.map((eventItem) => {
-                  const price = eventItem.ticketBatches?.[0]?.price ?? (eventItem as any).ticketPrice ?? 0;
-                  return (
-                    <TouchableOpacity
-                      key={eventItem.id}
-                      activeOpacity={0.8}
-                      onPress={() => router.push(`/events/${eventItem.id}` as any)}
-                      style={styles.eventCard}
-                    >
-                      <Image source={{ uri: eventItem.imageUrl }} style={styles.eventFlyer} />
-                      <View style={styles.eventDetails}>
-                        <View style={styles.eventBadgeRow}>
-                          <View style={styles.eventCategoryBadge}>
-                            <Text style={styles.eventCategoryText}>{eventItem.category}</Text>
-                          </View>
-                          <Text style={styles.eventPriceText}>{formatPrice(price)}</Text>
-                        </View>
-                        <Text style={styles.eventTitle} numberOfLines={1}>
-                          {eventItem.title}
-                        </Text>
-                        <View style={styles.eventMetaRow}>
-                          <Clock size={13} color="#a1a1aa" />
-                          <Text style={styles.eventMetaText} numberOfLines={1}>
-                            {eventItem.date}
-                          </Text>
-                        </View>
-                        <View style={styles.eventMetaRow}>
-                          <MapPin size={13} color="#a1a1aa" />
-                          <Text style={styles.eventMetaText} numberOfLines={1}>
-                            {eventItem.location}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.eventArrowContainer}>
-                        <ChevronRight size={18} color="#818cf8" />
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-
-          {/* SECCIÓN CARTA */}
-          {club.menu && club.menu.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Carta & Precios VIP</Text>
-              <ClubMenu menu={club.menu} />
-            </View>
-          )}
-        </View>
+        {activeTab === 'bookings' && (
+          <ClubBookingsTab
+            club={club}
+            tables={tables}
+            userBookings={userBookings}
+            isAuthenticated={isAuthenticated}
+            userFullName={userFullName}
+            onBookingCreated={() => loadClubData(false)}
+          />
+        )}
       </ScrollView>
-
-      {/* FOOTER DE RESERVA */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.reserveButton} onPress={handleReserve} activeOpacity={0.8}>
-          <Text style={styles.reserveButtonText}>Reservar Mesa VIP</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#020205' },
-  safeArea: { flex: 1, backgroundColor: '#020205', justifyContent: 'center', alignItems: 'center' },
-  errorText: { color: '#fff', fontSize: 18, marginBottom: 16 },
-  loadingText: { color: '#a1a1aa', fontSize: 14 },
-  backText: { color: '#818cf8', fontSize: 16, fontWeight: 'bold' },
-  heroImage: { width: '100%', height: 400 },
-  heroGradient: { flex: 1, justifyContent: 'space-between' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10 },
-  iconButton: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center', alignItems: 'center',
+  container: {
+    flex: 1,
+    backgroundColor: ClubTheme.colors.bg,
   },
-  content: { padding: 20, marginTop: -20 },
-  topBadges: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  badge: {
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 8,
+  scrollContent: {
+    paddingBottom: 80,
   },
-  badgeText: { color: '#818cf8', fontSize: 10, fontWeight: 'bold' },
-  ratingBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 8,
-  },
-  ratingText: { color: '#fbbf24', fontSize: 14, fontWeight: 'bold' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
-  title: { color: '#fff', fontSize: 30, fontWeight: '900', letterSpacing: -1, flex: 1 },
-  infoBox: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 20, padding: 20,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-    marginBottom: 32,
-  },
-  infoItem: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  infoDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginVertical: 16 },
-  infoLabel: { color: '#a1a1aa', fontSize: 12, marginBottom: 4 },
-  infoValue: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  section: { marginBottom: 32 },
-  sectionHeaderRow: {
-    flexDirection: 'row',
+  centerContainer: {
+    flex: 1,
+    backgroundColor: ClubTheme.colors.bg,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  sectionHeaderTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  eventCountBadge: {
-    backgroundColor: 'rgba(99, 102, 241, 0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.4)',
-  },
-  eventCountText: {
-    color: '#818cf8',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  description: { color: '#a1a1aa', fontSize: 14, lineHeight: 24 },
-  eventsLoadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 20,
-  },
-  eventsLoadingText: {
-    color: '#a1a1aa',
-    fontSize: 13,
-  },
-  emptyEventsBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    borderRadius: 16,
     padding: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    gap: 12,
   },
-  emptyIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+  loadingText: {
+    color: ClubTheme.colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  notFoundCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: ClubTheme.colors.dangerLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
   },
-  emptyTitle: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 6,
+  notFoundTitle: {
+    color: ClubTheme.colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
   },
-  emptySubtitle: {
-    color: '#71717a',
+  notFoundSubtitle: {
+    color: ClubTheme.colors.textSecondary,
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
+    maxWidth: 280,
   },
-  eventsList: {
-    gap: 12,
-  },
-  eventCard: {
+  backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: 16,
-    padding: 12,
+    gap: 8,
+    backgroundColor: ClubTheme.colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    gap: 12,
+    borderColor: ClubTheme.colors.border,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: ClubTheme.radii.md,
+    marginTop: 8,
   },
-  eventFlyer: {
-    width: 76,
-    height: 76,
-    borderRadius: 12,
-    backgroundColor: '#18181b',
-  },
-  eventDetails: {
-    flex: 1,
-    gap: 4,
-  },
-  eventBadgeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  eventCategoryBadge: {
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  eventCategoryText: {
-    color: '#818cf8',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  eventPriceText: {
-    color: '#10b981',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  eventTitle: {
+  backButtonText: {
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
   },
-  eventMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  eventMetaText: {
-    color: '#a1a1aa',
-    fontSize: 12,
-    flex: 1,
-  },
-  eventArrowContainer: {
-    paddingLeft: 4,
-  },
-  footer: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#05050A',
-    paddingHorizontal: 24, paddingVertical: 20,
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)',
-    paddingBottom: 36, // SafeArea padding
-  },
-  reserveButton: {
-    backgroundColor: '#818cf8',
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#818cf8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5,
-  },
-  reserveButtonText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
 });
