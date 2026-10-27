@@ -578,71 +578,7 @@ export const ClubInfoTab: React.FC<ClubInfoTabProps> = ({ club }) => {
   return (
     <View style={styles.container}>
       {/* ==================================================================== */}
-      {/* 1. PRESENTACIÓN DEL ESTABLECIMIENTO (COMPACT BRAND HEADER)           */}
-      {/* ==================================================================== */}
-      <View style={styles.cardSurface}>
-        <View style={styles.brandRow}>
-          {club.logo ? (
-            <Image source={{ uri: club.logo }} style={styles.brandLogo} />
-          ) : (
-            <View style={styles.brandLogoPlaceholder}>
-              <Store size={22} color="#9900F0" />
-            </View>
-          )}
-
-          <View style={styles.brandInfoCol}>
-            <Text style={styles.brandName} numberOfLines={1}>
-              {club.name}
-            </Text>
-            <View style={styles.brandSubRow}>
-              <Text style={styles.brandCategory}>{club.club_type || 'Discoteca'}</Text>
-              <Text style={styles.brandDot}>•</Text>
-              <Text style={styles.brandCity}>{club.city || 'Colombia'}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Barra compacta de estado y acceso a fotos */}
-        <View style={styles.brandStatusStrip}>
-          <View
-            style={[
-              styles.liveStatusBadge,
-              club.isOpen ? styles.liveStatusOpen : styles.liveStatusClosed,
-            ]}
-          >
-            <View
-              style={[
-                styles.liveStatusDot,
-                club.isOpen ? styles.liveStatusDotOpen : styles.liveStatusDotClosed,
-              ]}
-            />
-            <Text
-              style={[
-                styles.liveStatusText,
-                club.isOpen ? styles.liveStatusTextOpen : styles.liveStatusTextClosed,
-              ]}
-            >
-              {club.isOpen ? 'Abierto ahora' : 'Cerrado por ahora'}
-            </Text>
-          </View>
-
-          {mediaList.length > 0 && (
-            <TouchableOpacity
-              style={styles.mediaCountBadge}
-              activeOpacity={0.8}
-              onPress={() => openViewerAtIndex(0)}
-            >
-              <Sparkles size={12} color="#FF85B3" />
-              <Text style={styles.mediaCountText}>
-                {mediaList.length} {mediaList.length === 1 ? 'medio' : 'fotos y videos'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* ==================================================================== */}
-      {/* 2. SECCIÓN: SOBRE EL LUGAR                                           */}
+      {/* 1. SECCIÓN: SOBRE EL LUGAR                                           */}
       {/* ==================================================================== */}
       {descriptionText ? (
         <View style={styles.cardSurface}>
