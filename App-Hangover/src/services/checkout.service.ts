@@ -65,7 +65,7 @@ export const checkoutService = {
       // 3. Consultar la fecha (event_date) y datos REALES del evento desde public.events
       const { data: realEvent, error: fetchErr } = await supabase
         .from('events')
-        .select('id, title, event_date, opening_time, ticket_price, creator_id')
+        .select('id, title, event_date, opening_time, ticket_price, creator_id, club_id')
         .eq('id', params.eventId)
         .single();
 
@@ -141,6 +141,7 @@ export const checkoutService = {
       // 7. Construcción del Payload utilizando exclusivamente columnas existentes en public.bookings
       const bookingPayload: any = {
         user_id: user.id,
+        club_id: realEvent.club_id || null,
         event_id: realEvent.id,
         provider_id: realEvent.creator_id || user.id,
         event_name: realEvent.title || 'Evento Hangover',

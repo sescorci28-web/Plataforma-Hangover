@@ -510,8 +510,8 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, height: 24, backgroundColor: 'rgba(255,255,255,0.08)' },
 
   tabsScroll: { gap: 10, marginBottom: 10 },
-  tabButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.03)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  activeTabButton: { backgroundColor: 'rgba(99,102,241,0.2)', borderColor: '#6366f1' },
+  tabButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.03)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 0, borderColor: 'transparent' },
+  activeTabButton: { backgroundColor: 'rgba(99,102,241,0.2)', borderWidth: 0, borderColor: 'transparent' },
   tabText: { color: '#71717a', fontSize: 12, fontWeight: 'bold' },
   activeTabText: { color: '#fff' },
 

@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
-import { X, QrCode, Sparkles, ShieldCheck } from 'lucide-react-native';
+import { X, Sparkles, ShieldCheck } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import QRCode from 'react-native-qrcode-svg';
 
 interface UserQRModalProps {
   visible: boolean;
@@ -66,7 +67,12 @@ export function UserQRModal({
               style={styles.qrGradientBorder}
             >
               <View style={styles.qrWhiteBox}>
-                <QrCode size={180} color="#05020E" />
+                <QRCode
+                  value={displayQrCode}
+                  size={180}
+                  color="#05020E"
+                  backgroundColor="#FFFFFF"
+                />
               </View>
             </LinearGradient>
 

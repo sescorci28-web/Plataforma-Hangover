@@ -104,3 +104,37 @@ export interface ClubBookingItem {
   qr_status: string;
   created_at: string;
 }
+
+export interface VenueOrderItem {
+  id: string;
+  order_id?: string;
+  product_id: string;
+  variant_id?: string | null;
+  product_name: string;
+  variant_name?: string | null;
+  unit_price: number;
+  quantity: number;
+  subtotal: number;
+  notes?: string | null;
+}
+
+export interface VenueOrder {
+  id: string;
+  order_number: string;
+  club_id: string;
+  customer_id?: string | null;
+  user_id?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  status: 'pending' | 'accepted' | 'in_preparation' | 'ready' | 'delivered' | 'completed' | 'cancelled' | 'rejected' | string;
+  total: number;
+  total_amount: number;
+  subtotal?: number;
+  table_or_location: string;
+  notes?: string | null;
+  delivered_at?: string | null;
+  confirmed_at?: string | null;
+  created_at: string;
+  updated_at?: string;
+  items?: VenueOrderItem[];
+}

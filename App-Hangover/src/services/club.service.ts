@@ -7,13 +7,33 @@ import {
   ClubTable,
   ClubConnectStats,
   ClubBookingItem,
+  VenueOrder,
+  VenueOrderItem,
 } from '@/types/club.types';
+import type { VenueAccount, VenueAccountEntry } from '@/types/venueAccount';
 
 const DEFAULT_CLUB_BANNER = 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=800&q=80';
 
 function isUUID(str?: string | null): boolean {
   if (!str) return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
+export function formatCategoryName(category?: string | null): string {
+  if (!category || !category.trim()) return 'General';
+  const clean = category.trim();
+  return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
+}
+
+export function formatProductImageUrl(rawUrl?: string | null): string | null {
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  const { data } = supabase.storage.from('club-media').getPublicUrl(trimmed);
+  return data?.publicUrl || trimmed;
 }
 
 /**
@@ -120,7 +140,12 @@ export function mapSupabaseClubToClubDetail(dbClub: any): ClubDetail {
     tiktok: dbClub.tiktok || null,
     website: dbClub.website || null,
     opening_hours: dbClub.opening_hours || null,
-    isOpen: isClubOpen(dbClub.opening_hours),
+    isOpen:
+      typeof dbClub.is_open === 'boolean'
+        ? dbClub.is_open
+        : typeof dbClub.modules_config?.is_open === 'boolean'
+          ? dbClub.modules_config.is_open
+          : isClubOpen(dbClub.opening_hours),
     rating: typeof dbClub.rating === 'number' ? dbClub.rating : 0,
     reviews_count: typeof dbClub.reviews_count === 'number' ? dbClub.reviews_count : 0,
     hasRealRating,
@@ -275,42 +300,109 @@ export const clubService = {
 
   /**
    * Consulta los productos de la carta reales administrados desde Hangover Business.
+   * Unifica y sincroniza:
+   * 1. public.menu_products (administrada por la APK de Hangover Business)
+   * 2. public.club_menu_items (administrada por el Dashboard Web)
    */
   async getClubMenuItems(clubId: string): Promise<{ items: ClubMenuItem[]; error: string | null }> {
     try {
       if (!clubId) return { items: [], error: null };
 
-      const { data, error } = await supabase
-        .from('club_menu_items')
-        .select('*')
-        .eq('club_id', clubId)
-        .eq('active', true)
-        .order('featured', { ascending: false })
-        .order('category', { ascending: true })
-        .order('name', { ascending: true });
+      const cleanClubId = clubId.trim();
 
-      if (error) {
-        console.error('[clubService] Error al consultar club_menu_items:', error.message);
-        return { items: [], error: error.message };
+      // 1. Consultar productos creados desde la APK de Hangover Business (public.menu_products)
+      const mpPromise = supabase
+        .from('menu_products')
+        .select('id, club_id, name, description, image_url, product_type, base_price, is_available, is_featured, status, display_order, created_at, category:menu_categories(id, name)')
+        .eq('club_id', cleanClubId)
+        .eq('status', 'published');
+
+      // 2. Consultar productos registrados en public.club_menu_items
+      const cmiPromise = supabase
+        .from('club_menu_items')
+        .select('id, club_id, category, name, description, price, image_url, active, featured, available, created_at')
+        .eq('club_id', cleanClubId)
+        .eq('active', true);
+
+      const [mpRes, cmiRes] = await Promise.all([mpPromise, cmiPromise]);
+
+      if (mpRes.error && cmiRes.error) {
+        console.error('[clubService] Error al consultar la carta:', mpRes.error.message, cmiRes.error.message);
+        return { items: [], error: mpRes.error.message || cmiRes.error.message };
       }
 
-      const items: ClubMenuItem[] = (data || []).map((m) => ({
-        id: m.id,
-        club_id: m.club_id,
-        category: m.category || 'General',
-        name: m.name || 'Producto',
-        description: m.description || null,
-        price: Number(m.price || 0),
-        image_url: m.image_url || null,
-        active: Boolean(m.active),
-        featured: Boolean(m.featured),
-        available: m.available !== false, // Por defecto true si no es explícitamente false
-      }));
+      if (mpRes.error) {
+        console.warn('[clubService] Advertencia al consultar menu_products:', mpRes.error.message);
+      }
+      if (cmiRes.error) {
+        console.warn('[clubService] Advertencia al consultar club_menu_items:', cmiRes.error.message);
+      }
 
-      return { items, error: null };
+      // Mapear productos de menu_products (APK Business)
+      const mpItems: ClubMenuItem[] = (mpRes.data || []).map((p: any) => {
+        const rawCategory = p.category?.name || p.product_type || 'General';
+        return {
+          id: p.id,
+          club_id: p.club_id,
+          category: formatCategoryName(rawCategory),
+          name: (p.name || 'Producto').trim(),
+          description: p.description || null,
+          price: Number(p.base_price || 0),
+          image_url: formatProductImageUrl(p.image_url),
+          active: p.status === 'published',
+          featured: Boolean(p.is_featured),
+          available: p.is_available !== false,
+        };
+      });
+
+      // Mapear productos de club_menu_items (Dashboard Web / Legacy)
+      const cmiItems: ClubMenuItem[] = (cmiRes.data || []).map((m: any) => {
+        return {
+          id: m.id,
+          club_id: m.club_id,
+          category: formatCategoryName(m.category),
+          name: (m.name || 'Producto').trim(),
+          description: m.description || null,
+          price: Number(m.price || 0),
+          image_url: formatProductImageUrl(m.image_url),
+          active: Boolean(m.active),
+          featured: Boolean(m.featured),
+          available: m.available !== false,
+        };
+      });
+
+      // Unificación y deduplicación estricta:
+      // Si un producto existe en public.menu_products (autoritativa de Business), se prioriza su ID.
+      // Si un producto de club_menu_items coincide en nombre con uno publicado, se mapea su ID a menu_products.
+      const mpByName = new Map<string, ClubMenuItem>();
+      mpItems.forEach((item) => {
+        mpByName.set(item.name.toLowerCase().trim(), item);
+      });
+
+      const sanitizedCmi: ClubMenuItem[] = [];
+      cmiItems.forEach((cmi) => {
+        const cleanName = cmi.name.toLowerCase().trim();
+        const existingMp = mpByName.get(cleanName);
+        if (existingMp) {
+          // Ya existe en menu_products como publicado; no duplicar
+          return;
+        }
+        sanitizedCmi.push(cmi);
+      });
+
+      const combined = [...mpItems, ...sanitizedCmi];
+
+      // Ordenar: destacados primero, luego categoría, luego nombre
+      combined.sort((a, b) => {
+        if (a.featured !== b.featured) return a.featured ? -1 : 1;
+        if (a.category !== b.category) return a.category.localeCompare(b.category);
+        return a.name.localeCompare(b.name);
+      });
+
+      return { items: combined, error: null };
     } catch (err: any) {
       console.error('[clubService] Error inesperado en getClubMenuItems:', err?.message);
-      return { items: [], error: err?.message };
+      return { items: [], error: err?.message || 'Error inesperado al consultar la carta.' };
     }
   },
 
@@ -518,7 +610,7 @@ export const clubService = {
         number_of_people: params.guestCount,
         total_amount: 0,
         notes: notesParts.join(' | '),
-        status: 'pending',
+        status: 'PENDING',
         qr_code: qrCode,
         qr_status: 'active',
       };
@@ -581,7 +673,7 @@ export const clubService = {
         number_of_people: params.guestCount,
         total_amount: total,
         notes: `Cliente: ${params.customerName.trim()} | Compra de Cover (${params.guestCount} pers. x $${params.coverPrice})`,
-        status: 'pending',
+        status: 'PENDING',
         qr_code: qrCode,
         qr_status: 'active',
       };
@@ -628,7 +720,7 @@ export const clubService = {
         reservation_date: b.reservation_date || b.event_date || '',
         number_of_people: b.number_of_people || 1,
         notes: b.notes || '',
-        status: b.status || 'pending',
+        status: b.status || 'PENDING',
         total_amount: Number(b.total_amount || 0),
         qr_code: b.qr_code,
         qr_status: b.qr_status,
@@ -638,4 +730,661 @@ export const clubService = {
       return [];
     }
   },
+
+  /**
+   * Cancela una solicitud de reserva pendiente del usuario actual en public.bookings.
+   */
+  async cancelUserClubBooking(bookingId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { success: false, error: 'Usuario no autenticado' };
+
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'cancelled' })
+        .eq('id', bookingId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Error al cancelar la reserva' };
+    }
+  },
+
+  /**
+   * Alias de compatibilidad para reserveVIPTable (utilizado por flujos VIP).
+   */
+  async reserveVIPTable(params: {
+    clubId: string;
+    clubSlug?: string;
+    providerId?: string | null;
+    ownerId?: string | null;
+    customerName: string;
+    reservationDate: string;
+    guestCount: number;
+    tableZone?: string;
+    tableNumber?: string;
+    comment?: string;
+  }) {
+    return this.createClubBooking(params);
+  },
+
+  /**
+   * Alias de compatibilidad para reserveCover.
+   */
+  async reserveCover(params: {
+    clubId: string;
+    clubSlug?: string;
+    providerId?: string | null;
+    ownerId?: string | null;
+    customerName: string;
+    visitDate: string;
+    guestCount: number;
+    coverPrice: number;
+  }) {
+    return this.buyClubCover(params);
+  },
+
+  /**
+   * Verifica si el usuario actual tiene presencia activa en la discoteca
+   * o si su entrada QR ya fue validada en puerta para la jornada actual.
+   */
+  async checkUserPresenceInClub(clubId: string): Promise<boolean> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !clubId) return false;
+
+      // 0. Verificar si la discoteca se encuentra actualmente abierta
+      const { data: club } = await supabase
+        .from('clubs')
+        .select('modules_config')
+        .eq('id', clubId)
+        .maybeSingle();
+
+      const isOpen = Boolean(club?.modules_config?.is_open);
+      if (!isOpen) {
+        return false;
+      }
+
+      const now = new Date().toISOString();
+      const lastStatusChange = club?.modules_config?.last_status_change
+        ? new Date(club.modules_config.last_status_change).getTime()
+        : 0;
+
+      // 1. Consultar si existe presencia viva en connect_presence
+      const { data: presence, error: presenceError } = await supabase
+        .from('connect_presence')
+        .select('id, expires_at, status')
+        .eq('user_id', user.id)
+        .eq('club_id', clubId)
+        .maybeSingle();
+
+      if (!presenceError && presence) {
+        if (presence.expires_at && presence.expires_at > now) {
+          // Verificar si la cuenta de la estancia actual ya fue cerrada
+          const { data: latestAccount } = await supabase
+            .from('venue_accounts')
+            .select('status')
+            .eq('user_id', user.id)
+            .eq('club_id', clubId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (latestAccount?.status === 'closed') {
+            return false;
+          }
+
+          return true;
+        }
+      }
+
+      // No se utiliza una compra histórica ni una entrada QR ya usada para reactivar la presencia.
+      // Un nuevo ingreso requiere un nuevo flujo de validación en puerta.
+      return false;
+    } catch (err) {
+      console.error('[clubService.checkUserPresenceInClub] Error:', err);
+      return false;
+    }
+  },
+
+  /**
+   * Crea un pedido en vivo mediante la función segura PostgreSQL create_venue_order.
+   */
+  async createClubVenueOrder(params: {
+    clubId: string;
+    customerName: string;
+    tableOrLocation: string;
+    items: Array<{
+      product_id: string;
+      variant_id?: string | null;
+      quantity: number;
+      notes?: string;
+    }>;
+    customerPhone?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; orderId?: string; orderNumber?: string; totalAmount?: number; error?: string }> {
+    try {
+      if (!params.clubId || !params.tableOrLocation?.trim() || !params.items?.length) {
+        return { success: false, error: 'Faltan datos obligatorios para el pedido (mesa o productos).' };
+      }
+
+      // Validar si la discoteca se encuentra abierta comercialmente
+      const { data: clubRecord } = await supabase
+        .from('clubs')
+        .select('id, modules_config, opening_hours')
+        .eq('id', params.clubId)
+        .maybeSingle();
+
+      if (clubRecord) {
+        const manualIsOpen = clubRecord.modules_config?.is_open;
+        const isCurrentlyOpen =
+          typeof (clubRecord as any).is_open === 'boolean'
+            ? (clubRecord as any).is_open
+            : typeof manualIsOpen === 'boolean'
+              ? manualIsOpen
+              : isClubOpen(clubRecord.opening_hours);
+
+        if (!isCurrentlyOpen) {
+          return {
+            success: false,
+            error: 'La discoteca se encuentra cerrada actualmente. No se pueden emitir nuevos pedidos.',
+          };
+        }
+      }
+
+      // 1. Validar presencia activa en esta discoteca
+      const hasPresence = await this.checkUserPresenceInClub(params.clubId);
+      if (!hasPresence) {
+        // Verificar si el usuario autenticado es personal/dueño del establecimiento para pruebas operativas
+        const { data: { user } } = await supabase.auth.getUser();
+        let isStaffOrOwner = false;
+        if (user) {
+          const { data: clubStaff } = await supabase
+            .from('clubs')
+            .select('owner_id')
+            .eq('id', params.clubId)
+            .maybeSingle();
+          if (clubStaff?.owner_id === user.id) {
+            isStaffOrOwner = true;
+          }
+        }
+
+        if (!isStaffOrOwner) {
+          return {
+            success: false,
+            error: 'Debes contar con un ingreso validado en puerta y presencia activa para realizar pedidos en vivo.',
+          };
+        }
+      }
+
+      // 2. Mapeo defensivo de identificadores:
+      // Si algún product_id proviene de club_menu_items, resolver al id de menu_products
+      const resolvedItems = await Promise.all(
+        params.items.map(async (item) => {
+          // Verificar si el product_id existe directamente en public.menu_products
+          const { data: mp } = await supabase
+            .from('menu_products')
+            .select('id')
+            .eq('id', item.product_id)
+            .eq('club_id', params.clubId)
+            .maybeSingle();
+
+          if (mp?.id) {
+            return item;
+          }
+
+          // Si no está en menu_products, consultar si es de club_menu_items y resolver su contraparte en menu_products
+          const { data: cmi } = await supabase
+            .from('club_menu_items')
+            .select('name')
+            .eq('id', item.product_id)
+            .eq('club_id', params.clubId)
+            .maybeSingle();
+
+          if (cmi?.name) {
+            const { data: matchMp } = await supabase
+              .from('menu_products')
+              .select('id')
+              .eq('club_id', params.clubId)
+              .ilike('name', cmi.name.trim())
+              .eq('status', 'published')
+              .maybeSingle();
+
+            if (matchMp?.id) {
+              return { ...item, product_id: matchMp.id };
+            }
+          }
+
+          return item;
+        })
+      );
+
+      const { data, error } = await supabase.rpc('create_venue_order', {
+        p_club_id: params.clubId,
+        p_customer_name: params.customerName.trim(),
+        p_customer_phone: params.customerPhone?.trim() || null,
+        p_table_or_location: params.tableOrLocation.trim(),
+        p_notes: params.notes?.trim() || null,
+        p_items: resolvedItems.map((i) => ({
+          product_id: i.product_id,
+          variant_id: i.variant_id || null,
+          quantity: i.quantity,
+          notes: i.notes || null,
+        })),
+      });
+
+      if (error) {
+        console.error('[createClubVenueOrder] Error RPC:', error);
+        return { success: false, error: error.message || 'Error al procesar el pedido.' };
+      }
+
+      if (data && data.success) {
+        return {
+          success: true,
+          orderId: data.order_id,
+          orderNumber: data.order_number,
+          totalAmount: Number(data.total_amount || 0),
+        };
+      }
+
+      return {
+        success: false,
+        error: data?.error || 'No se pudo crear el pedido.',
+      };
+    } catch (err: any) {
+      console.error('[createClubVenueOrder] Excepción:', err);
+      return { success: false, error: err?.message || 'Error inesperado al emitir comanda.' };
+    }
+  },
+
+  /**
+   * Consulta los pedidos en vivo del usuario actual en esta discoteca.
+   */
+  async getUserActiveVenueOrders(clubId: string): Promise<VenueOrder[]> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !clubId) return [];
+
+      const { data, error } = await supabase
+        .from('venue_orders')
+        .select(`
+          id,
+          order_number,
+          club_id,
+          customer_id,
+          customer_name,
+          customer_phone,
+          status,
+          total,
+          subtotal,
+          table_or_location,
+          notes,
+          created_at,
+          updated_at,
+          items:venue_order_items (
+            id,
+            order_id,
+            product_id,
+            variant_id,
+            product_name,
+            variant_name,
+            unit_price,
+            quantity,
+            subtotal,
+            notes
+          )
+        `)
+        .eq('club_id', clubId)
+        .eq('customer_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error || !data) {
+        console.warn('[getUserActiveVenueOrders] Error:', error?.message);
+        return [];
+      }
+
+      return data.map((o: any) => {
+        const orderTotal = Number(o.total || o.total_amount || 0);
+        return {
+          id: o.id,
+          order_number: o.order_number,
+          club_id: o.club_id,
+          customer_id: o.customer_id,
+          user_id: o.customer_id,
+          customer_name: o.customer_name,
+          customer_phone: o.customer_phone,
+          status: o.status,
+          total: orderTotal,
+          total_amount: orderTotal,
+          subtotal: Number(o.subtotal || 0),
+          table_or_location: o.table_or_location,
+          notes: o.notes,
+          delivered_at: o.delivered_at || null,
+          confirmed_at: o.confirmed_at || null,
+          created_at: o.created_at,
+          updated_at: o.updated_at,
+          items: (o.items || o.venue_order_items || []).map((it: any) => ({
+            id: it.id,
+            order_id: it.order_id,
+            product_id: it.product_id,
+            variant_id: it.variant_id,
+            product_name: it.product_name,
+            variant_name: it.variant_name,
+            unit_price: Number(it.unit_price || 0),
+            quantity: Number(it.quantity || 1),
+            subtotal: Number(it.subtotal || 0),
+            notes: it.notes,
+          })),
+        };
+      });
+    } catch (err) {
+      console.error('[getUserActiveVenueOrders] Excepción:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Confirma la recepción del pedido por parte del cliente.
+   * Utiliza la función RPC segura 'confirm_venue_order_delivery' con validación de identidad.
+   */
+  async confirmOrderDelivery(orderId: string): Promise<{ success: boolean; error?: string | null }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return { success: false, error: 'Debes iniciar sesión para confirmar la recepción.' };
+      }
+      if (!orderId) {
+        return { success: false, error: 'Identificador de comanda no válido.' };
+      }
+
+      // 1. Llamada a la RPC server-side que valida auth.uid() y estado 'delivered'
+      const { data: rpcData, error: rpcError } = await supabase.rpc('confirm_venue_order_delivery', {
+        p_order_id: orderId,
+      });
+
+      if (!rpcError && rpcData?.success) {
+        return { success: true, error: null };
+      }
+
+      // 2. Si la RPC devolvió un error de validación de negocio, reportarlo
+      if (rpcError && rpcError.message && !rpcError.message.includes('Could not find')) {
+        console.warn('[confirmOrderDelivery] RPC error:', rpcError.message);
+        return { success: false, error: rpcError.message };
+      }
+
+      // 3. Fallback defensivo directo en Supabase
+      const nowIso = new Date().toISOString();
+      let { error: directError } = await supabase
+        .from('venue_orders')
+        .update({
+          status: 'completed',
+          confirmed_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq('id', orderId)
+        .eq('customer_id', user.id)
+        .eq('status', 'delivered');
+
+      // Si falla por columna confirmed_at no existente en schema cache
+      if (directError && directError.message && directError.message.includes('confirmed_at')) {
+        const retry = await supabase
+          .from('venue_orders')
+          .update({
+            status: 'completed',
+            updated_at: nowIso,
+          })
+          .eq('id', orderId)
+          .eq('customer_id', user.id)
+          .eq('status', 'delivered');
+        directError = retry.error;
+      }
+
+      if (directError) {
+        console.error('[confirmOrderDelivery] Error en fallback directo:', directError);
+        return { success: false, error: directError.message || rpcError?.message || 'No se pudo confirmar la entrega.' };
+      }
+
+      // Asegurar que el cargo en la cuenta de estancia se registre incluso en el fallback directo
+      try {
+        await supabase.rpc('record_venue_account_charge_for_order', {
+          p_order_id: orderId,
+        });
+      } catch (chargeErr) {
+        console.warn('[confirmOrderDelivery] Aviso al asentar cargo en fallback:', chargeErr);
+      }
+
+      return { success: true, error: null };
+    } catch (err: any) {
+      console.error('[confirmOrderDelivery] Excepción inesperada:', err);
+      return { success: false, error: err?.message || 'Error al confirmar la comanda.' };
+    }
+  },
+
+  /**
+   * Consulta la cuenta activa de consumo por estancia del usuario y su ledger de movimientos.
+   */
+  async getMyActiveVenueAccount(clubId: string): Promise<{
+    account: VenueAccount | null;
+    entries: VenueAccountEntry[];
+    isClubOpen?: boolean;
+    stayStatus?: string;
+    error: string | null;
+  }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { account: null, entries: [], error: 'No autenticado.' };
+      if (!clubId) return { account: null, entries: [], error: 'ID de discoteca no especificado.' };
+
+      // 1. Intento por RPC autoritativa
+      const { data, error } = await supabase.rpc('get_my_active_venue_account', {
+        p_club_id: clubId,
+      });
+
+      if (!error && data) {
+        return {
+          account: data.account as VenueAccount | null,
+          entries: (data.entries as VenueAccountEntry[]) || [],
+          isClubOpen: data.is_club_open,
+          stayStatus: data.stay_status,
+          error: null,
+        };
+      }
+
+      // 2. Fallback directo en caso de desincronización de esquema
+      const { data: clubData } = await supabase
+        .from('clubs')
+        .select('modules_config')
+        .eq('id', clubId)
+        .maybeSingle();
+
+      const fallbackIsOpen = Boolean(clubData?.modules_config?.is_open);
+
+      const { data: accData, error: accError } = await supabase
+        .from('venue_accounts')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('club_id', clubId)
+        .in('status', ['open', 'pending_payment', 'paid', 'closed'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (accError || !accData) {
+        return { account: null, entries: [], isClubOpen: fallbackIsOpen, error: null };
+      }
+
+      const { data: entData } = await supabase
+        .from('venue_account_entries')
+        .select('*')
+        .eq('account_id', accData.id)
+        .order('created_at', { ascending: false });
+
+      return {
+        account: accData as VenueAccount,
+        entries: (entData as VenueAccountEntry[]) || [],
+        isClubOpen: fallbackIsOpen,
+        error: null,
+      };
+    } catch (err: any) {
+      console.warn('[getMyActiveVenueAccount] Excepción:', err);
+      return { account: null, entries: [], error: err?.message || 'Error al consultar cuenta.' };
+    }
+  },
+
+  /**
+   * Control de salida: finaliza la estancia en la discoteca únicamente si el saldo
+   * calculado por el servidor es exactamente 0.00 COP.
+   * Si hay saldo pendiente, el servidor rechaza la salida y retorna el saldo adeudado.
+   */
+  async finalizeVenueStay(clubId: string): Promise<{
+    success: boolean;
+    code?: string;
+    error?: string;
+    message?: string;
+    balance?: number;
+    closed_at?: string;
+    is_club_closed?: boolean;
+  }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return { success: false, error: 'Debes iniciar sesión para finalizar tu estancia.' };
+      }
+      if (!clubId) {
+        return { success: false, error: 'ID de discoteca no válido.' };
+      }
+
+      const { data, error } = await supabase.rpc('finalize_venue_stay', {
+        p_club_id: clubId,
+      });
+
+      if (error) {
+        console.warn('[finalizeVenueStay] Error RPC:', error.message);
+        return { success: false, error: error.message };
+      }
+
+      return data as {
+        success: boolean;
+        code?: string;
+        error?: string;
+        message?: string;
+        balance?: number;
+        closed_at?: string;
+        is_club_closed?: boolean;
+      };
+    } catch (err: any) {
+      console.error('[finalizeVenueStay] Excepción:', err);
+      return { success: false, error: err?.message || 'Error al procesar la salida.' };
+    }
+  },
+
+  /**
+   * Obtiene la estancia activa del usuario en alguna discoteca (cuenta abierta o presencia confirmada).
+   */
+  async getUserActiveStay(): Promise<{
+    clubId: string;
+    clubName: string;
+    hasActivePresence: boolean;
+    isClubOpen: boolean;
+    hasPendingDebt?: boolean;
+    accountBalance?: number;
+  } | null> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const now = new Date().toISOString();
+
+      // 1. Consultar si el usuario tiene presencia viva confirmada en puerta
+      const { data: presence } = await supabase
+        .from('connect_presence')
+        .select('club_id, status, expires_at, clubs(id, name, modules_config)')
+        .eq('user_id', user.id)
+        .gt('expires_at', now)
+        .order('last_seen_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const hasLivePresence = Boolean(presence?.club_id);
+      const liveClubId = presence?.club_id;
+
+      // 2. Consultar si tiene una cuenta de consumo abierta o con saldo pendiente
+      const { data: account } = await supabase
+        .from('venue_accounts')
+        .select('club_id, balance, status, clubs(id, name, modules_config)')
+        .eq('user_id', user.id)
+        .in('status', ['open', 'pending_payment'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const hasDebt = Number(account?.balance || 0) > 0;
+
+      // Caso 1: Tiene presencia viva en sala (validado en puerta)
+      if (hasLivePresence && liveClubId) {
+        const clubName = (presence.clubs as any)?.name || 'Discoteca Hangover';
+        const clubModulesConfig = (presence.clubs as any)?.modules_config || {};
+        const isClubOpen = Boolean(clubModulesConfig.is_open);
+
+        // Si la discoteca está cerrada, la presencia viva concluye operativamente
+        if (!isClubOpen) {
+          if (hasDebt && account?.club_id === liveClubId) {
+            return {
+              clubId: liveClubId,
+              clubName,
+              hasActivePresence: false,
+              isClubOpen: false,
+              hasPendingDebt: true,
+              accountBalance: Number(account?.balance || 0),
+            };
+          }
+          return null;
+        }
+
+        // Si la cuenta asociada a este local ya está cerrada, la estancia finalizó
+        if (account?.club_id === liveClubId && account?.status === 'closed') {
+          return null;
+        }
+
+        return {
+          clubId: liveClubId,
+          clubName,
+          hasActivePresence: true,
+          isClubOpen: true,
+          hasPendingDebt: hasDebt,
+          accountBalance: Number(account?.balance || 0),
+        };
+      }
+
+      // Caso 2: No tiene presencia viva, pero tiene saldo adeudado pendiente de pago
+      if (hasDebt && account?.club_id) {
+        const clubName = (account.clubs as any)?.name || 'Discoteca Hangover';
+        const clubModulesConfig = (account.clubs as any)?.modules_config || {};
+        const isClubOpen = Boolean(clubModulesConfig.is_open);
+
+        return {
+          clubId: account.club_id,
+          clubName,
+          hasActivePresence: false,
+          isClubOpen,
+          hasPendingDebt: true,
+          accountBalance: Number(account.balance || 0),
+        };
+      }
+
+      // Caso 3: Sin presencia viva y sin deuda -> Sin estancia activa
+      return null;
+    } catch (err) {
+      console.warn('[getUserActiveStay] Error:', err);
+      return null;
+    }
+  },
 };
+
+

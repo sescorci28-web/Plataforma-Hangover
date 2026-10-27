@@ -138,7 +138,7 @@ export const ClubHero: React.FC<ClubHeroProps> = ({
 
           <View style={[styles.statusDot, club.isOpen ? styles.statusDotOpen : styles.statusDotClosed]} />
           <Text style={[styles.statusText, club.isOpen ? styles.statusTextOpen : styles.statusTextClosed]}>
-            {club.isOpen ? 'Abierto hoy' : 'Cerrado ahora'}
+            {club.isOpen ? 'Abierto ahora' : 'Cerrado ahora'}
           </Text>
 
           {club.hasRealRating && (
