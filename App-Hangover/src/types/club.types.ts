@@ -138,3 +138,46 @@ export interface VenueOrder {
   updated_at?: string;
   items?: VenueOrderItem[];
 }
+
+export interface ClubReview {
+  id: string;
+  club_id: string;
+  user_id: string;
+  rating: number;
+  atmosphere?: number;
+  service?: number;
+  music?: number;
+  security?: number;
+  facilities?: number;
+  comment: string | null;
+  recommend?: boolean;
+  created_at: string;
+  booking_id?: string;
+  profiles?: {
+    full_name?: string | null;
+    avatar_url?: string | null;
+    username?: string | null;
+  } | null;
+}
+
+export interface ClubReviewsSummary {
+  reviews: ClubReview[];
+  averageRating: number;
+  totalCount: number;
+  distribution: {
+    1: number;
+    2: number;
+    3: number;
+    4: number;
+    5: number;
+  };
+}
+
+export interface ClubReviewEligibility {
+  authenticated: boolean;
+  hasEntered: boolean;
+  canReview: boolean;
+  alreadyReviewed: boolean;
+  existingReview: ClubReview | null;
+  verifiedBookingId?: string | null;
+}

@@ -37,6 +37,7 @@ import { ClubExperienceTab } from '@/components/clubs/ClubExperienceTab';
 import { ClubEventsTab } from '@/components/clubs/ClubEventsTab';
 import { ClubCommunityTab } from '@/components/clubs/ClubCommunityTab';
 import { ClubBookingsTab } from '@/components/clubs/ClubBookingsTab';
+import { ClubReviewsModal } from '@/components/clubs/ClubReviewsModal';
 
 export default function ClubDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -68,6 +69,8 @@ export default function ClubDetailScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [menuLoading, setMenuLoading] = useState(false);
   const [menuError, setMenuError] = useState<string | null>(null);
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [isFollowingClub, setIsFollowingClub] = useState(false);
 
   // 1. Cargar usuario autenticado
   const checkAuth = useCallback(async () => {
@@ -119,7 +122,7 @@ export default function ClubDetailScreen() {
       // 2.2 Consultar recursos vinculados
       const realClubId = fetchedClub.id;
 
-      const [menuRes, tablesRes, eventsRes, statsRes, bookingsRes, presenceRes, ordersRes] = await Promise.all([
+      const [menuRes, tablesRes, eventsRes, statsRes, bookingsRes, presenceRes, ordersRes, followingRes] = await Promise.all([
         clubService.getClubMenuItems(realClubId),
         clubService.getClubTables(realClubId),
         eventService.getEventsByClubId(realClubId),
@@ -127,6 +130,7 @@ export default function ClubDetailScreen() {
         clubService.getUserClubBookings(realClubId),
         clubService.checkUserPresenceInClub(realClubId),
         clubService.getUserActiveVenueOrders(realClubId),
+        clubService.isUserFollowingClub(realClubId),
       ]);
 
       if (menuRes.error) {
@@ -143,6 +147,7 @@ export default function ClubDetailScreen() {
       setUserBookings(bookingsRes || []);
       setHasActivePresence(Boolean(presenceRes));
       setUserVenueOrders(ordersRes || []);
+      setIsFollowingClub(Boolean(followingRes));
     } catch (err) {
       console.error('[ClubDetailScreen] Error cargando datos:', err);
     } finally {
@@ -616,12 +621,37 @@ export default function ClubDetailScreen() {
           />
         }
       >
-        {/* Index 0: PORTADA / HERO LIMPIO */}
+        {/* Index 0: PORTADA / HERO LIMPIO CON ACCIONES COMPACTAS */}
         <ClubHero
           club={club}
           onBack={() => router.back()}
           onSelectTab={handleSelectTab}
           onBookCover={club.cover_price > 0 ? handleBookCover : undefined}
+          isAuthenticated={isAuthenticated}
+          isFollowing={isFollowingClub}
+          onToggleFollow={async () => {
+            if (!isAuthenticated) {
+              Alert.alert(
+                'Iniciar sesión',
+                'Inicia sesión con tu cuenta para seguir a tus discotecas favoritas y recibir avisos de sus eventos.',
+                [{ text: 'Entendido', style: 'cancel' }]
+              );
+              return;
+            }
+            const previousState = isFollowingClub;
+            const nextFollow = !previousState;
+            setIsFollowingClub(nextFollow);
+            try {
+              const res = await clubService.toggleFollowClub(club.id, previousState);
+              if (!res.success) {
+                setIsFollowingClub(previousState);
+                Alert.alert('No se pudo actualizar', res.error || 'Ocurrió un error al guardar tu preferencia.');
+              }
+            } catch {
+              setIsFollowingClub(previousState);
+            }
+          }}
+          onOpenReviews={() => setShowReviewsModal(true)}
         />
 
         {/* Index 1: NAVEGACIÓN PRINCIPAL (Sticky Header) */}
@@ -722,6 +752,18 @@ export default function ClubDetailScreen() {
           )}
         </Animated.View>
       </ScrollView>
+
+      {/* MODAL DEDICADO DE CALIFICACIONES Y OPINIONES VERIFICADAS */}
+      <ClubReviewsModal
+        visible={showReviewsModal}
+        onClose={() => setShowReviewsModal(false)}
+        clubId={club.id}
+        clubName={club.name}
+        isAuthenticated={isAuthenticated}
+        onReviewSubmitted={() => {
+          loadClubData(false);
+        }}
+      />
     </View>
   );
 }

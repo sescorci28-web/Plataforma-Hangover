@@ -9,6 +9,9 @@ import {
   ClubBookingItem,
   VenueOrder,
   VenueOrderItem,
+  ClubReview,
+  ClubReviewsSummary,
+  ClubReviewEligibility,
 } from '@/types/club.types';
 import type { VenueAccount, VenueAccountEntry } from '@/types/venueAccount';
 
@@ -1383,6 +1386,385 @@ export const clubService = {
     } catch (err) {
       console.warn('[getUserActiveStay] Error:', err);
       return null;
+    }
+  },
+
+  /**
+   * Consulta si el usuario actual sigue a una discoteca.
+   */
+  async isUserFollowingClub(clubId: string): Promise<boolean> {
+    if (!clubId) return false;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { data } = await supabase
+        .from('user_favorite_clubs')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('club_id', clubId)
+        .maybeSingle();
+
+      return Boolean(data);
+    } catch (err) {
+      console.warn('[isUserFollowingClub] Error:', err);
+      return false;
+    }
+  },
+
+  /**
+   * Alterna el estado de seguimiento (seguir / dejar de seguir) con persistencia en Supabase.
+   */
+  async toggleFollowClub(
+    clubId: string,
+    currentFollowing: boolean
+  ): Promise<{ success: boolean; following: boolean; error?: string }> {
+    if (!clubId) return { success: false, following: currentFollowing, error: 'invalid_club' };
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return { success: false, following: currentFollowing, error: 'auth_required' };
+      }
+
+      if (currentFollowing) {
+        // Dejar de seguir
+        const { error } = await supabase
+          .from('user_favorite_clubs')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('club_id', clubId);
+
+        if (error) throw error;
+        return { success: true, following: false };
+      } else {
+        // Seguir
+        const { error } = await supabase
+          .from('user_favorite_clubs')
+          .insert({
+            user_id: user.id,
+            club_id: clubId,
+          });
+
+        if (error && error.code !== '23505') {
+          // Si no es un error de clave duplicada, propagar el fallo
+          throw error;
+        }
+        return { success: true, following: true };
+      }
+    } catch (err: any) {
+      console.error('[toggleFollowClub] Error:', err);
+      return { success: false, following: currentFollowing, error: err?.message || 'Error al cambiar seguimiento' };
+    }
+  },
+
+  /**
+   * Consulta el listado de opiniones públicas, promedio real y distribución de estrellas.
+   */
+  async getClubReviews(clubId: string): Promise<ClubReviewsSummary> {
+    const emptySummary: ClubReviewsSummary = {
+      reviews: [],
+      averageRating: 0,
+      totalCount: 0,
+      distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    };
+
+    if (!clubId) return emptySummary;
+
+    try {
+      const { data, error } = await supabase
+        .from('club_reviews')
+        .select(`
+          id,
+          club_id,
+          user_id,
+          rating,
+          atmosphere,
+          service,
+          music,
+          security,
+          facilities,
+          comment,
+          recommend,
+          created_at,
+          booking_id,
+          profiles (
+            full_name,
+            avatar_url,
+            username
+          )
+        `)
+        .eq('club_id', clubId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('[getClubReviews] Error:', error.message);
+        return emptySummary;
+      }
+
+      const reviews: ClubReview[] = (data || []).map((row: any) => ({
+        id: row.id,
+        club_id: row.club_id,
+        user_id: row.user_id,
+        rating: Number(row.rating || 5),
+        atmosphere: row.atmosphere,
+        service: row.service,
+        music: row.music,
+        security: row.security,
+        facilities: row.facilities,
+        comment: row.comment,
+        recommend: row.recommend,
+        created_at: row.created_at,
+        booking_id: row.booking_id,
+        profiles: row.profiles
+          ? {
+              full_name: row.profiles.full_name || null,
+              avatar_url: row.profiles.avatar_url || null,
+              username: row.profiles.username || null,
+            }
+          : null,
+      }));
+
+      const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      let sum = 0;
+
+      reviews.forEach((r) => {
+        const star = Math.max(1, Math.min(5, Math.round(r.rating))) as 1 | 2 | 3 | 4 | 5;
+        distribution[star] = (distribution[star] || 0) + 1;
+        sum += r.rating;
+      });
+
+      const totalCount = reviews.length;
+      const averageRating = totalCount > 0 ? Number((sum / totalCount).toFixed(1)) : 0;
+
+      return {
+        reviews,
+        averageRating,
+        totalCount,
+        distribution,
+      };
+    } catch (err) {
+      console.error('[getClubReviews] Error:', err);
+      return emptySummary;
+    }
+  },
+
+  /**
+   * Regla Antifraude: Verifica si el usuario actual cumple las condiciones para calificar
+   * (ingreso validado en puerta con QR usado o registro en admission_logs).
+   */
+  async checkUserCanReviewClub(clubId: string): Promise<ClubReviewEligibility> {
+    const unverified: ClubReviewEligibility = {
+      authenticated: false,
+      hasEntered: false,
+      canReview: false,
+      alreadyReviewed: false,
+      existingReview: null,
+      verifiedBookingId: null,
+    };
+
+    if (!clubId) return unverified;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return unverified;
+
+      // 1. Intentar invocar RPC server-side autoritativa si existe
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('check_user_can_review_club', {
+          p_club_id: clubId,
+        });
+
+        if (!rpcErr && rpcRes) {
+          return {
+            authenticated: true,
+            hasEntered: Boolean(rpcRes.has_entered),
+            canReview: Boolean(rpcRes.can_review),
+            alreadyReviewed: Boolean(rpcRes.already_reviewed),
+            existingReview: rpcRes.existing_review || null,
+            verifiedBookingId: rpcRes.verified_booking_id || null,
+          };
+        }
+      } catch {
+        // Fallback a consulta directa si la RPC aún no fue migrada
+      }
+
+      // 2. Fallback de verificación directa
+      // 2.1 Buscar booking con qr_status = 'used'
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('id, qr_status, qr_validated_at, created_at')
+        .eq('user_id', user.id)
+        .eq('club_id', clubId)
+        .eq('qr_status', 'used')
+        .order('qr_validated_at', { ascending: false })
+        .limit(1);
+
+      let verifiedBookingId = bookings?.[0]?.id || null;
+
+      // 2.2 Si no está directo en bookings, buscar en admission_logs con status 'approved'
+      if (!verifiedBookingId) {
+        const { data: admissions } = await supabase
+          .from('admission_logs')
+          .select('id, booking_id, status, bookings!inner(club_id, user_id)')
+          .eq('status', 'approved')
+          .eq('bookings.club_id', clubId)
+          .eq('user_id', user.id)
+          .limit(1);
+
+        if (admissions && admissions.length > 0) {
+          verifiedBookingId = admissions[0].booking_id;
+        }
+      }
+
+      const hasEntered = Boolean(verifiedBookingId);
+
+      // 2.3 Consultar si ya tiene opinión publicada
+      const { data: existingReviewData } = await supabase
+        .from('club_reviews')
+        .select('id, club_id, user_id, rating, comment, created_at, booking_id')
+        .eq('club_id', clubId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      return {
+        authenticated: true,
+        hasEntered,
+        canReview: hasEntered,
+        alreadyReviewed: Boolean(existingReviewData),
+        existingReview: existingReviewData as ClubReview | null,
+        verifiedBookingId,
+      };
+    } catch (err) {
+      console.warn('[checkUserCanReviewClub] Error:', err);
+      return { ...unverified, authenticated: true };
+    }
+  },
+
+  /**
+   * Publica o actualiza una opinión verificada con estrellas (1-5) y comentario opcional.
+   */
+  async submitClubReview(params: {
+    clubId: string;
+    rating: number;
+    comment?: string;
+  }): Promise<{ success: boolean; error?: string; review?: any }> {
+    const { clubId, rating, comment } = params;
+
+    if (!clubId) return { success: false, error: 'Discoteca no especificada.' };
+    if (!rating || rating < 1 || rating > 5) {
+      return { success: false, error: 'La calificación debe ser de 1 a 5 estrellas.' };
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return { success: false, error: 'Debes iniciar sesión para calificar.' };
+      }
+
+      // 1. Intentar primero con RPC server-side autoritativa
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('submit_verified_club_review', {
+          p_club_id: clubId,
+          p_rating: Math.round(rating),
+          p_comment: comment?.trim() || null,
+        });
+
+        if (!rpcErr && rpcRes) {
+          if (!rpcRes.success) {
+            return { success: false, error: rpcRes.error };
+          }
+          return { success: true, review: rpcRes };
+        }
+      } catch {
+        // Fallback a ejecución directa si la RPC no existe aún
+      }
+
+      // 2. Verificación previa de entrada obligatoria (Regla Antifraude)
+      const eligibility = await this.checkUserCanReviewClub(clubId);
+      if (!eligibility.hasEntered || !eligibility.verifiedBookingId) {
+        return {
+          success: false,
+          error:
+            'Puedes consultar todas las opiniones. Para calificar esta discoteca, primero debes haber ingresado y tener una entrada registrada en Hangover.',
+        };
+      }
+
+      const cleanComment = comment?.trim() || null;
+      const cleanRating = Math.max(1, Math.min(5, Math.round(rating)));
+
+      // 3. Upsert de la opinión
+      const payload = {
+        club_id: clubId,
+        user_id: user.id,
+        booking_id: eligibility.verifiedBookingId,
+        rating: cleanRating,
+        atmosphere: cleanRating,
+        service: cleanRating,
+        music: cleanRating,
+        security: cleanRating,
+        facilities: cleanRating,
+        comment: cleanComment,
+        recommend: cleanRating >= 4,
+      };
+
+      if (eligibility.alreadyReviewed && eligibility.existingReview?.id) {
+        const { data: updated, error: updErr } = await supabase
+          .from('club_reviews')
+          .update({
+            rating: cleanRating,
+            atmosphere: cleanRating,
+            service: cleanRating,
+            music: cleanRating,
+            security: cleanRating,
+            facilities: cleanRating,
+            comment: cleanComment,
+            recommend: cleanRating >= 4,
+          })
+          .eq('id', eligibility.existingReview.id)
+          .select()
+          .single();
+
+        if (updErr) throw updErr;
+
+        // Recalcular rating de la discoteca
+        await this.syncClubRatingStats(clubId);
+        return { success: true, review: updated };
+      } else {
+        const { data: inserted, error: insErr } = await supabase
+          .from('club_reviews')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (insErr) throw insErr;
+
+        // Recalcular rating de la discoteca
+        await this.syncClubRatingStats(clubId);
+        return { success: true, review: inserted };
+      }
+    } catch (err: any) {
+      console.error('[submitClubReview] Error:', err);
+      return { success: false, error: err?.message || 'Error al guardar tu calificación.' };
+    }
+  },
+
+  /**
+   * Sincroniza y recalcula el rating promedio y número de opiniones en public.clubs.
+   */
+  async syncClubRatingStats(clubId: string): Promise<void> {
+    if (!clubId) return;
+    try {
+      const summary = await this.getClubReviews(clubId);
+      await supabase
+        .from('clubs')
+        .update({
+          rating: summary.averageRating,
+          reviews_count: summary.totalCount,
+        })
+        .eq('id', clubId);
+    } catch (err) {
+      console.warn('[syncClubRatingStats] Error sincronizando rating:', err);
     }
   },
 };
